@@ -1,0 +1,29 @@
+{% set couponCode = "" %}
+{% set hasCoupon = false %}
+{% for item in data.order.orderItems %}
+    {% if item.typeId == 4 %}
+        {% set hasCoupon = true %}
+        {% for prop in item.properties %}
+            {% if prop.typeId == 18 %}
+                {% set couponCode = prop.value %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+{% endfor %}
+
+<script>
+    var ADT = ADT || {};
+    ADT.Tag = ADT.Tag || {};
+    ADT.Tag.t = 3;
+    ADT.Tag.c = "{{ data.order.amounts[0].currency }}";
+    ADT.Tag.tp = 1964449345;
+    {% if hasCoupon %}
+    ADT.Tag.am = {{ ((data.order.amounts[0].grossTotal - data.order.amounts[0].shippingCostsGross) * 0.20)|number_format(2, '.', '') }};
+    ADT.Tag.cpn = "{{ couponCode }}";
+    {% else %}
+    ADT.Tag.am = {{ (data.order.amounts[0].grossTotal - data.order.amounts[0].shippingCostsGross)|number_format(2, '.', '') }};
+    ADT.Tag.cpn = "";
+    {% endif %}
+    ADT.Tag.ti = "{{ data.order.id }}";
+</script>
+<script defer src="https://to.outlet46.de/jsTag?ap=1963991560"></script>
