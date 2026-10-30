@@ -258,7 +258,7 @@
             {% endif %}
             {% endif %}
             <script> 
-            var pluginPathCeres = "https://cdn02.outlet46.de/plugin/428/ceres";
+            var pluginPathCeres = "{{ plugin_path('Ceres') }}";
             var activeLang = "{{ lang }}";
             var activeLang2 = "{{ lang == 'de' ? '' : '/' ~ lang }}";
              </script>      
@@ -398,25 +398,25 @@
     </div>
 </div>    
             {% if "amazon" in currentRequestUri or "expressCheckoutReview" in currentRequestUri or category.id in mainjs  %}
-               <script src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/jquery-3.7.1.min.js"></script>
-               <script type="text/javascript" src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/main-050525.min.js" defer></script> 
+               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
+               <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/main-050525.min.js" defer></script>
             {% elseif category.id in vuejs %}
-                <script type="text/javascript" src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/vue-060525.min.js" defer></script>
+                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/vue-060525.min.js" defer></script>
             {% elseif currentTemplate in vuePages|keys %} 
-               <script src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/main-050525.min.js" defer></script> 
+               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
+                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/main-050525.min.js" defer></script>
             {% elseif category.id in nojs %}
-               <script src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/main-050525.min.js" defer></script> 
+               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
+                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/main-050525.min.js" defer></script>
             {% elseif category.id or isSearch %}
-               <script src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/cat-050525.min.js" defer></script>
+               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
+                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/cat-050525.min.js" defer></script>
             {% elseif isItem %}
-               <script src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/item-050525.min.js" defer></script>
+               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
+                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/item-050525.min.js" defer></script>
             {% else %} 
-               <script src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="https://cdn02.outlet46.de/plugin/428/guardiansbasic/js/main-050525.min.js" defer></script> 
+               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
+                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/main-050525.min.js" defer></script>
             {% endif %} 
             {{ LayoutContainer.show("Ceres::Script.AfterScriptsLoaded") }} 
             {% if isItem %}
@@ -424,9 +424,9 @@
             {% endif %}
             {% include "GuardiansBasic::PageDesign.Components.cookiebar" %} 
             {% if category.id in wkbkasse %}
-                <link rel="stylesheet" href="https://cdn02.outlet46.de/plugin/428/amazonpaycheckout/css/amazon-pay.min.css" />
+                <link rel="stylesheet" href="{{ plugin_path('AmazonPayCheckout') }}/css/amazon-pay.min.css" />
                 <script src="https://static-eu.payments-amazon.com/checkout.js" defer></script>
-                <script src="https://cdn02.outlet46.de/plugin/428/amazonpaycheckout/js/amazon-pay.min.js"></script>
+                <script src="{{ plugin_path('AmazonPayCheckout') }}/js/amazon-pay.min.js"></script>
             {% endif %}
             {% include "GuardiansBasic::PageDesign.Components.gutschein" ~ langCodeMap[lang] %}
             
