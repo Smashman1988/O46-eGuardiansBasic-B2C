@@ -1,6 +1,6 @@
-# Release Notes für CeresVanilla
+# Release Notes für GuardiansBasic
 
-## Unveröffentlicht (2026-10-30)
+## v1.0.7 (2026-10-30)
 
 ### Geändert
 

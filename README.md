@@ -1,5 +1,22 @@
 # Smashman (Marcel) is the best!
 
+## Versionierung und Baseline
+
+Vorbereitet am 2026-10-30: **GuardiansBasic B2C – Baseline 1.0.7**.
+Die Plugin-Version ist `1.0.7`; für die spätere Veröffentlichung ist `v1.0.7`
+vorgesehen. Die Abnahme im PlentyONE-Test-Pluginset steht noch aus.
+Git-Tag und GitHub-Release werden erst nach erfolgreicher Abnahme erstellt.
+
+Es gilt Semantic Versioning im Schema `MAJOR.MINOR.PATCH`:
+
+- **PATCH:** Fehlerkorrekturen und kleine kompatible Verbesserungen.
+- **MINOR:** Neue, rückwärtskompatible Funktionen.
+- **MAJOR:** Grundlegende oder nicht rückwärtskompatible Änderungen.
+- Die Versionsnummer bei Vorbereitung eines neuen Releases erhöhen, nicht für jeden Commit.
+- `plugin.json` und beide Changelogs bei der Version synchron halten; Datum und Änderungsbeschreibungen beider Changelogs müssen übereinstimmen.
+- GitHub-Versionstags verwenden das Format `vMAJOR.MINOR.PATCH`; jeder freigegebene Release erhält einen eigenen Git-Tag.
+- Git-Tags erst nach erfolgreicher Abnahme erstellen; bestehende Versionstags niemals verändern oder wiederverwenden.
+
 ## Pluginset-unabhängige B2C-Ressourcen (2026-10-30)
 
 Eigene Ressourcen verwenden in Twig `plugin_path('GuardiansBasic')`; der Name ist
