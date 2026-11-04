@@ -1,5 +1,5 @@
 {# ======================  shipping-free-meter.twig  ====================== #}
-{% set FREE_LIMITS  = { 'DE': 49.00 } %}
+{% set FREE_LIMITS  = { 'DE': 54.00 } %}
 {% set FREE_LIMIT   = FREE_LIMITS['DE'] %}
 {% set currencyData = services.checkout.getCurrencyData %}
 {% set currencyCode = currencyData.name %}
@@ -87,7 +87,7 @@
       txt.textContent = 'Noch ' + money(remaining,cur) + ' bis versandkostenfrei (ab ' + money(limit,cur) + ' in DE).';
     } else {
       box.classList.add('o46-free-ship--done');
-      txt.textContent = 'Yeah! Dein Einkauf ist versandkostenfrei. (ab 49,00 € in DE)';
+      txt.textContent = 'Yeah! Dein Einkauf ist versandkostenfrei. (ab 54,00 € in DE)';
     }
   }
 
