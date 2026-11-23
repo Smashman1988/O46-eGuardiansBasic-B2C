@@ -208,9 +208,9 @@ async function scenario(browser, version, lang, mobile) {
         await page.locator('#outside').focus(); await page.locator('#outside').press('Escape');
         check('Escape bubbles without preventDefault, including outside input', await page.evaluate(() =>
             [escapes.length > 5, escapes.every(e => !e.prevented), escapes.at(-1).target]), [true, true, 'outside']);
-        check('language API contract unchanged', await page.evaluate(() => pending.every(request =>
-            request.url === '/rest/io/item/search/autocomplete/' &&
-            JSON.stringify(request.params.types) === JSON.stringify(['item', 'category', 'suggestion']))), true);
+        check('language API contract', await page.evaluate(english => pending.every(request =>
+            request.url === (english ? '/rest/guardiansbasic/item/search/autocomplete/' : '/rest/io/item/search/autocomplete/') &&
+            JSON.stringify(request.params.types) === JSON.stringify(english ? ['item', 'suggestion'] : ['item', 'category', 'suggestion'])), ['it','es'].includes(lang)), true);
         check('idempotent initialization keeps one keyboard/input listener', await page.evaluate(() => ['header', 'missing'].map(id => {
             const events = $._data(document.getElementById(id), 'events'); return [events.keydown.length, events.input.length];
         })), [[1, 1], [1, 1]]);

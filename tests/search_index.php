@@ -37,7 +37,7 @@ namespace Plenty\Plugin\Templates { class Twig { public function addExtension($c
 namespace Plenty\Plugin\Log { trait Loggable {} }
 namespace Plenty\Plugin\Events { class Dispatcher {
     public $listeners=[];
-    public function listen($name,$fn,$priority=0) { $this->listeners[$name]=$fn; }
+    public function listen($name,$fn,$priority=0) { $this->listeners[$name][$priority][]=$fn; }
     public function hasListeners($name) { return isset($this->listeners[$name]); }
 } }
 namespace Plenty\Plugin\Http {
@@ -50,6 +50,7 @@ namespace IO\Api {
     class ResponseCode { const OK=200, BAD_REQUEST=400; }
 }
 namespace IO\Helper {
+    class Utils { public static function getWebstoreId(){return 1;} }
     interface ContextInterface {}
     class TemplateContainer { public $context=\Ceres\Contexts\ItemSearchContext::class; public function setContext($class){$this->context=$class;} }
 }
@@ -57,7 +58,10 @@ namespace Plenty\Plugin\Templates\Extensions { class Twig_Extension {} }
 namespace IO\Services {
     class TemplateService { public static $currentTemplateData = []; }
     class TemplateConfigService { public function getInteger($key){return 0;} }
-    class CategoryService {}
+    class CategoryService {
+        public function get($id,$language='de') { return (object)['id'=>$id,'branch'=>null,'details'=>[(object)['name'=>$language.' Home','imagePath'=>'/brand.jpg']]]; }
+        public function isVisibleForWebstore($category,$store,$language) { return $store===1 && $category->id===4103; }
+    }
 }
 namespace Ceres\Helper { class SearchOptions {
     const SCOPE_SEARCH='search', SCOPE_CATEGORY='category';
@@ -75,6 +79,13 @@ namespace Ceres\Contexts { class CategoryContext implements \IO\Helper\ContextIn
 namespace Plenty\Modules\Webshop\Contracts {
     class LocalizationRepositoryContract { public $lang='de'; public function getLanguage(){return $this->lang;} }
     class UrlBuilderRepositoryContract {
+        public function buildCategoryUrl($id,$lang,$store) {
+            $targets=json_decode(file_get_contents(__DIR__.'/fixtures/home-living.json'),true);
+            return new class($targets[$lang][$id]) {
+                public function __construct(private string $url) {}
+                public function toRelativeUrl($prefix){return $this->url;}
+            };
+        }
         public function buildVariationUrl($id,$vid,$lang){return new \SearchTest\Url($lang,$id);}
         public function getSuffix($id,$vid,$withVariation){return '';}
     }
@@ -121,6 +132,8 @@ namespace Plenty\Modules\Webshop\ItemSearch\Services { class ItemSearchService {
 } }
 namespace {
     use Ceres\Contexts\ItemSearchContext;
+    use GuardiansBasic\Contexts\EnglishTextSearchContext;
+    use GuardiansBasic\Services\EnglishTextSearch;
     use IO\Services\ItemSearchAutocompleteService;
     use Plenty\Modules\Webshop\Contracts as Shop;
     use Plenty\Modules\Webshop\ItemSearch\SearchPresets as Presets;
@@ -131,7 +144,7 @@ namespace {
     $assertions=0; $objects=[];
     function pluginApp($class) {
         global $objects;
-        if ($class===ItemSearchAutocompleteService::class) {
+        if ($class===ItemSearchAutocompleteService::class || $class===\GuardiansBasic\Services\SearchAutocompleteService::class) {
             return new $class(pluginApp(Shop\UrlBuilderRepositoryContract::class),pluginApp(Shop\LocalizationRepositoryContract::class),pluginApp(Shop\WebstoreConfigurationRepositoryContract::class));
         }
         return $objects[$class] ??= new $class();
@@ -147,26 +160,36 @@ namespace {
     require $argv[2].'/src/Api/Resources/ItemSearchAutocompleteResource.php';
     $src=dirname(__DIR__).'/src/';
     require $src.'Helper/SeoPage.php';
-    foreach (['Extensions/Base_Extension','Providers/GuardiansBasicServiceProvider','Resources/FacetResource'] as $name) require $src.$name.'.php';
+    foreach (['Extensions/Base_Extension','Services/EnglishTextSearch','Services/SearchAutocompleteService','Contexts/EnglishTextSearchContext','Providers/GuardiansBasicServiceProvider','Resources/FacetResource','Resources/SearchAutocompleteResource'] as $name) require $src.$name.'.php';
     $provider=new \GuardiansBasic\Providers\GuardiansBasicServiceProvider();
     $provider->register();
     $events=pluginApp(\Plenty\Plugin\Events\Dispatcher::class);
     $provider->boot(new \Plenty\Plugin\Templates\Twig(),$events,new \Plenty\Plugin\ConfigRepository());
     $req=pluginApp(Request::class);
     $facetRoute=new \GuardiansBasic\Resources\FacetResource($req,new \IO\Api\ApiResponse());
-    $suggestRoute=new \IO\Api\Resources\ItemSearchAutocompleteResource($req,new \IO\Api\ApiResponse());
+    $suggestRoute=new \GuardiansBasic\Resources\SearchAutocompleteResource($req,new \IO\Api\ApiResponse());
     $engine=pluginApp(ItemSearchService::class);
     $locale=pluginApp(Shop\LocalizationRepositoryContract::class);
     $langs=['de','en','fr','it','es'];
-    $terms=['adidas','nike','shoes','9885396','2351296','0002','zzqnohits426xyz'];
+    $terms=['adidas','nike','shoes','9885396','2351296','0002','4251846255291','zzqnohits426xyz'];
+    foreach ([['id'=>60],(object)['id'=>'60'],['id'=>61]] as $category) {
+        \IO\Services\TemplateService::$currentTemplateData=['category'=>$category];
+        $container=new \IO\Helper\TemplateContainer();
+        $listeners=$events->listeners['IO.ctx.category.item'];
+        krsort($listeners);
+        foreach ($listeners as $group) foreach ($group as $listener) { if ($listener($container) === false) break 2; }
+        $id=is_array($category)?$category['id']:$category->id;
+        check(($container->context === \Ceres\Contexts\CategoryContext::class) === ((int)$id === 60),'plain Ceres context only for brand directory');
+    }
     $browserFixture=[];
     foreach ($langs as $lang) {
-        $locale->lang=$lang;
+        $locale->lang=$lang; $english=in_array($lang,['it','es'],true);
         $container=new \IO\Helper\TemplateContainer();
         \IO\Services\TemplateService::$currentTemplateData = ['page'=>2];
-        $events->listeners['IO.ctx.search']($container);
+        $listeners=$events->listeners['IO.ctx.search']; krsort($listeners);
+        foreach ($listeners as $group) foreach ($group as $listener) { if ($listener($container) === false) break 2; }
         check(\IO\Services\TemplateService::$currentTemplateData['itemsPerPage']===12,'native search page size');
-        check($container->context===ItemSearchContext::class,'context selection '.$lang);
+        check($container->context===($english?EnglishTextSearchContext::class:ItemSearchContext::class),'context selection '.$lang);
         foreach ($terms as $q) {
             $opts=['query'=>$q,'facets'=>'376,727','page'=>2,'itemsPerPage'=>12,'sorting'=>'sorting.price.avg_asc','priceMin'=>3.50,'priceMax'=>9];
             $req->data=$opts;
@@ -186,8 +209,13 @@ namespace {
                 check($call['itemList']->preset===Presets\SearchItems::class && $call['facets']->preset===Presets\Facets::class,'native presets');
                 check($call['itemList']->options['facets']==='376,727' && $call['facets']->options['facets']==='376,727','active facets');
                 check($call['itemList']->options['priceMin']===3.50 && $call['itemList']->options['priceMax']===9,'item price range');
-                check($call['itemList']->options['query']===$q && $call['facets']->options['query']===$q &&
-                    $call['itemList']->text===null && $call['facets']->text===null,'native query for items and facets');
+                if ($english) {
+                    check($call['itemList']->options['query']==='' && !isset($call['facets']->options['query']),'neutral native bases');
+                    check($call['itemList']->text===[$q,'en','and'] && $call['facets']->text===$call['itemList']->text,'matching text and operator');
+                    check($call['facets']->prices===[3.5,9.0],'facet price range');
+                } else {
+                    check($call['itemList']->options['query']===$q && $call['itemList']->text===null,'unchanged native query');
+                }
             }
             $req->data=['query'=>$q,'types'=>['item','category','suggestion']];
             $engine->calls=[]; $engine->next=[['items'=>['documents'=>$docs,'categories.all'=>[]],'suggestions'=>['searchSuggestions'=>$none?[]:[$q=>3]]]];
@@ -195,9 +223,14 @@ namespace {
             $browserFixture[]=['l'=>$lang,'q'=>$q,'ac'=>$ac,'facet'=>['id'=>$opts['facets'],'total'=>$facet['itemList']['total']]];
             check(count($engine->calls)===1 && $locale->lang===$lang,'autocomplete batch and locale');
             $call=$engine->calls[0];
-            check($call['suggestions']->preset===Presets\SearchSuggestions::class && $call['items']->options['query']===$q &&
-                $call['items']->options['withCategories']===true && $call['items']->options['autocomplete']===true &&
-                $call['items']->text===null,'native autocomplete with category aggregation');
+            if ($english) {
+                check(($call['items']->options['autocomplete'] ?? false) === true,'autocomplete preset selected before factory construction');
+                check($call['items']->defaultImage,'existing native placeholder extension retained');
+                check($call['items']->text===[$q,'en','or'] && $call['items']->categories && $call['items']->fields===\Plenty\Modules\Webshop\ItemSearch\Helpers\ResultFieldTemplate::load(4),'product autocomplete');
+                check($call['suggestions']->preset===Presets\SearchItems::class && $call['suggestions']->completion===[$q,'en'] && $call['suggestions']->options['itemsPerPage']===0,'protected prefix aggregation');
+            } else {
+                check($call['suggestions']->preset===Presets\SearchSuggestions::class && $call['items']->options['query']===$q,'native autocomplete');
+            }
             if ($none) {
                 check($ac['suggestion']===[] && $ac['item']===[],'empty result');
             } else {
@@ -207,6 +240,48 @@ namespace {
             }
         }
     }
+    // Only explicitly requested, visible B2C categories may appear in suggestions.
+    $verifiedCategories=json_decode(file_get_contents(__DIR__.'/fixtures/home-living.json'),true,512,JSON_THROW_ON_ERROR);
+    foreach ($langs as $lang) {
+        $locale->lang=$lang;
+        $req->data=['query'=>'home','types'=>['item','category']];
+        $engine->calls=[];
+        $engine->next=[['items'=>['documents'=>[], 'categories.all'=>[4103=>2,99=>5]], 'suggestions'=>['searchSuggestions'=>[]]]];
+        $result=$suggestRoute->index()->body;
+        check(count($result['category'])===1 && $result['category'][0]['label']===$lang.' Home','only category visible in B2C');
+        check($result['category'][0]['url']===$verifiedCategories[$lang][4103],'localized category destination');
+    }
+    // Phase 12: omit unused categories only on the existing IT/ES adapter. The
+    // native item preset/options and every displayed item/suggestion stay equal.
+    $categoryContracts=[];
+    foreach (['it','es'] as $lang) {
+        $locale->lang=$lang;
+        $responses=[]; $calls=[];
+        foreach ([true,false] as $withCategories) {
+            $req->data=['query'=>'adidas','types'=>$withCategories?['item','category','suggestion']:['item','suggestion']];
+            $raw=['items'=>['documents'=>[$doc]],'suggestions'=>['searchSuggestions'=>['adidas'=>3,'0002'=>1]]];
+            if ($withCategories) $raw['items']['categories.all']=[];
+            $engine->calls=[];$engine->next=[$raw];
+            $responses[]=$suggestRoute->index()->body;$calls[]=$engine->calls[0];
+            check(count($engine->calls)===1,'one autocomplete batch with/without category');
+            check($engine->calls[0]['items']->categories===$withCategories,'category aggregation follows requested type');
+        }
+        check($responses[0]===$responses[1],'full formatter contract including empty category preserved');
+        check($calls[0]['items']->options===$calls[1]['items']->options,'same native storefront options/customer boundary');
+        check($calls[0]['items']->text===$calls[1]['items']->text && $calls[0]['items']->fields===$calls[1]['items']->fields,'same item query and fields');
+        check($calls[0]['suggestions']==$calls[1]['suggestions'],'same suggestion preset and text');
+        $categoryContracts[]=['language'=>$lang,'categoryAggregationBefore'=>1,'categoryAggregationAfter'=>0,'responseEqual'=>true,'nativePresetsUnchanged'=>true];
+    }
+    // IO directly indexes categories.all. A missing key cannot be assumed safe
+    // for DE/EN/FR; do not relax its warning into a passing API contract.
+    set_error_handler(function($severity,$message){throw new \ErrorException($message,0,$severity);});
+    try {
+        $missingCategoryRejected=false;
+        try { pluginApp(ItemSearchAutocompleteService::class)->transformResult(['items'=>['documents'=>[]],'suggestions'=>['searchSuggestions'=>[]]]); }
+        catch (\ErrorException $e) { $missingCategoryRejected=str_contains($e->getMessage(),'categories.all'); }
+        check($missingCategoryRejected,'IO missing categories.all is not a supported formatter input');
+    } finally { restore_error_handler(); }
+    if ($argc===4) file_put_contents($argv[3].'.categories.json',json_encode(['status'=>'PASS','rows'=>$categoryContracts,'ioMissingCategoryRejected'=>$missingCategoryRejected],JSON_PRETTY_PRINT));
     // The real IO formatter selects the lowest-position variation image, falls back
     // to item images, and forwards the native placeholder for a genuinely empty item.
     foreach ($langs as $lang) {
@@ -235,10 +310,43 @@ namespace {
             check($item['url']===($lang==='de'?'':'/'.$lang).'/product/a-'.(100+$n).'/' && $item['label']==="$lang product $n",'image remains associated with localized item');
         }
     }
+    $locale->lang='es';
+    $opts=['query'=>'shoess','facets'=>'376,727','priceMin'=>4,'priceMax'=>9,'searchOperator'=>'and'];
+    $miss=['itemList'=>['total'=>0,'documents'=>[],'suggestions'=>['didYouMean'=>[['text'=>'shoess','suggestions'=>[['text'=>'shoes','score'=>1]]]]]],'facets'=>[]];
+    $engine->calls=[]; $engine->next=[$miss,$reply];
+    $corrected=pluginApp(EnglishTextSearch::class)->getPage($opts);
+    check(count($engine->calls)===2 && $corrected['suggestionString']==='shoes','conditional correction only');
+    foreach ($engine->calls[1] as $factory) check($factory->text===['shoes','en','and'] && $factory->options['facets']==='376,727','both corrected factories');
     $req->data=['categoryId'=>60,'query'=>'adidas'];
     $engine->next=[$reply]; $engine->calls=[]; $facetRoute->index();
     check($engine->calls[0]['itemList']->preset===Presets\CategoryItems::class,'category facet path unchanged');
     $req->data=[]; check($facetRoute->index()->status===400 && $suggestRoute->index()->status===400,'empty API request');
+    $engine->next=[['items'=>['documents'=>[]]]]; $engine->calls=[];
+    $req->data=['query'=>'0002','types'=>['item']]; $only=$suggestRoute->index();
+    check(array_keys($engine->calls[0])===['items'] && !$engine->calls[0]['items']->categories && $only->body['suggestion']===[],'optional suggestions');
+    foreach (['de','en','fr','it','es'] as $language) {
+        $locale->lang=$language;
+        foreach ([['query'=>['nike']], ['query'=>false], ['query'=>new \stdClass()],
+                  ['query'=>'nike','types'=>'item'], ['query'=>'nike','types'=>new \stdClass()]] as $invalid) {
+            $req->data=$invalid; $engine->calls=[];
+            check($suggestRoute->index()->status===400 && !$engine->calls,'invalid autocomplete types rejected before search');
+        }
+        $req->data=['query'=>2351296,'types'=>['item']]; $engine->calls=[];
+        $engine->next=[['items'=>['documents'=>[], 'categories.all'=>[]], 'suggestions'=>['searchSuggestions'=>[]]]];
+        $response=$suggestRoute->index();
+        $factory=$engine->calls[0]['items'];
+        $numericQuery=in_array($language,['it','es'],true) ? $factory->text[0] : $factory->options['query'];
+        check($response->status===200 && count($engine->calls)===1 &&
+            $numericQuery===(in_array($language,['it','es'],true) ? '2351296' : 2351296),
+            'numeric search text and existing parent path preserved for '.$language);
+        $req->data=['query'=>'0002','types'=>[]]; $engine->calls=[];
+        $engine->next=[['items'=>['documents'=>[], 'categories.all'=>[]], 'suggestions'=>['searchSuggestions'=>[]]]];
+        $response=$suggestRoute->index();
+        $factory=$engine->calls[0]['items'];
+        $stringQuery=in_array($language,['it','es'],true) ? $factory->text[0] : $factory->options['query'];
+        check($response->status===200 && count($engine->calls)===1 && $stringQuery==='0002' &&
+            array_keys($engine->calls[0])===['items'], 'leading zero query and optional types preserved for '.$language);
+    }
     if (isset($argv[3])) file_put_contents($argv[3],json_encode($browserFixture,JSON_THROW_ON_ERROR));
-    echo "$assertions assertions passed; 35 language / query combinations. Native engine not executed.\n";
+    echo "$assertions assertions passed; ".(count($langs)*count($terms))." language / query combinations. Native engine not executed.\n";
 }

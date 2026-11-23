@@ -47,7 +47,7 @@ async function scenario(browser,file,code,lang){
         checks.push({name:'A-B-A rejects older identical query before debounce fires',pass:!duringDebounce.text.includes('OLD alpha')&&actual.text.includes('LATEST alpha')&&!actual.text.includes('OLD'),duringDebounce,actual});
         await input.fill('a');await p.waitForTimeout(450);actual=await snapshot();
         checks.push({name:'short input removes full suggestion row and loader',pass:!actual.text&&!actual.loading&&actual.requests.length===5,actual});
-        const endpoint='/rest/io/item/search/autocomplete/';
+        const endpoint=['it','es'].includes(lang) ? '/rest/guardiansbasic/item/search/autocomplete/' : '/rest/io/item/search/autocomplete/';
         checks.push({name:'existing debounce and language endpoint preserved',pass:actual.requests.length===5&&actual.requests.every(x=>x.url===endpoint)});
         await fill('network error',6);
         await p.evaluate(()=>pending[5].cb({},503));

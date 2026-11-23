@@ -182,9 +182,9 @@
 {% endif %}
 <article class="single" data-item data-eg-active-variation="{{ itemData.variation.id }}" data-mainitemid="{{ itemData.item.id }}">  
     <div class="container">
-        <div class="d-lg-block clearfix">
+        <div class="{{ isQuickView ? 'row eg-product-columns' : 'clearfix' }}">
             {% if isQuickView %}
-            <div class="col-12 col-xl-6 pull-lg-left stickyarticle z-index1">
+            <div class="col-12 col-md-6 stickyarticle z-index1">
                 <div class="row eg-item-gallery">
                     <div class="col-md-2 col-lg-2 col-xl-2 d-none d-md-block eg-gallery-thumbnails">
 
@@ -268,7 +268,7 @@
             </div>
            {% endif %}
            {% if isQuickView %}
-            <div class="col-12 col-lg-5 col-xl-6 pull-lg-right" data-eg-loading-attr>
+            <div class="col-12 col-md-6" data-eg-loading-attr>
                 {% endif %}
                 <h1 class="item-title" data-eg-item-title>{{ itemData | itemName }}</h1>
                  {% if isQuickView %}
@@ -293,6 +293,7 @@
                 {% endif %}
                 <hr class="hr-style">
                 {% if isQuickView %}
+                    <div class="eg-product-offer">
                     {% if itemData.filter.hasManufacturer %}
                         {% set hasLogo = itemData.item.manufacturer.logo is not empty %}
                         {% set hasUrl = itemData.item.manufacturer.url is not empty %}
@@ -311,7 +312,7 @@
                                 {% set categoryURLint = categoryURLService.toAbsoluteUrl(true) %}
                             {% endif %}
 
-                            <div class="col-5 pull-right">
+                            <div class="eg-product-brand">
                                 <span class="item-producer-img mt-0">
                                     <a href="{{ lang == 'de' ? categoryURL : categoryURLint }}">
                                         <img src="{{ vendorlogo }}" alt="{{ itemData.item.manufacturer.externalName }} Logo" title="{{ itemData.item.manufacturer.externalName }}" width="100px" height="100px">
@@ -320,7 +321,7 @@
                             </div>
                         {% endif %}
                     {% endif %}
-                    <div class="col-7 padding-10-0{% if itemData.prices.graduatedPrices|length>1 %}hasGruadetPrices{% endif %}">
+                    <div class="eg-product-price{% if itemData.prices.graduatedPrices|length>1 %} hasGruadetPrices{% endif %}">
                     <span class="bold single-item-price{% if not hasUnitPrice %} d-none{% endif %}">
                       <span data-eg-item-price class="bold single-item-price">
                         {{ hasUnitPrice ? unitPriceValue|number_format(2, ',', '.') : '' }}
@@ -346,7 +347,7 @@
                         {{ currencyData[currencyFormat] }}!
                       </span>
                     </div>
-                    <div class="col-12 padding-10-0">   
+                    <div class="eg-product-shipping">
                     {% if currencyData.name == 'EUR' and hasUnitPrice and unitPriceValue >= 54 %}
                     <span class="sofort-lieferbar font-12">{{ trans("GuardiansBasic::Template.ab29") }}</span>
                     {% else %}
@@ -356,6 +357,8 @@
                     <span class="sofort-lieferbar font-12">{{ trans("GuardiansBasic::Template.samedayshipping") }}</span>#}
                     </div>
                         {#<a href="#" data-eg-handler="modalContent" data-eg-type="modal-lg" data-eg-event="click" data-eg-href="{% if lang == "de" %}{% elseif lang == "en" %}/en{% elseif lang == "fr" %}/fr{% elseif lang == "it" %}/it{% elseif lang == "es" %}/es{% endif %}/getShopBuilderContent?categoryId=5934" data-eg-title="{{ trans("GuardiansBasic::Template.10percentcode") }}"><div class="benefit-detailview"><span class="benefit-detailview--text">{{ trans("GuardiansBasic::Template.10percentcode") }}</span></div></a>#}
+                    </div>
+                    </div>
                     <hr class="hr-style">
                 {% endif %}
 
@@ -446,8 +449,9 @@
                 {% endfor %}
                 </div>
                 {% else %} 
-                {% if itemData.stock.net<7 %}
-                <p class="data-stock-warn tcenter">{{ trans("GuardiansBasic::Template.bpss1") }} {{ itemData.stock.net }} {{ trans("GuardiansBasic::Template.bpss2") }}</p>
+                {% set availableStock = itemData.stock.net ?? null %}
+                {% if availableStock is not empty and availableStock < 7 %}
+                <p class="data-stock-warn tcenter">{{ trans("GuardiansBasic::Template.bpss1") }} {{ availableStock }} {{ trans("GuardiansBasic::Template.bpss2") }}</p>
                 {% else %}
                 <p class="data-stock-warn tcenter">{{ trans("GuardiansBasic::Template.bpss") }}</p>
                 {% endif %}
@@ -481,7 +485,7 @@
 </div>
 {% endif %}
   {{ itemData.texts.description|raw }}
-      <div class="property-box">
+{% set propertyRows %}
 {% set orderedKeys = [46, 115, 105, 196, 197, 198, 7, 107, 108, 122, 111, 73, 127, 110, 109, 123, 124, 106, 118, 119, 125, 102, 103, 101, 104] %}{% set propertiesById = getItemPropertiesById(itemData.properties) %}
 {% for id in orderedKeys %}
     {% set property = propertiesById[id] ?? false %}
@@ -496,7 +500,8 @@
         {% endif %}
     {% endif %}
 {% endfor %}
-    </div>
+{% endset %}
+{% if propertyRows|trim %}<div class="property-box">{{ propertyRows }}</div>{% endif %}
     {% if itemData.item.manufacturer.street or itemData.item.manufacturer.houseNo or itemData.item.manufacturer.postcode or itemData.item.manufacturer.town or itemData.item.manufacturer.email or itemData.item.manufacturer.contactUrl or itemData.item.manufacturer.phoneNumber or itemData.item.manufacturer.responsibleName or itemData.item.manufacturer.responsibleStreet or itemData.item.manufacturer.responsibleHouseNo or itemData.item.manufacturer.responsiblePostCode or itemData.item.manufacturer.responsibleTown or itemData.item.manufacturer.responsibleEmail or itemData.item.manufacturer.responsibleContactUrl or itemData.item.manufacturer.responsiblePhoneNo is not empty %}
     <button class="collapsible font-w700">{{ trans("GuardiansBasic::Template.EUresponsibleperson") }}</button>
 <div class="content">
@@ -528,10 +533,11 @@
 </div>
 {% endif %}
 </div>
-                </div> 
+                </div>
+            </div>
             {% endif %}
         </div>
-    </div> </div>
+    </div>
          {% if isQuickView %}
              {% if itemData.item.feedbackCount > 0 %}
       <div class="container">

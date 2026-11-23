@@ -31,7 +31,7 @@ function deriveCriticalCss(source, head, compiledCss, footerMarkup) {
     replaceCritical('logo', logoCss);
     report.logoBytes = Buffer.byteLength(logoCss);
 
-    const thumbSelectors = ['.single .single-prev-images a', '.single .single-prev-images a img', '.single-prev-images'];
+    const thumbSelectors = ['.single .single-prev-images a', '.single .single-prev-images a img', '.single-prev-images', '.property-box'];
     const thumbs = postcss.root();
     for (const selector of thumbSelectors) {
         const from = source.indexOf('\n' + selector + '{');
@@ -40,6 +40,10 @@ function deriveCriticalCss(source, head, compiledCss, footerMarkup) {
         thumbs.append(postcss.parse(source.slice(from, to)).nodes[0]);
     }
     assert.equal(thumbs.nodes.length, thumbSelectors.length);
+    // Reserve the final space for price, logo, controls and columns before main.css arrives.
+    const productLayout = source.match(/\/\* PDP layout start \*\/([\s\S]*?)\/\* PDP layout end \*\//);
+    assert.ok(productLayout, 'Missing product layout geometry');
+    for (const node of postcss.parse(productLayout[1]).nodes) thumbs.append(node.clone());
     // MagicZoom inserts its figure/lens before async main.css applies. Borrow only
     // their existing layout declarations, scoped to the PDP anchor. Keep vendor
     // CSS authoritative: no second definition or extra external bundle rules.

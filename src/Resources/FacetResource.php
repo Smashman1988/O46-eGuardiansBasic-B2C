@@ -2,7 +2,10 @@
 
 namespace GuardiansBasic\Resources;
 
+use Ceres\Helper\SearchOptions;
 use GuardiansBasic\Helper\SeoPage;
+use GuardiansBasic\Services\EnglishTextSearch;
+use Plenty\Modules\Webshop\Contracts\WebstoreConfigurationRepositoryContract;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\CategoryItems;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\Facets;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\SearchItems;
@@ -88,6 +91,16 @@ class FacetResource extends ApiResource
             else
             {
                 $itemListOptions['query'] = $searchString;
+            }
+            if ($categoryId <= 0 && EnglishTextSearch::applies()) {
+                $config = pluginApp(WebstoreConfigurationRepositoryContract::class)->getWebstoreConfiguration();
+                $itemListOptions['searchOperator'] = $config->itemSearchOperator;
+                $options = SearchOptions::validateItemListOptions($itemListOptions, SearchOptions::SCOPE_SEARCH);
+                $response = pluginApp(EnglishTextSearch::class)->getPage($options, $countsOnly);
+                return $this->response->create([
+                    'facets' => $response['facets'],
+                    'itemList' => $response['itemList']
+                ], ResponseCode::OK);
             }
             $searchParams = [
                 'facets'   => Facets::getSearchFactory( $itemListOptions ),

@@ -32,7 +32,9 @@ O46Core.initLiveSearch = O46Core.initLiveSearch || function(_this){
     const $input = $(_this);
     const listId = 'eg-autocomplete-' + (eGuardians.events._liveSearchId = (eGuardians.events._liveSearchId || 0) + 1);
     $input.attr({ role: 'combobox', 'aria-autocomplete': 'list', 'aria-expanded': 'false' });
-    const autocompleteUrl = '/rest/io/item/search/autocomplete/';
+    const useEnglishSearchIndex = activeLang === 'it' || activeLang === 'es';
+    const autocompleteUrl = useEnglishSearchIndex
+        ? '/rest/guardiansbasic/item/search/autocomplete/' : '/rest/io/item/search/autocomplete/';
     let searchInputVersion = 0;
     let searchTimer;
     let searchPending = false;
@@ -55,7 +57,7 @@ O46Core.initLiveSearch = O46Core.initLiveSearch || function(_this){
             const searchParams = {
                 template: "Ceres::ItemList.Components.ItemSearch",
                 query: query,
-                types: ["item", "category", "suggestion"],
+                types: useEnglishSearchIndex ? ["item", "suggestion"] : ["item", "category", "suggestion"],
                 templateType: "home"
             };
 
@@ -180,7 +182,7 @@ O46Core.initLiveSearch = O46Core.initLiveSearch || function(_this){
             currentFocus += e.keyCode == 40 ? 1 : -1;
             addAutocompleteItemActive(x);
             $input.val($(x[currentFocus]).find('a').attr('title'));
-        } else if (e.keyCode == 13 && (activeLang === 'it' || activeLang === 'es') && x.is('.autocomplete-active')) {
+        } else if (e.keyCode == 13 && useEnglishSearchIndex && x.is('.autocomplete-active')) {
             // Preserve navigation to the selected product independently of the IO search backend.
             e.preventDefault();
             x.filter('.autocomplete-active').find('a')[0].click();

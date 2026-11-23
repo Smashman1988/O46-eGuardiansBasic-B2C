@@ -71,6 +71,7 @@ $after[$prefix . 'CategoryNavigation.twig'] = $shared;
 $sourceAfter += strlen($shared);
 $beforeService = new NavigationCurrencyFixture(); $afterService = new NavigationCurrencyFixture();
 $old = environment($before, $beforeService); $new = environment($after, $afterService);
+$homeLiving = json_decode(file_get_contents(__DIR__.'/fixtures/home-living.json'),true,512,JSON_THROW_ON_ERROR);
 $rows = [];
 foreach (['DE','EN','FR','IT','ES'] as $lang) {
     $caller = '{% import "' . $prefix . 'CategoryTree' . $lang . '.twig" as Tree %}{{ Tree.get_nav_bar([], "") }}';
@@ -81,9 +82,30 @@ foreach (['DE','EN','FR','IT','ES'] as $lang) {
         $oldHtml = $oldCaller->render([]); $newHtml = $newCaller->render([]);
         ensure($beforeService->calls === 1 && $afterService->calls === 1, "$lang/$currency currency service contract");
         [$oldDom, $oldTree] = semanticDom($oldHtml); [$newDom, $newTree] = semanticDom($newHtml);
-        ensure($oldTree === $newTree, "$lang/$currency DOM, attributes, texts or order changed");
+        // Only the approved top-level slot changes. Keep its position in the DOM comparison.
+        $expected = $homeLiving[strtolower($lang)];
+        $xpath = new DOMXPath($newDom);
+        $path = '//ul[@id="navigation-fixture"]/li[contains(concat(" ",@class," ")," cat-4103 ")]';
+        $entry = $xpath->query($path);
+        ensure($entry->length === 1, "$lang Home & Living root");
+        $suffix = $currency === 'EUR' ? '' : '?currency='.$currency;
+        foreach ($expected as $id => $url) {
+            $selector = $id == 4103 ? './a' : './/li[contains(concat(" ",@class," ")," cat-'.$id.' ")]/a';
+            $matches = $xpath->query($selector, $entry->item(0));
+            ensure($matches->length === 1 && $matches->item(0)->getAttribute('href') === $url.$suffix, "$lang/$currency category $id");
+        }
+        $trees = [];
+        foreach ([[$oldDom,5081],[$newDom,4103]] as [$original,$id]) {
+            $copy = $original->cloneNode(true);
+            $tree = $copy->getElementById('navigation-fixture');
+            $node = (new DOMXPath($copy))->query('./li[contains(concat(" ",@class," ")," cat-'.$id.' ")]', $tree);
+            ensure($node->length === 1, "$lang expected menu position");
+            $tree->replaceChild($copy->createElement('li'), $node->item(0));
+            $trees[] = semanticNode($tree);
+        }
+        ensure($trees[0] === $trees[1], "$lang/$currency other links, texts or order changed");
         $links = $newDom->getElementsByTagName('a');
-        ensure($links->length === $oldDom->getElementsByTagName('a')->length, "$lang/$currency active link count changed");
+        ensure($links->length === $oldDom->getElementsByTagName('a')->length + count($expected), "$lang/$currency active link count changed");
         foreach ($links as $link) {
             $href = $link->getAttribute('href');
             if ($href === 'javascript:void(0)') { continue; }
@@ -113,7 +135,7 @@ $report = ['status'=>'PASS','kind'=>'LOCAL_REAL_TWIG_RENDER_WITH_EXPLICIT_CURREN
     'php'=>PHP_VERSION,'twig'=>Twig\Environment::VERSION,'cases'=>count($rows),'helperCompatibilityCases'=>5,
     'sourceBytesBefore'=>$sourceBefore,'sourceBytesAfter'=>$sourceAfter,'sourceBytesSaved'=>$sourceBefore-$sourceAfter,
     'rows'=>$rows,'deprecations'=>$deprecations,
-    'limits'=>['Whitespace-only text nodes intentionally reduced; element tree, attributes, link order and visible texts compared against independent baseline.',
+    'limits'=>['Home & Living replaces slot 5081. Its nine public destinations are checked separately. All other nodes, attributes, link order and visible texts are compared against the independent B2C baseline.',
         'Warm local Twig timings are isolated measurements; no native PHP time, TTFB, compressed transfer, LCP, CLS or INP claim.',
         'Browser layout and mobile event tests are separate. No category lookup or browser data request added.']];
 file_put_contents($argv[2], json_encode($report, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));

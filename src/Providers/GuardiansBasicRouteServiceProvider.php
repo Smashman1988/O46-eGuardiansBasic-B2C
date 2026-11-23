@@ -17,6 +17,7 @@ class GuardiansBasicRouteServiceProvider extends RouteServiceProvider
         $router->get('getShopBuilderContent', 'GuardiansBasic\Controllers\ContentController@getShopBuilderContent');      
         $router->get('trackings', 'GuardiansBasic\Controllers\ContentController@getTrackings');
         $api->version(['v1'], ['namespace' => 'GuardiansBasic\Resources'], function ($api) {
+            $api->get('guardiansbasic/item/search/autocomplete', 'SearchAutocompleteResource@index');
             $api->resource('io/facet', 'FacetResource');
         });
     }

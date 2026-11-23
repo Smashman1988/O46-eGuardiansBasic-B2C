@@ -1,0 +1,57 @@
+{
+  "de": {
+    "1385": "/home-living/badgarnituren-badzubehoer/",
+    "1889": "/home-living/heimtextilien/",
+    "2345": "/home-living/haushaltswaren/",
+    "4103": "/home-living/",
+    "4104": "/home-living/teppiche-home-textilien/",
+    "4105": "/home-living/lampen-beleuchtung/",
+    "4106": "/home-living/wohn-dekoration/",
+    "4107": "/home-living/stuehle-sitzgruppen/",
+    "4108": "/home-living/moebel-tische/"
+  },
+  "en": {
+    "1385": "/en/home-living/bath-sets-bath-accessories/",
+    "1889": "/en/home-living/home-textiles/",
+    "2345": "/en/home-living/household-goods/",
+    "4103": "/en/home-living/",
+    "4104": "/en/home-living/carpets-home-textiles/",
+    "4105": "/en/home-living/lamps-lighting/",
+    "4106": "/en/home-living/residential-decorating/",
+    "4107": "/en/home-living/chairs-seating-groups/",
+    "4108": "/en/home-living/furniture-tables/"
+  },
+  "fr": {
+    "1385": "/fr/maison-vie/garniture-de-bain-accessoires-de-bain/",
+    "1889": "/fr/maison-vie/linge-de-maison/",
+    "2345": "/fr/maison-vie/articles-menagers/",
+    "4103": "/fr/maison-vie/",
+    "4104": "/fr/maison-vie/tapis-textiles-de-maison/",
+    "4105": "/fr/maison-vie/lampes-eclairage/",
+    "4106": "/fr/maison-vie/decoration-de-maison/",
+    "4107": "/fr/maison-vie/chaises-sieges/",
+    "4108": "/fr/maison-vie/meubles-tables/"
+  },
+  "it": {
+    "1385": "/it/casa-e-vita/set-da-bagno-e-accessori/",
+    "1889": "/it/casa-e-vita/tessuti-per-la-casa/",
+    "2345": "/it/casa-e-vita/articoli-per-la-casa/",
+    "4103": "/it/casa-e-vita/",
+    "4104": "/it/casa-e-vita/tappeti-e-tessuti-per-la-casa/",
+    "4105": "/it/casa-e-vita/lampade-e-illuminazione/",
+    "4106": "/it/casa-e-vita/decorazioni-per-la-casa/",
+    "4107": "/it/casa-e-vita/sedie-e-gruppi-di-sedute/",
+    "4108": "/it/casa-e-vita/mobili-e-tavoli/"
+  },
+  "es": {
+    "1385": "/es/vida-en-el-hogar/conjuntos-y-accesorios-de-baño/",
+    "1889": "/es/vida-en-el-hogar/casa-de-textiles/",
+    "2345": "/es/vida-en-el-hogar/artículos-para-el-hogar/",
+    "4103": "/es/vida-en-el-hogar/",
+    "4104": "/es/vida-en-el-hogar/alfombras-y-textiles-para-el-hogar/",
+    "4105": "/es/vida-en-el-hogar/lámparas-e-iluminación/",
+    "4106": "/es/vida-en-el-hogar/decoración-hogareña/",
+    "4107": "/es/vida-en-el-hogar/sillas-y-grupos-de-asientos/",
+    "4108": "/es/vida-en-el-hogar/mobiliario-y-mesas/"
+  }
+}

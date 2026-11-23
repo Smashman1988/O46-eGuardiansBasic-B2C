@@ -17,12 +17,13 @@ class GuardRequest { public $value; function __construct($v){$this->value=$v;} f
 class GuardServices {
     public $calls=[],$lang,$request,$containers=[],$texts=[],$quantity=0,$sorts=0;
     public $wishListSnapshot = [], $wishListHit = false;
+    public $singleVariation = false;
     function __construct($lang,$request){$this->lang=$lang;$this->request=$request;}
     function __call($name,$args){
         $this->calls[]=$name;
         switch($name){
             case 'setType': return null;
-            case 'getVariationAttributeMap': return [['variationId'=>1011,'attributes'=>[['attributeId'=>1,'attributeValueId'=>1]]],['variationId'=>1012,'attributes'=>[['attributeId'=>1,'attributeValueId'=>2]]]];
+            case 'getVariationAttributeMap': return $this->singleVariation ? [] : [['variationId'=>1011,'attributes'=>[['attributeId'=>1,'attributeValueId'=>1]]],['variationId'=>1012,'attributes'=>[['attributeId'=>1,'attributeValueId'=>2]]]];
             case 'getBasketForTemplate': return ['itemQuantity'=>$this->quantity,'currency'=>'EUR'] + $this->wishListSnapshot;
             case 'getBasketQuantity': return $this->quantity;
             case 'getURLById': return '/'.$this->lang.'/category-'.$args[0].'/';
@@ -130,12 +131,26 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     $rrp= $format==='legacy' ? ['data'=>['unitPrice'=>60]] : ['unitPrice'=>['value'=>60]];
     $ctx['item']['documents'][0]['data']['prices']=['default'=>$default,'rrp'=>$rrp];
     $ctx['item']['documents'][0]['data']['item']['storeSpecial']=[];
+    $svc->singleVariation = $lang === 'de' || $lang === 'es';
+    if ($svc->singleVariation && $format === 'legacy') {
+        $ctx['item']['documents'][0]['data']['stock']['net'] = $lang === 'de' ? 2 : 7;
+    }
     $html=$twig->render('SingleItem',$ctx);
     assertPriceUi($html,$value===null,54,60,'');
     $dom=new DOMDocument(); $dom->loadHTML($html,LIBXML_NOERROR|LIBXML_NOWARNING); $xp=new DOMXPath($dom);
+    if ($svc->singleVariation) {
+        $warning = trim($xp->evaluate('string(//article//p[contains(@class,"data-stock-warn")])'));
+        $expected = $lang === 'de' && $format === 'legacy'
+            ? 'de:GuardiansBasic::Template.bpss1 2 de:GuardiansBasic::Template.bpss2'
+            : $lang.':GuardiansBasic::Template.bpss';
+        if ($warning !== $expected) throw new RuntimeException('Unexpected single-variation availability message: '.$warning);
+    }
     if ($xp->query('//article[@data-mainitemid="42"]//*[@data-item-tobasket]')->length!==1) throw new RuntimeException('B2C buy button missing');
     if ($xp->query('//*[@id="eg-wish-picker"]')->length!==($value===null?1:0)) throw new RuntimeException('Wishlist dialog scope changed');
     if ($value===null && $xp->query('//*[@data-eg-gallery-count="3"]')->length!==1) throw new RuntimeException('Gallery image count');
+    if ($value===null && $xp->query('//article//div[contains(concat(" ",@class," ")," property-box ") and not(*) and normalize-space(.)=""]')->length) {
+        throw new RuntimeException('Empty property section reserves space');
+    }
     if ($value===null && $lang==='de' && $format==='prepared') file_put_contents(dirname($argv[2]).'/pdp.html',$html);
     $rows[]=[$lang,$value,$format];
 }

@@ -7,10 +7,13 @@ use Plenty\Plugin\ServiceProvider;
 use Plenty\Plugin\Events\Dispatcher;
 use Plenty\Plugin\Templates\Twig;
 use IO\Helper\TemplateContainer;
+use Ceres\Contexts\CategoryContext;
 use IO\Services\TemplateService;
 use IO\Extensions\Functions\Partial;
 use Plenty\Plugin\ConfigRepository;
 use GuardiansBasic\Extensions\Base_Extension;
+use GuardiansBasic\Services\EnglishTextSearch;
+use GuardiansBasic\Contexts\EnglishTextSearchContext;
 use GuardiansBasic\Helper\SeoPage;
 use Plenty\Modules\Webshop\Consent\Contracts\ConsentRepositoryContract;
 
@@ -101,6 +104,13 @@ class GuardiansBasicServiceProvider extends ServiceProvider
     public function boot(Twig $twig, Dispatcher $dispatcher, ConfigRepository $config)
     {
         $twig->addExtension(Base_Extension::class);
+        $dispatcher->listen('IO.ctx.search', function (TemplateContainer $container)
+        {
+            if (EnglishTextSearch::applies()) {
+                $container->setContext(EnglishTextSearchContext::class);
+                return false;
+            }
+        }, self::PRIORITY);
         // Apply the same approved page size to the native Ceres listing query.
         foreach (['IO.ctx.category.item', 'IO.ctx.tags', 'IO.ctx.search'] as $event) {
             $dispatcher->listen($event, function () {
@@ -113,6 +123,18 @@ class GuardiansBasicServiceProvider extends ServiceProvider
         }
         $enabledOverrides = explode(", ", $config->get("GuardiansBasic.templates.override"));
         $overrideAll = in_array("all", $enabledOverrides);
+        // The brand directory renders the navigation tree from CategoryContext.
+        // The item context would also fetch a product page and facet buckets.
+        if ($overrideAll || in_array('category_item', $enabledOverrides, true)) {
+            $dispatcher->listen('IO.ctx.category.item', function (TemplateContainer $container) {
+                $category = TemplateService::$currentTemplateData['category'] ?? null;
+                $id = is_array($category) ? ($category['id'] ?? null) : ($category->id ?? null);
+                if ((string)$id === '60') {
+                    $container->setContext(CategoryContext::class);
+                    return false;
+                }
+            }, self::PRIORITY);
+        }
         // Override partials
         $dispatcher->listen('IO.init.templates', function (Partial $partial) use ($enabledOverrides, $overrideAll)
         {

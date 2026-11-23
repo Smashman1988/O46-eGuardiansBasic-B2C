@@ -35,6 +35,27 @@ async function run() {
             results.push({format:[w,h],frameHeight:box[3]});
         }
         assert.equal(new Set(results.map(r=>r.frameHeight)).size,1);save();
+
+        for (const width of [320,375,390,430,768,992,1280,1440,1920]) {
+            await page.setViewportSize({width,height:850});
+            const layout = await page.locator('article.single').evaluate(article => {
+                const gallery = article.querySelector('.stickyarticle').getBoundingClientRect();
+                const info = article.querySelector('[data-eg-loading-attr]').getBoundingClientRect();
+                const button = article.querySelector('[data-item-tobasket]');
+                const buy = button.getBoundingClientRect();
+                return {
+                    sideBySide: gallery.right <= info.left + 1,
+                    stacked: gallery.bottom <= info.top + 1,
+                    purchaseOutsidePrice: !button.closest('.eg-product-offer'),
+                    inViewport: buy.left >= -1 && buy.right <= innerWidth + 1
+                };
+            });
+            assert.ok(width >= 768 ? layout.sideBySide : layout.stacked, 'PDP grid at '+width);
+            assert.ok(layout.purchaseOutsidePrice && layout.inViewport, 'Buy button at '+width);
+            results.push({width,layout});
+        }
+        await page.setViewportSize({width:390,height:850});
+        save();
         dimensions=[700,900];
         await page.reload();
         await page.addStyleTag({path:'resources/css/main.min.css'});

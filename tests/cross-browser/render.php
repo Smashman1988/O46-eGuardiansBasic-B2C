@@ -70,7 +70,7 @@ foreach (['modal-cross'=>'modal fade modal-cross','dynamicModal'=>'modal dynamic
 preg_match('~<div class="eg-backdrop transition"[^>]+></div>~',$layout,$match);
 $result['backdrop']=$match[0];
 $pdp=$templates['GuardiansBasic::Item.SingleItem'];
-$gallery=fragment($pdp,'<div class="col-12 col-xl-6 pull-lg-left stickyarticle','{% endif %}' . "\n" . '           {% if isQuickView');
+$gallery=fragment($pdp,'<div class="col-12 col-md-6 stickyarticle','{% endif %}' . "\n" . '           {% if isQuickView');
 $images=[];
 foreach (['blue','green','red'] as $color) {
     $url='/image/'.$color.'.svg';

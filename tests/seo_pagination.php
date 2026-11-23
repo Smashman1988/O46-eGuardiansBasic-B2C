@@ -291,7 +291,7 @@ namespace {
     $twig = new Twig\Environment($loader, ['cache'=>false, 'autoescape'=>'html']);
     $renderer->environment = $twig;
     function addFunction($twig, $name, $callback) { $twig->addFunction(new Twig\TwigFunction($name, [new Callback($callback),'invoke'])); }
-    foreach (['getFacetView','createSeoPage','prepareSeoContent','getItemsFromCat','getItemsFromCatSimple','getCardAttributeMaps'] as $name) { addFunction($twig, $name, [$extension,$name]); }
+    foreach (['getBrandGroups','getFacetView','createSeoPage','prepareSeoContent','getItemsFromCat','getItemsFromCatSimple','getCardAttributeMaps'] as $name) { addFunction($twig, $name, [$extension,$name]); }
     foreach (['get_consent_scripts','get_filtered_tags','get_json_data','get_shop_builder_scripts','component','ssr_entry','csrf_token'] as $name) { addFunction($twig,$name,function () { return ''; }); }
     foreach (['get_additional_styles','get_additional_scripts'] as $name) { addFunction($twig,$name,function () { return []; }); }
     addFunction($twig,'getPartial',function ($name) { return ['page-design'=>'layout','head'=>'head','page-metadata'=>'metadata'][$name] ?? 'empty'; });
@@ -973,6 +973,18 @@ namespace {
             }
         }
     }
+    test('brands/language-order-and-valid-fragments',function () use ($twig,$base) {
+        $children = [];
+        foreach (['Mode','1A','Zwei','Mira','2B'] as $name) {
+            $children[]=['details'=>[['name'=>$name,'nameUrl'=>strtolower($name)]]];
+        }
+        $html=$twig->render('GuardiansBasic::Category.Item.CategoryItemBrands',array_replace($base,[
+            'categories'=>[['id'=>60,'details'=>[['lang'=>'it','nameUrl'=>'marche']],'children'=>$children]]
+        ]));
+        check(substr_count($html,'id="M"')===1 && strpos($html,'href="#M"')!==false,'One target for separated entries with the same initial');
+        check(strpos($html,'href="#Q"')===false && strpos($html,'href="#Y"')===false,'Absent initial links nowhere');
+        check(substr_count($html,'id="end"')===1 && strpos($html,'id="end"')<strpos($html,'/1a'),'Numeric link precedes its products');
+    });
     test('assets/brand-first-row',function () use ($twig,$base) {
         $children = [['details'=>[]]];
         foreach (range(1,5) as $i) {

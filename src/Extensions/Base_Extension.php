@@ -71,6 +71,7 @@ class Base_Extension extends Twig_Extension
             $this->factory->createSimpleFunction('prepareSeoContent', [$this, 'prepareSeoContent']),
             $this->factory->createSimpleFunction('sortSizes', [$this, 'sortSizes']),
             $this->factory->createSimpleFunction('getAttributesWithImages', [$this, 'getAttributesWithImages']),
+            $this->factory->createSimpleFunction('getBrandGroups', [$this, 'getBrandGroups']),
             $this->factory->createSimpleFunction('getCardLinks', [$this, 'getCardLinks']),
             $this->factory->createSimpleFunction('getCardAttributeMaps', [$this, 'getCardAttributeMaps']),
             $this->factory->createSimpleFunction('getItemPropertiesById', [$this, 'getItemPropertiesById']),
@@ -175,6 +176,32 @@ class Base_Extension extends Twig_Extension
         }
         return $mapsByItem;
     }
+    public function getBrandGroups($children): array
+    {
+        $letters = [];
+        $other = [];
+        $numbers = [];
+        foreach ($children ?? [] as $child) {
+            $details = is_array($child) ? ($child['details'] ?? []) : ($child->details ?? []);
+            $detail = $details[0] ?? null;
+            $name = trim(is_array($detail) ? ($detail['name'] ?? '') : ($detail->name ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $initial = strtoupper(mb_strtolower(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8'));
+            if (preg_match('/^[0-9]$/D', $initial)) {
+                $numbers[] = $child;
+            } elseif (preg_match('/^[A-Z]$/D', $initial)) {
+                $letters[$initial][] = $child;
+            } else {
+                $other[$initial][] = $child;
+            }
+        }
+        ksort($letters);
+        ksort($other);
+        return $letters + $other + ($numbers ? ['0–9' => $numbers] : []);
+    }
+
     public function getCardLinks($itemUrl, $currency): array
     {
         $parts = explode('#', (string)$itemUrl, 2);
