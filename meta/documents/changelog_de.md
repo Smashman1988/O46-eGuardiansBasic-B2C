@@ -1,5 +1,13 @@
 # Release Notes für GuardiansBasic
 
+## Unveröffentlicht · B2C develop
+
+- Die fünf Shopsprachen nutzen die reguläre IO-Suche. Gefilterte, sortierte und mehrdeutige Folgeseiten liefern bereinigte Canonicals. Produkt- und Quickview-Links übernehmen die gewählte Währung einmalig. Frühe Menü-, Filter- und Warenkorbgeometrie sowie zwei ältere Twig-Vorlagen wurden korrigiert.
+- Über die B2B-Commits bis einschließlich `1f154b9` abgeglichen. Produktkarten, Bildpriorität, Navigation, Suche, Filter, Galerie, Merklisten-, Konto- und Warenkorbdialoge verwenden die gemeinsamen Korrekturen.
+- Paginierte Hauptlisten fragen zwölf Artikel ab. Teaser behalten ihre konfigurierte Anzahl. Sprachverweise auf Folgeseiten setzen einen belegten Zielbestand voraus.
+- Bestätigte Mengenänderungen aktualisieren Summen und UVP-Anzeige. B2C zeigt die DE-Versandfreigrenze bei 54 € an. Die vorhandene Einzelkauf- und Bruttodarstellung bleibt maßgeblich.
+- Reproduzierbare CSS-/JS-Lieferdateien mit inhaltsabhängigen Asset-Versionen und SHA-256-Prüfung.
+
 ## v1.0.7 (2026-10-30)
 
 ### Geändert

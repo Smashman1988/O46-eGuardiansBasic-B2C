@@ -9,31 +9,31 @@ use Plenty\Modules\Authorization\Services\AuthHelper;
 use Plenty\Modules\Item\ItemImage\Contracts\ItemImageRepositoryContract;
 use Plenty\Modules\Feedback\Contracts\FeedbackRepositoryContract;
 use Plenty\Modules\Feedback\Contracts\FeedbackAverageRepositoryContract;
-use Plenty\Modules\Feedback\Models\FeedbackAverage;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\CategoryItems;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\Facets;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\SearchItems;
 use Plenty\Modules\Webshop\ItemSearch\Services\ItemSearchService;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\CrossSellingItems;
 use IO\Services\BasketService;
-use Plenty\Modules\Item\Manufacturer\Contracts\ManufacturerExternalRepositoryContract;
-use Plenty\Modules\Plugin\Libs\Contracts\LibraryCallContract;
 use Plenty\Plugin\Http\Request;
 use IO\Services\CategoryService;
-use Ceres\Contexts\CategoryContext;
 use Ceres\Helper\SearchOptions;
 use Plenty\Plugin\Templates\Twig;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\VariationAttributeMap;
+use GuardiansBasic\Helper\SeoPage;
 
 class Base_Extension extends Twig_Extension
 {
-    
+    public const SHOPBUILDER_ITEMS_PER_PAGE = 12;
+
     /**
      * @var TwigFactory
      */
     private $factory;
     private $req;
     private $twig;
+    /** Active only inside prepareSeoContent(); restored even if rendering fails. */
+    private $seoPageCapture = null;
     /**
      * BlogTwigExtension constructor.
      * @param TwigFactory $factory
@@ -61,25 +61,139 @@ class Base_Extension extends Twig_Extension
             $this->factory->createSimpleFunction('getFeedbackItemList', [$this, 'getFeedbackItemList']),
             $this->factory->createSimpleFunction('getListFeedbackAverages', [$this, 'getListFeedbackAverages']),
             $this->factory->createSimpleFunction('getFacetsFromCat', [$this, 'getFacetsFromCat']),
+            $this->factory->createSimpleFunction('getFacetView', [$this, 'getFacetView']),
             $this->factory->createSimpleFunction('sortCatByKey', [$this, 'sortCatByKey']),
             $this->factory->createSimpleFunction('getCrossSeller', [$this, 'getCrossSeller']),
             $this->factory->createSimpleFunction('restGetContent', [$this, 'restGetContent']),
             $this->factory->createSimpleFunction('getItemsFromCat', [$this, 'getItemsFromCat']),
             $this->factory->createSimpleFunction('getItemsFromCatSimple', [$this, 'getItemsFromCatSimple']),
+            $this->factory->createSimpleFunction('createSeoPage', [$this, 'createSeoPage']),
+            $this->factory->createSimpleFunction('prepareSeoContent', [$this, 'prepareSeoContent']),
             $this->factory->createSimpleFunction('sortSizes', [$this, 'sortSizes']),
-            $this->factory->createSimpleFunction('getAttributesWithImages', [$this, 'getAttributesWithImages']),  
-            
+            $this->factory->createSimpleFunction('getAttributesWithImages', [$this, 'getAttributesWithImages']),
+            $this->factory->createSimpleFunction('getCardLinks', [$this, 'getCardLinks']),
+            $this->factory->createSimpleFunction('getCardAttributeMaps', [$this, 'getCardAttributeMaps']),
+            $this->factory->createSimpleFunction('getItemPropertiesById', [$this, 'getItemPropertiesById']),
         ];
     }
-    public function getAttributesWithImages($itemId){
-        $options = array(
-            "itemId" => $itemId,
-            "afterKey" => null
-        );
-        $searchfactory = VariationAttributeMap::getSearchFactory( $options );
-        $result = pluginApp(ItemSearchService::class)->getResult($searchfactory);
-        return $result;
+
+    private function requestedFacetIds(): array
+    {
+        $raw = $this->req->get('facets');
+        $values = is_string($raw) ? explode(',', $raw) : (is_array($raw) ? $raw : [$raw]);
+        $ids = [];
+        foreach ($values as $value) {
+            $id = SeoPage::positiveInteger($value, true);
+            if ($id !== null) {
+                $ids[$id] = $id;
+            }
+        }
+        return array_values($ids);
     }
+
+    /** Presentation only: reuse this request's IO result, without another search or cache. */
+    public function getFacetView(array $facets, array $selectedFacets = []): array
+    {
+        $selected = [];
+        // Only active filter chips consume a name lookup; other values stay in rows.
+        $names = [];
+        foreach (array_merge($this->requestedFacetIds(), $selectedFacets) as $value) {
+            $id = SeoPage::positiveInteger($value);
+            if ($id !== null && !in_array((string)$id, $selected, true)) {
+                $selected[] = (string)$id;
+                $names[$id] = null;
+            }
+        }
+        $values = [];
+        foreach ($facets as $facet) {
+            $rows = [];
+            foreach ($facet['values'] ?? [] as $value) {
+                $id = (string)$value['id'];
+                $rows[] = [$id, $value['name'], (int)$value['count']];
+                if (array_key_exists($id, $names)) {
+                    $names[$id] = $value['name'];
+                }
+            }
+            $values[(string)$facet['id']] = $rows;
+        }
+        $active = [];
+        // Selected IDs belong to the URL/configuration, not to the result buckets.
+        // An absent bucket is not proof of an invalid ID or an untranslated facet.
+        foreach ($selected as $id) {
+            $active[] = ['id' => $id, 'name' => $names[$id] ?? null,
+                'remaining' => implode(',', array_diff($selected, [$id]))];
+        }
+        return ['values' => $values, 'selected' => $selected, 'active' => $active];
+    }
+
+    public function getAttributesWithImages($itemId){
+        return pluginApp(ItemSearchService::class)->getResult($this->cardAttributeFactory($itemId));
+    }
+
+    /** Index the existing item result once; the first property for an ID wins. */
+    public function getItemPropertiesById(iterable $properties): array
+    {
+        $indexed = [];
+        foreach ($properties as $property) {
+            $id = $property['property']['id'] ?? null;
+            // Result-field property IDs are integers; also retain numeric-string IDs.
+            if (!is_int($id) && !is_numeric($id)) {
+                continue;
+            }
+            $key = (int)$id;
+            if ($id == $key && !array_key_exists($key, $indexed)) {
+                $indexed[$key] = $property;
+            }
+        }
+        return $indexed;
+    }
+
+    private function cardAttributeFactory($itemId)
+    {
+        return VariationAttributeMap::getSearchFactory(['itemId' => $itemId, 'afterKey' => null]);
+    }
+
+    public function getCardAttributeMaps(array $itemIds): array
+    {
+        $mapsByItem = [];
+        // Attribute maps can include documents and images. Keep only the attributes
+        // after each group, even when a ShopBuilder list has a large page size.
+        foreach (array_chunk(array_unique(array_filter($itemIds)), 24) as $ids) {
+            $factories = [];
+            foreach ($ids as $id) {
+                $factories['item' . $id] = $this->cardAttributeFactory($id);
+            }
+            $results = pluginApp(ItemSearchService::class)->getResults($factories);
+            foreach ($ids as $id) {
+                $key = 'item' . $id;
+                if (!isset($results[$key])) {
+                    throw pluginApp(\UnexpectedValueException::class, ['message' => 'Missing card attribute result for ' . $id]);
+                }
+                $mapsByItem[$id] = ['attributes' => $results[$key]['attributes'] ?? []];
+            }
+            unset($results);
+        }
+        return $mapsByItem;
+    }
+    public function getCardLinks($itemUrl, $currency): array
+    {
+        $parts = explode('#', (string)$itemUrl, 2);
+        $fragment = isset($parts[1]) ? '#'.$parts[1] : '';
+        $pathQuery = explode('?', $parts[0], 2);
+        $params = [];
+        foreach (explode('&', $pathQuery[1] ?? '') as $pair) {
+            $name = strtolower(urldecode(explode('=', $pair, 2)[0]));
+            if ($pair !== '' && $name !== 'quickviewitem' && $name !== 'currency') {
+                $params[] = $pair;
+            }
+        }
+        if ($currency && $currency !== 'EUR') {
+            $params[] = 'currency='.rawurlencode($currency);
+        }
+        $url = $pathQuery[0].($params ? '?'.implode('&', $params) : '');
+        return ['product' => $url.$fragment, 'quickview' => $url.($params ? '&' : '?').'quickViewItem=true'.$fragment];
+    }
+
     public function getImageAttributeList($itemId,$attributeNameMap)
     {
         $attributeImageList = null;
@@ -149,10 +263,7 @@ class Base_Extension extends Twig_Extension
             /*,
             "isVisible" => false*/
         ];
-        $itemColumns = [
-            '*'
-        ];       
-        
+
         $feedbacksItem = $FeedbackRepositoryContract->listFeedbacks($page, $maxCount, [], $filters);
         $feedbacksReturn = null;
         if($feedbacksItem == null){
@@ -166,10 +277,7 @@ class Base_Extension extends Twig_Extension
     {
         /** @var FeedbackAverageRepositoryContract $FeedbackAverageRepositoryContract */
         $FeedbackAverageRepositoryContract = pluginApp(FeedbackAverageRepositoryContract::class);
-        $filters = [
-            "itemId" => $itemId
-        ];      
-        
+
         $feedbacksItem = $FeedbackAverageRepositoryContract->getFeedbackAverage($itemId);
         $feedbacksReturn = null;
         if($feedbacksItem == null){
@@ -201,52 +309,11 @@ class Base_Extension extends Twig_Extension
         
         return $response;
     }
-    public function restGetContent($query_url){
 
-        $CookiesPlentyId = $_COOKIE['plentyID'];
-        /*$cooli = array(
-            "Cookie: plentyID=".$CookiesPlentyId,
-            "pragma:no-cache",
-            "cache-control:no-cache"
-        );*/
-        $post = "";
-        $headers = array();
-    
-        $headers[] = "User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:2.0.1) Gecko/20100101 Firefox/4.0.1";
-        $headers[] = 'Accept: application/json, text/javascript, */*; q=0.01'; 
-        $headers[] = 'Accept-Language: de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7';
-        $headers[] = 'Cache-Control: no-cache';
-        $headers[] = 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8';
-        $headers[] = 'Pragma: no-cache';
-        $headers[] = 'Cookie:'.json_encode($_COOKIE);
-        $headers[] = 'Referer: https://www.outlet46.de/';
-        $headers[] = 'X-Requested-With: XMLHttpRequest';
-        
-        $options = array(
-            CURLOPT_URL => $query_url,
-            CURLOPT_HEADER => 0,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 4,
-            CURLOPT_HTTPHEADER => $headers
-        );
-        /** @var BasketService $basketService */
-        $basketService = pluginApp(BasketService::class);
-         
-        
-        $ch = curl_init();
-        foreach($options as $option => $value)
-        {
-            curl_setopt($ch, $option, $value);
-        }
-        /*$sdfsdf = array();
-        foreach ($_SESSION as $key=>$val){
-            $sdfsdf[] = $key." ".$val."<br/>";
-        }*/
-        $content = curl_exec($ch);
-        curl_close($ch);
-        return $basketService->getBasketForTemplate();
-        
-        
+    /** Kept for stored Twig callers. Its result is always the current basket. */
+    public function restGetContent($query_url)
+    {
+        return pluginApp(BasketService::class)->getBasketForTemplate();
     }
     public function sortCatByKey($array, $sortKey)
     {
@@ -321,34 +388,57 @@ class Base_Extension extends Twig_Extension
         return [(float)$priceMin, (float)$priceMax];
     }
 
+    public function createSeoPage($template, $pageMax = null, $currentPage = null, $total = null)
+    {
+        // SeoPage is not a shared container binding: constructor data belongs
+        // to this render only, including when another page is rendered later.
+        return pluginApp(SeoPage::class, [
+            'query' => $this->req->query(),
+            'requestUri' => $this->req->getRequestUri(),
+            'template' => $template,
+            'pageMax' => $pageMax,
+            'currentPage' => $currentPage,
+            'total' => $total
+        ]);
+    }
+
+    public function prepareSeoContent(SeoPage $page, $categoryId): string
+    {
+        if ($page->shopBuilderHtml !== null) {
+            return '';
+        }
+        $previousCapture = $this->seoPageCapture;
+        $this->seoPageCapture = $page;
+        try {
+            $page->shopBuilderHtml = $this->twig->render(
+                'GuardiansBasic::Category.Content.PreparedShopBuilder',
+                ['seoCategoryId' => $categoryId]
+            );
+        } finally {
+            $this->seoPageCapture = $previousCapture;
+        }
+        return '';
+    }
+
+    /** The second argument is retained for compatibility with saved ShopBuilder widgets. */
     public function getItemsFromCat($categoryId, $maxItemsPerPage, $ownFacets, $priceFilter = [0,0])
     {
         $categoryService = pluginApp(CategoryService::class);
-        $categoryContext = pluginApp(CategoryContext::class);
         $activeCategory = $categoryService->get($categoryId);
-        $templateData = array(
-            'category' => $activeCategory
-        );
-        $categoryContext->init($templateData);
+        // The source category belongs to the list only. Never re-initialize the
+        // routed page's shared CategoryContext (metadata, assets, notifications).
 
-        $filterFacets = $this->req->get( 'facets', '' );
-        $facets = $ownFacets ?: [];
-        if($filterFacets!=""){
-            $filterFacetsSplitted = explode(',',$filterFacets);
-            foreach ($filterFacetsSplitted as $facetId) {
-                if ($facetId !== '') {
-                    $facets[] = intval($facetId);
-                }
-            }
-        }
+        $facets = array_values(array_unique(array_merge($ownFacets ?: [], $this->requestedFacetIds())));
+        $sorting = $this->req->get('sorting', '');
+        $sorting = is_string($sorting) ? $sorting : '';
 
         // --- NEU: Preisspanne flexibel auflösen (URL > Param > 0/0)
         [$priceMin, $priceMax] = $this->resolvePriceRange($priceFilter);
 
         $itemListOptions = [
-            'page'          => $this->req->get('page', 1),
-            'itemsPerPage'  => $maxItemsPerPage,
-            'sorting'       => $this->req->get( 'sorting', '' ),
+            'page'          => SeoPage::positiveInteger($this->req->get('page', 1)) ?? 1,
+            'itemsPerPage'  => self::SHOPBUILDER_ITEMS_PER_PAGE,
+            'sorting'       => $sorting,
             'facets'        => $facets,
             'categoryId'    => $categoryId,
             'priceMin'      => $priceMin,
@@ -357,40 +447,61 @@ class Base_Extension extends Twig_Extension
 
         $itemListOptions = SearchOptions::validateItemListOptions($itemListOptions, SearchOptions::SCOPE_CATEGORY);
 
-        $searchParams = [
-            'facets'   => Facets::getSearchFactory( $itemListOptions ),
-            'itemList' => CategoryItems::getSearchFactory( $itemListOptions )
-        ];
+        $effectivePage = SeoPage::positiveInteger($itemListOptions['page']);
+        $effectiveSize = SeoPage::positiveInteger($itemListOptions['itemsPerPage']);
+        if ($effectivePage === null || $effectiveSize !== self::SHOPBUILDER_ITEMS_PER_PAGE) {
+            throw pluginApp(\UnexpectedValueException::class, [
+                'message' => 'Invalid effective category pagination after SearchOptions validation'
+            ]);
+        }
+        $itemListOptions['page'] = $effectivePage;
+        $itemListOptions['itemsPerPage'] = $effectiveSize;
+
+        // The infinite-scroll fragment renders cards and pagination without filter controls.
+        $listFragment = $this->req->get('quickViewItem') === 'true';
+        $searchParams = [];
+        if (!$listFragment) {
+            $searchParams['facets'] = Facets::getSearchFactory($itemListOptions);
+        }
+        $searchParams['itemList'] = CategoryItems::getSearchFactory($itemListOptions);
         /** @var ItemSearchService $itemSearchService */
         $itemSearchService = pluginApp( ItemSearchService::class );
 
         $resultItems = $itemSearchService->getResults($searchParams);
         $total = $resultItems['itemList']['total'];
-        $resultItems['itemList'] = $resultItems['itemList']['documents'];
-        $resultItems['currentPage'] = intval($this->req->get('page', 1));
+        $resultItems['itemList'] = $resultItems['itemList']['documents'] ?? null;
+        $documentCount = is_array($resultItems['itemList']) ? count($resultItems['itemList']) : null;
+        $reportedPages = $total / $effectiveSize;
+        $pageMax = ceil($reportedPages);
+        if ($documentCount > 0 && $effectivePage > $pageMax) {
+            $pageMax = $effectivePage;
+        }
+        $resultItems['currentPage'] = $effectivePage;
         $resultItems['itemCountTotal'] = $total;
-        $resultItems['itemCountPage'] = $maxItemsPerPage;
-        $resultItems['pageMax'] = ceil($total / $maxItemsPerPage);
-        $resultItems['pageLimit'] = ceil($total / $maxItemsPerPage);
+        $resultItems['itemCountPage'] = $effectiveSize;
+        // A full page that already exceeds the total can offer one more navigation
+        // link. Its destination makes its own SEO decision from its own documents.
+        $resultItems['pageMax'] = $documentCount === $effectiveSize && $effectivePage > $reportedPages
+            ? $pageMax + 1 : $pageMax;
+        $resultItems['pageLimit'] = $resultItems['pageMax'];
         $resultItems['categoryId'] = $categoryId;
         $resultItems['category'] = $activeCategory;
-        $defaultSortingOptions = SearchOptions::get(SearchOptions::SCOPE_CATEGORY);
-        $resultItems['searchOptions'] = $defaultSortingOptions;
-        $resultItems['itemSorting'] = $this->req->get( 'sorting', '' );
-        $resultItems['query'] = ['items' => $maxItemsPerPage, 'sorting' => "variation.createdAt_desc"];
+        if (!$listFragment) {
+            $resultItems['searchOptions'] = SearchOptions::get(SearchOptions::SCOPE_CATEGORY);
+        }
+        $resultItems['itemSorting'] = $sorting;
+        $resultItems['query'] = ['items' => $effectiveSize, 'sorting' => $itemListOptions['sorting']];
         $resultItems['selectedFacets'] = $ownFacets;
+
+        if ($this->seoPageCapture !== null) {
+            $this->seoPageCapture->addList($effectivePage, $pageMax, $total, $documentCount);
+        }
 
         return  $this->twig->render('GuardiansBasic::Category.Item.CategoryItemContent', $resultItems);
     }
 
     public function getItemsFromCatSimple($categoryId, $maxItemsPerPage, $ownFacets, $priceFilter = [0,0])
     {
-        $categoryService = pluginApp(CategoryService::class);
-        $categoryContext = pluginApp(CategoryContext::class);
-        $activeCategory = $categoryService->get($categoryId);
-        $templateData = ['category' => $activeCategory];
-        $categoryContext->init($templateData);
-
         // --- NEU: Preisspanne flexibel auflösen (URL > Param > 0/0)
         [$priceMin, $priceMax] = $this->resolvePriceRange($priceFilter);
 

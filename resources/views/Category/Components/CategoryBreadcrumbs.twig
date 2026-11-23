@@ -5,17 +5,19 @@
                 <ul class="list-no-style">
                     <li class="breadcrumb-item">
                         <a href="{{ homepageURL }}">
-                            {{ trans("GuardiansBasic::Template.home") }}  
+                            {{ trans("GuardiansBasic::Template.home") }}
                         </a>
                     </li>
                     {% set break = false %}
-                    {% for category in categoryBreadcrumbs[:categoryBreadcrumbs | length - 1] if not break %}
-                        {% if category.details[0] %}
-                            <li class="breadcrumb-item">
-                                <a href="{{ services.category.getURLById( category.id ) }}" title="{{ category.details[0].name }}">{{ category.details[0].name }}</a>
-                            </li>
-                        {% else %}
-                            {% set break = true %}
+                    {% for category in categoryBreadcrumbs[:categoryBreadcrumbs | length - 1] %}
+                        {% if not break %}
+                            {% if category.details[0] %}
+                                <li class="breadcrumb-item">
+                                    <a href="{{ services.category.getURLById( category.id ) }}" title="{{ category.details[0].name }}">{{ category.details[0].name }}</a>
+                                </li>
+                            {% else %}
+                                {% set break = true %}
+                            {% endif %}
                         {% endif %}
                     {% endfor %}
                     {% set lastCategory = categoryBreadcrumbs | last %}

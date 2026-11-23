@@ -39,8 +39,27 @@
 {% set vuejs = [5482, 5041, 5484,5171] %}
 {% set wkbkasse = [5482, 5484] %}
 {% set currentTemplate = services.template.getCurrentTemplate() %}
+{# IO renders its linked basket category as tpl.category.content; the link is merchant-configurable. #}
+{% set isBasketCategory = currentTemplate == 'tpl.category.content' and (bodyClasses is defined
+    ? 'category-basket' in bodyClasses
+    : (category.id|default(0) > 0 and category.id == config('IO.routing.category_basket'))) %}
+{% set isBasketPage = currentTemplate == 'tpl.basket' or isBasketCategory %}
+{% set isWishListPage = currentTemplate == 'tpl.wish-list' or (currentTemplate == 'tpl.category.content'
+    and category.id|default(0) > 0 and category.id == config('IO.routing.category_wish-list')) %}
+{# Use the template selected by the IO controller, never a return URL or request templateType. #}
+{% set publicLogoutPage = currentTemplate in ['tpl.home', 'tpl.home.category', 'tpl.item', 'tpl.search', 'tpl.tags',
+    'tpl.contact', 'tpl.cancellation-rights', 'tpl.cancellation-form', 'tpl.legal-disclosure', 'tpl.privacy-policy',
+    'tpl.terms-conditions', 'tpl.declaration-of-accessibility', 'tpl.item-not-found', 'tpl.page-not-found',
+    'tpl.category.blog', 'tpl.blog.category', 'tpl.blog.article', 'tpl.blog.search', 'tpl.blog.landing',
+    'tpl.category.item', 'tpl.category.content'] %}
+{% if publicLogoutPage and currentTemplate != 'tpl.item' and category.id|default(0) > 0 %}
+    {% set publicLogoutPage = not isBasketPage and not isWishListPage
+        and category.id not in [5178, 5483, 5482, 5484, config('IO.routing.category_my-account'), config('IO.routing.category_confirmation'),
+            config('IO.routing.category_order-return'), config('IO.routing.category_checkout')]
+        and category.right|default('') != 'customer' and not services.category.isHidden(category.id) %}
+{% endif %}
 {% set currentRequestUri = request.getRequestUri() %}
-{% if currentTemplate in vuePages|keys or "amazon" in currentRequestUri or "expressCheckoutReview" in currentRequestUri or isShopBuilder or category.id in contentVuePages %}
+{% if currentTemplate in vuePages|keys or isBasketCategory or isWishListPage or "amazon" in currentRequestUri or "expressCheckoutReview" in currentRequestUri or isShopBuilder or category.id in contentVuePages %}
     {% set isVueView = true %}
 {% endif %} 
 {% if isVueView %}
@@ -56,17 +75,78 @@
     {{ component( "Ceres::Customer.Components.Contact.AcceptPrivacyPolicyCheck") }}
 {% endif %}   
 {# spaceless #}
-{% endif %}  
+{% endif %}
+{# Render-scoped SEO data; preparation runs after widget/component registration. #}
+{% set seoPage = createSeoPage(services.template.getCurrentTemplate(), pageMax is defined ? pageMax : null, currentPage is defined ? currentPage : null, itemCountTotal is defined ? itemCountTotal : null) %}
+{% block PrepareSeoContent %}{% endblock %}
 <!DOCTYPE html>
-<html lang="{{ lang }}" prefix="og: http://ogp.me/ns#">
+<html lang="{{ lang }}" prefix="og: http://ogp.me/ns#"{% if isQuickView and not publicLogoutPage %} data-eg-logout-home="{{ urls.home|default('/') }}"{% if services.customer.getContactId() > 0 %} data-eg-private-member{% endif %}{% endif %}>
     <head>
         {% if isQuickView %}
+        <script data-eg-session-history>
+        (() => {
+            const root = document.documentElement;
+            const home = root.getAttribute('data-eg-logout-home');
+            const conceal = () => root.style.setProperty('display', 'none', 'important');
+            const fromHistory = performance.getEntriesByType('navigation')[0]?.type === 'back_forward';
+            const wasMember = root.hasAttribute('data-eg-private-member');
+            // Keep only a logout generation on personal history entries, never keys, URLs or customer data.
+            const generation = () => {
+                try { return localStorage.getItem('eg:lastLogout') || ''; } catch (_) { return null; }
+            };
+            let entry = history.state?.egMemberGeneration;
+            if (wasMember && !fromHistory) {
+                entry = generation();
+                history.replaceState({...history.state, egMemberGeneration: entry}, '');
+            }
+            async function restore() {
+                conceal();
+                if (home === null) {
+                    location.reload();
+                    return;
+                }
+                // Ceres or another tab can end the session independently of the theme button.
+                // Check IO before revisiting a personal URL that may still carry a valid order key.
+                if (typeof entry === 'string' && entry === generation()) {
+                    try {
+                        const response = await fetch('/rest/io/customer/', {
+                            cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(8000)
+                        });
+                        const contact = response.status === 200 ? await response.json() : null;
+                        if (!contact?.error && /^[1-9]\d*$/.test(contact?.data?.id)) {
+                            location.reload();
+                            return;
+                        }
+                    } catch (_) { /* Unconfirmed session: take the public fallback. */ }
+                }
+                location.replace(location.origin + (/^\/(?:[a-z]{2}\/?)?$/.test(home) ? home : '/'));
+            }
+            if (home !== null && fromHistory && (wasMember || entry !== undefined)) {
+                restore();
+                return;
+            }
+            let concealed = false;
+            window.addEventListener('pagehide', event => {
+                if (event.persisted && (wasMember || document.querySelector('.btn-login-open.isLoggedIn, .loginpreview-register [data-eg-handler="logoutUser"]'))) {
+                    concealed = true;
+                    conceal();
+                }
+            });
+            window.addEventListener('pageshow', event => {
+                if (event.persisted && concealed) restore();
+            });
+        })();
+        </script>
         {{ get_consent_scripts(ceresConfig.global.blockCookies) }}
         {% endif %}
+        {# Render metadata once so the head also sees robots from child blocks. #}
+        {% set renderedPartialHead %}
+            {% block PartialHead %}
+                {% embed getPartial('page-metadata') %}{% endembed %}
+            {% endblock %}
+        {% endset %}
         {% include getPartial('head') %}
-        {% block PartialHead %}
-            {% embed getPartial('page-metadata') %}{% endembed %}
-        {% endblock %}
+        {{ renderedPartialHead|raw }}
          {% if isQuickView %}
         {% set filteredStyles = get_additional_styles() %}
         {% for styleTemplate in filteredStyles %}
@@ -98,7 +178,7 @@
         {% endif %}
         {% endif %}
     </head>
-    <body class="hold-transition" {% if isVueView %}id="isVueView"{% endif %}>
+    <body class="hold-transition" {% if isVueView %}id="isVueView"{% endif %}{% if isBasketPage %} data-o46-basket-sync{% endif %}{% if not isBasketPage and currentTemplate != 'tpl.checkout' and category.id not in wkbkasse|default([]) %} data-eg-shop-dialogs{% endif %}>
         {% if isQuickView %}
         {{ context.renderState() }}
         <!-- SSR:app() -->
@@ -111,14 +191,14 @@
                     <shipping-country-select :disable-input="{{ services.template.isCheckout() | json_encode() }}"></shipping-country-select>
                 </div>
                 <div id="login-modal-wrapper">
-                    <div class="modal fade login-modal" id="login" tabindex="-1" role="dialog">
+                    <div class="modal login-modal" id="login" data-eg-dialog aria-labelledby="eg-login-title" tabindex="-1" role="dialog">
                         <div class="modal-dialog">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true" aria-label="Close">
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="{{ trans('GuardiansBasic::Template.facetClose') }}">
                                         <span aria-hidden="true">&times;</span>
                                     </button>
-                                    <div class="modal-title h3">{{ trans("Ceres::Template.login") }}</div>
+                                    <div class="modal-title h3" id="eg-login-title">{{ trans("Ceres::Template.login") }}</div>
                                 </div>
                                 <login template="#vue-login" modal-element="login-modal-wrapper"></login>
                             </div>
@@ -127,7 +207,7 @@
                 </div>
             {% endif %}
             {% include getPartial('header') %}
-            <div id="page-body" {% if currentTemplate == "tpl.wish-list" %}class="isWishList"{% endif %}>    
+            <div id="page-body" {% if currentTemplate == "tpl.wish-list" %}class="isWishList"{% elseif urls.templateType == 'home' %}class="isHome"{% endif %}>
             {% endif %}
             {% block PageBody %}
                 <!-- inject content of inherited templates here -->
@@ -141,23 +221,17 @@
             {% include getPartial('footer') %}
         </div>
         <!-- /SSR -->
-        <div class="modal fade dynamicModal" tabindex="-1" role="dialog">
+        <template id="o46-basket-toast">{% include "GuardiansBasic::DynamicContent.DynamicBasketPreviewSmall" %}</template>
+        <div class="modal dynamicModal" data-eg-dialog aria-labelledby="eg-info-title" tabindex="-1" role="dialog">
             <div class="modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <span class="modal-title"></span>
-                  <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span class="modal-title" id="eg-info-title"></span>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="{{ trans('GuardiansBasic::Template.facetClose') }}">
                         <span aria-hidden="true">&times;</span>
                   </button>
                 </div>
-                <div class="modal-body"> 
-                    <div class="loading-modal--wrap">
-                        <div>
-                            <span class="icon-spinner9 loader-basket"></span>
-                        </div>
-                        <div class="text-center">{{ trans("GuardiansBasic::Template.loadinginfo") }}</div>
-                    </div>
-                </div>
+                <div class="modal-body" data-loading="{{ trans('GuardiansBasic::Template.dialogLoading') }}" data-load-error="{{ trans('GuardiansBasic::Template.dialogLoadError') }}"></div>
               </div>
             </div>
         </div>              
@@ -231,8 +305,24 @@
             </script>
             
             {{ Loader.include_components() }}
+            {% if isWishListPage %}
+                {% include "GuardiansBasic::WishList.Components.WishList" %}
+            {% endif %}
             {{ LayoutContainer.show("Ceres::Script.Loader") }}
-            {{ Translations.add( "Ceres", "Template" ) }}
+            {% if isWishListPage and lang in ['it', 'es'] %}
+                {# Use the Ceres translation block for both wishlist components. Store translations take precedence. #}
+                {% set wishListFallbacks = {
+                    wishListInactiveItemAvailability: trans('GuardiansBasic::Template.wishListInactiveItemAvailability'),
+                    wishListInactiveItemId: trans('GuardiansBasic::Template.wishListInactiveItemId')
+                } %}
+                <!-- SSR:global(translations.Ceres.Template) -->
+                <script type="application/json" data-translation="Ceres::Template">
+                    {{ wishListFallbacks|merge(services.localization.getTranslations('Ceres', 'Template')|default({}))|json_encode(15)|raw }}
+                </script>
+                <!-- /SSR -->
+            {% else %}
+                {{ Translations.add( "Ceres", "Template" ) }}
+            {% endif %}
             {{ get_json_data() }}
             
             {% set minSuffix = ceresConfig.log.performanceLevel == 'development' ? '' : '.min' %}
@@ -263,10 +353,13 @@
             var activeLang2 = "{{ lang == 'de' ? '' : '/' ~ lang }}";
              </script>      
             {% if isVueView %}
-            {% include "GuardiansBasic::PageDesign.Components.cashinadvance" %}    
+            {% include "GuardiansBasic::PageDesign.Components.cashinadvance" %}
             {% if assetName is defined and assetName == 'ceres-checkout' %}
                 {{ LayoutContainer.show("Ceres::Checkout.AfterScriptsLoaded") }}
             {% endif %}                    
+            {% if isBasketPage %}
+                {% include "GuardiansBasic::Basket.Partials.QuantitySync" %}
+            {% endif %}
             <!-- SSR:on() -->
             <script>
                 window.createApp("#vue-app");
@@ -323,7 +416,6 @@
                 "301": "{{ trans("Ceres::Template.notificationRemoveCouponMinimumOrderValueIsNotReached") }}",
                 "401": "{{ trans("Ceres::Template.notificationsCalculateShippingFailed") }}",
                 "loginSuccessTitle" : "{{ trans("GuardiansBasic::Template.loginSuccessTitle") }}",
-                "loginSuccess" : "{{ trans("GuardiansBasic::Template.loginSuccess") }}",
                 "loginSuccess" : "{{ trans("GuardiansBasic::Template.loginSuccess1") }}",
                 "stockWarn1" : "{{ trans("GuardiansBasic::Template.stockWarn1") }}",
                 "stockWarn2" : "{{ trans("GuardiansBasic::Template.stockWarn2") }}",
@@ -383,12 +475,12 @@
        {% if not services.template.shouldBeCached() %}
             <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
         {% endif %}
-<div class="modal fade modal-cross" tabindex="-1" role="dialog">
+<div class="modal fade modal-cross" data-eg-dialog aria-labelledby="eg-quick-title" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
       <div class="modal-content">
         <div class="modal-header">
-          <span class="modal-title"></span>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span class="modal-title" id="eg-quick-title">{{ trans('GuardiansBasic::Template.quickViewTitle') }}</span>
+          <button type="button" class="close" data-dismiss="modal" aria-label="{{ trans('GuardiansBasic::Template.facetClose') }}">
                 <span aria-hidden="true">&times;</span>
           </button>
         </div>
@@ -397,27 +489,35 @@
       </div>
     </div>
 </div>    
-            {% if "amazon" in currentRequestUri or "expressCheckoutReview" in currentRequestUri or category.id in mainjs  %}
-               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
-               <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/main-050525.min.js" defer></script>
-            {% elseif category.id in vuejs %}
-                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/vue-060525.min.js" defer></script>
-            {% elseif currentTemplate in vuePages|keys %} 
-               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/main-050525.min.js" defer></script>
-            {% elseif category.id in nojs %}
-               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/main-050525.min.js" defer></script>
+            {# The brands directory explicitly renders no product grid or facets. #}
+            {% if (category.id or isSearch) and not isItem and not isBasketPage and (rendersItemGrid is not defined or rendersItemGrid) %}
+                <script src="{{ plugin_path('GuardiansBasic') }}/js/facets.min.js?v=1" defer></script>
+            {% endif %}
+            {# Keep the existing page selection and Ceres-owned jQuery exception. #}
+            {# Asset URLs are generated from asset-versions.json by npm run build. #}
+            {% set themePageScript = 'main.min.js?v=2' %}
+            {% set themeNeedsJquery = true %}
+
+            {% if "amazon" in currentRequestUri or "expressCheckoutReview" in currentRequestUri or (not isBasketCategory and category.id in mainjs) %}
+            {% elseif isBasketCategory or category.id in vuejs %}
+                {% set themeNeedsJquery = false %}
+            {% elseif currentTemplate in vuePages|keys or category.id in nojs %}
+            {% elseif rendersItemGrid is defined and not rendersItemGrid %}
             {% elseif category.id or isSearch %}
-               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/cat-050525.min.js" defer></script>
+                {% set themePageScript = 'cat.min.js?v=3' %}
             {% elseif isItem %}
-               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/item-050525.min.js" defer></script>
-            {% else %} 
-               <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js"></script>
-                <script type="text/javascript" src="{{ plugin_path('GuardiansBasic') }}/js/main-050525.min.js" defer></script>
-            {% endif %} 
+                {% set themePageScript = 'item.min.js?v=2' %}
+
+            {% endif %}
+            {% if themeNeedsJquery %}
+                <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js?v=1"></script>
+            {% endif %}
+            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=6" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
+            <script src="{{ plugin_path('GuardiansBasic') }}/js/{{ themePageScript }}"{% if not themeNeedsJquery %} data-eg-vue-logout{% endif %} defer></script>
+            {% if isItem %}
+                {# After item.js defines mzOptions, before DOMContentLoaded initializes the gallery. #}
+                <script src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" data-eg-magiczoom defer></script>
+            {% endif %}
             {{ LayoutContainer.show("Ceres::Script.AfterScriptsLoaded") }} 
             {% if isItem %}
                 {{ LayoutContainer.show("Ceres::SingleItem.AfterScriptsLoaded") }}

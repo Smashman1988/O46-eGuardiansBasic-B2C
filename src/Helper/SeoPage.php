@@ -1,0 +1,168 @@
+<?php
+
+namespace GuardiansBasic\Helper;
+
+/** Data for one page render only; never persisted or shared between requests. */
+class SeoPage
+{
+    public $shopBuilderHtml = null;
+    private $query;
+    private $template;
+    private $duplicatePage;
+    private $blockRobots = '';
+    private $categoryPagination;
+    private $lists = [];
+
+    public function __construct(array $query, $template, $pageMax = null, $currentPage = null, $total = null, $requestUri = '')
+    {
+        // The parsed request retains only the last repeated scalar key.
+        $rawQuery = explode('?', (string)$requestUri, 2)[1] ?? '';
+        $this->duplicatePage = false;
+        $seenPage = false;
+        foreach (explode('&', $rawQuery) as $pair) {
+            $name = explode('=', $pair, 2)[0];
+            // Match the raw (possibly percent-encoded) lowercase PHP key, including array syntax.
+            if (preg_match('/^(?:p|%70)(?:a|%61)(?:g|%67)(?:e|%65)(?:$|\[|%5[bB])/D', $name)) {
+                if ($seenPage) {
+                    $this->duplicatePage = true;
+                    break;
+                }
+                $seenPage = true;
+            }
+        }
+        $this->query = $query;
+        $this->template = $template;
+        $this->categoryPagination = ['pageMax' => $pageMax, 'currentPage' => $currentPage, 'total' => $total];
+    }
+
+    public static function positiveInteger($value, bool $allowPadding = false)
+    {
+        if (!is_int($value) && !is_string($value)) {
+            return null;
+        }
+        // Request IDs can be zero-padded. Pagination and callers using the
+        // default continue to require a canonical positive integer.
+        $text = $allowPadding ? trim((string)$value) : (string)$value;
+        $pattern = $allowPadding ? '/^0*([1-9][0-9]*)$/D' : '/^([1-9][0-9]*)$/D';
+        if (!preg_match($pattern, $text, $matches)) {
+            return null;
+        }
+        $integer = filter_var($matches[1], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        return $integer === false ? null : $integer;
+    }
+
+    private function nonNegativeInteger($value)
+    {
+        if ($value === 0 || $value === 0.0 || $value === '0') {
+            return 0;
+        }
+        // Ceres supplies pageMax through ceil(), i.e. as an integral float.
+        // Bounds reject NaN and both infinities before floor() or an int cast.
+        if (is_float($value) && $value > 0 && $value < PHP_INT_MAX && floor($value) === $value) {
+            $value = (int)$value;
+        }
+        return self::positiveInteger($value);
+    }
+
+    public function addList($currentPage, $pageMax, $total, $documentCount = null)
+    {
+        $this->lists[] = ['currentPage' => $currentPage, 'pageMax' => $pageMax, 'total' => $total, 'documentCount' => $documentCount];
+    }
+
+    public function disableCategoryPagination()
+    {
+        $this->categoryPagination = null;
+    }
+
+    public function getPagination(): array
+    {
+        $hasPage = array_key_exists('page', $this->query);
+        $requestedPage = $hasPage ? self::positiveInteger($this->query['page']) : 1;
+        $invalidInput = $this->duplicatePage || ($hasPage && $requestedPage === null);
+        $hasList = $this->template === 'tpl.category.item' && $this->categoryPagination !== null;
+        $pagination = $hasList ? $this->categoryPagination : [];
+        $ambiguous = false;
+        if ($this->template === 'tpl.category.content') {
+            $hasList = count($this->lists) > 0;
+            $ambiguous = count($this->lists) > 1;
+            // Only a single full paginated list is an unambiguous main list.
+            $pagination = count($this->lists) === 1 ? $this->lists[0] : [];
+        }
+        $pageMax = $this->nonNegativeInteger($pagination['pageMax'] ?? null);
+        $total = $this->nonNegativeInteger($pagination['total'] ?? null);
+        $effectivePage = self::positiveInteger($pagination['currentPage'] ?? null);
+        $outOfRange = $hasList && $pageMax !== null && $requestedPage !== null
+            && $requestedPage > 1 && $requestedPage > $pageMax;
+        $documentCount = $pagination['documentCount'] ?? null;
+        $empty = $hasList && ($documentCount ?? 0) === 0 && ($total === 0 || $pageMax === 0);
+        $valid = $hasList && !$ambiguous && !$invalidInput && !$empty && $pageMax !== null
+            && $requestedPage <= $pageMax && $effectivePage === $requestedPage
+            && ($requestedPage === 1 || $documentCount !== 0);
+        // An empty category is still a real landing page. Keep its first page
+        // eligible for the configured robots directives; empty price searches
+        // and unproven follow-up pages retain their existing restrictions.
+        $emptyFirstCategory = $empty && $this->template === 'tpl.category.item' && $requestedPage === 1
+            && !array_key_exists('priceMin', $this->query) && !array_key_exists('priceMax', $this->query);
+
+        return [
+            'requestedPage' => $requestedPage,
+            'currentPage' => $valid ? $effectivePage : 1,
+            'pageMax' => $pageMax,
+            'hasList' => $hasList,
+            'ambiguous' => $ambiguous,
+            'invalidInput' => $invalidInput,
+            'outOfRange' => $outOfRange,
+            'empty' => $empty,
+            'valid' => $valid,
+            // Unknown bounds are not an invented one-page list. Unproven follow-up
+            // URLs still get a base canonical and noindex as a conservative fallback.
+            'noindex' => $invalidInput || ($empty && !$emptyFirstCategory) || ($hasPage && $requestedPage > 1 && !$valid)
+        ];
+    }
+
+    private function parseRobotsDirectives($value): array
+    {
+        $tokens = [];
+        foreach (explode(',', strtoupper(trim((string)$value))) as $directive) {
+            // Preserve directive values (e.g. max-snippet or unavailable_after).
+            if (strpos($directive, ':') !== false) {
+                $tokens[] = trim($directive);
+            } else {
+                $tokens = array_merge($tokens, preg_split('/[\s_]+/', trim($directive), -1, PREG_SPLIT_NO_EMPTY));
+            }
+        }
+        if (in_array('NONE', $tokens, true)) {
+            $tokens = array_merge($tokens, ['NOINDEX', 'NOFOLLOW']);
+        }
+        return array_values(array_diff($tokens, ['ALL', 'NONE']));
+    }
+
+    public function setBlockRobots($directives)
+    {
+        $this->blockRobots = $directives;
+    }
+
+    public function getRobots($blockRobots, $categoryRobots, $forceNoIndex, bool $listingHistory = false): string
+    {
+        $block = $this->parseRobotsDirectives($blockRobots ?: $this->blockRobots);
+        $category = $this->parseRobotsDirectives($categoryRobots);
+        $restrictions = array_merge($block, $category);
+        $robots = array_values(array_unique($restrictions));
+        $noindex = $forceNoIndex || in_array('NOINDEX', $restrictions, true) || $this->getPagination()['noindex'];
+        $nofollow = in_array('NOFOLLOW', $restrictions, true);
+        foreach (array_keys($this->query) as $key) {
+            // The fragment itself stays noindex. Its visible history URL omits this transport flag.
+            if ($listingHistory && $key === 'quickViewItem') {
+                continue;
+            }
+            if (in_array(strtolower($key), ['query', 'currency', 'quickviewitem', 'facets', 'sorting', 'pricemin', 'pricemax'], true)) {
+                $noindex = true;
+            }
+        }
+        if (strpos($this->template, 'tpl.search') === 0 || $this->template === 'tpl.page-not-found') {
+            $noindex = true;
+        }
+        $robots = array_values(array_diff($robots, ['INDEX', 'NOINDEX', 'FOLLOW', 'NOFOLLOW']));
+        return implode(',', array_merge([$noindex ? 'NOINDEX' : 'INDEX', $nofollow ? 'NOFOLLOW' : 'FOLLOW'], $robots));
+    }
+}

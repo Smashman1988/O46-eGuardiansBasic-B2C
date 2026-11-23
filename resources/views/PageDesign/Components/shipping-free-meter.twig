@@ -63,7 +63,7 @@
     }
 
     var cur   = 'EUR'; // Anzeige bleibt EUR, weil nur in EUR sichtbar
-    var limit = n(box.getAttribute('data-limit') || 49);
+    var limit = n(box.getAttribute('data-limit') || {{ FREE_LIMIT }});
     if (!(limit > 0)){ box.classList.add('is-hidden'); return; }
 
     var gross = basketGross(items);

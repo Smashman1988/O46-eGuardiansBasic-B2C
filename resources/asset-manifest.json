@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 4,
+  "assets": {
+    "css/checkout.min.css": {
+      "version": 1,
+      "sha256": "9bf47285af9957edb26e66b14901b94533d2d42acb2522d0df4af3c91aaecaee"
+    },
+    "css/main.min.css": {
+      "version": 2,
+      "sha256": "ca3ddf58dd8aedbdd81a5b9220e45eed5be770c4bdbaba133952c6cbec2bf4d5"
+    },
+    "js/cat.min.js": {
+      "version": 3,
+      "sha256": "2d592b4b22657924c6ee4a7f6b504c33d629e0648b9a89c26fbdf2c80963a4ec"
+    },
+    "js/core.min.js": {
+      "version": 6,
+      "sha256": "af14b181106241d6a92c53bf8076f0f5d4e84ab3dd9884ebed96e5281dc9c095"
+    },
+    "js/facets.min.js": {
+      "version": 1,
+      "sha256": "838495844a40d52b99cc50f1e7ef69be19dcaa27a5d3ec4591c0bc8b462cd2f3"
+    },
+    "js/item.min.js": {
+      "version": 2,
+      "sha256": "8d262292c040ae11e1f25bd47d1ca610a17727942b2aaf26d5183d18f6840d0e"
+    },
+    "js/jquery-3.7.1.min.js": {
+      "version": 1,
+      "sha256": "fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a"
+    },
+    "js/magiczoom.min.js": {
+      "version": 1,
+      "sha256": "1e23342e39817586c448d281818f8e8e255d4183baa6bbcef3c24c6d52eeb81e"
+    },
+    "js/main.min.js": {
+      "version": 2,
+      "sha256": "5a92367bb10ea60270d1c5e74998c04ad0b4690583e36fbb472a60640fccbcd3"
+    },
+    "js/vue.min.js": {
+      "version": 2,
+      "sha256": "b60b90e69dc87cee244b3c8e666204f20f63f4feb07a500eff8ce887ad3e6201"
+    }
+  }
+}

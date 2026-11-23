@@ -13,12 +13,9 @@
 {% else %}
   {% import "GuardiansBasic::Category.Macros.CategoryTree.twig" as Tree %}
 {% endif %}
-{% set basketItems = services.basket.getBasketForTemplate() %}
-    {% set isVueView = false %}
-{% if services.template.getCurrentTemplate() == "tpl.basket" or services.template.getCurrentTemplate() == "tpl.login" or services.template.isCheckout() or services.template.getCurrentTemplate() == "tpl.register" %}
-    {% set isVueView = false %}
-{% endif %}
-{% set currencycheck = services.checkout.getCurrencyData.name %}
+{% set basketItems = pdpBasketForHeader is defined ? pdpBasketForHeader : services.basket.getBasketForTemplate() %}
+{% set headerCurrency = services.checkout.getCurrencyData() %}
+{% set currencycheck = headerCurrency.name %}
 {% set currencyParam = currencycheck != "EUR" ? '?currency=' ~ currencycheck : '' %}
 
 
@@ -26,19 +23,19 @@
 <div class="container nopadding">
         <div class="col-12 text-right lang-switcher nopadding">
            <span class="f-size16"><a href="{{ googlereviewlink }}">{{ trans("GuardiansBasic::Template.trustpilotinfo") }} <img fetchpriority="low" src="{{ plugin_path('GuardiansBasic') }}/images/g-Logo.svg" alt="Outlet46.de" class="margin-right-10" style="vertical-align: middle;max-height: 25px;max-width: 80px;"></a></span>
-            <button href="#" class="btn-small margin-right7-5 text-black" data-eg-handler="modalContent" data-eg-type="modal-lg" data-eg-event="click" data-eg-href="{{ langSlug }}/getShopBuilderContent/?categoryId=5638" data-eg-title="{{ trans("GuardiansBasic::Template.currency") }}">{{ services.checkout.getCurrencyData()['symbol'] }}</button>
-            <button href="#" class="btn-small margin-right7-5 text-black" data-eg-handler="modalContent" data-eg-type="modal-lg" data-eg-event="click" data-eg-href="{{ langSlug }}/getShopBuilderContent/?categoryId=5640" data-eg-title="{{ trans('GuardiansBasic::Template.langchange') }}" aria-label="{{ trans('GuardiansBasic::Template.langchange') }}"><img fetchpriority="low" src="{{ plugin_path('Ceres') }}/images/flags/4x3/{{ flags[lang]|default('de') }}.svg" class="flag-icon" alt="flag-{{ flags[lang]|default('de') }}"></button>
+            <button href="#" class="btn-small margin-right7-5 text-black" data-eg-handler="modalContent" data-eg-type="modal-lg" data-eg-event="click" data-eg-href="{{ langSlug }}/getShopBuilderContent/?categoryId=5638" data-eg-currency data-eg-title="{{ trans('GuardiansBasic::Template.currencyDialogTitle') }}">{{ headerCurrency.symbol }}</button>
+            <button type="button" class="btn-small margin-right7-5 text-black" data-eg-handler="modalContent" data-eg-type="modal-lg" data-eg-language-switch data-eg-language-unavailable="{{ trans('GuardiansBasic::Template.facetLanguageUnavailable') }}" data-eg-href="{{ langSlug }}/getShopBuilderContent/?categoryId=5640" data-eg-title="{{ trans('GuardiansBasic::Template.langchange') }}" aria-label="{{ trans('GuardiansBasic::Template.langchange') }}"><img fetchpriority="low" src="{{ plugin_path('Ceres') }}/images/flags/4x3/{{ flags[lang]|default('de') }}.svg" class="flag-icon" alt="flag-{{ flags[lang]|default('de') }}"></button>
         </div>
 </div>
 {#{% endcacheblock %}#}
-<header class="main-header stickyhead" id="page-header">
+<header class="main-header stickyhead" id="page-header" data-eg-basket-currency="{{ currencycheck }}"{% if not services.template.shouldBeCached() and basketItems.shippingCountryId is defined %} data-eg-basket-country="{{ basketItems.shippingCountryId }}"{% endif %}>
     <div class="eg-backdrop eg-backdrop-basket-prev transition" data-eg-handler="closeBackdrop" data-eg-event="click touchend"></div>
     <div class="header-wrap">
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-5 col-sm-5 col-lg-3 col-xlg-3 col-xxlg-3 no-pad-right">
                     <a href="{{ langSlug }}/{{ currencyParam }}" title="Outlet46.de" class="company-logo"> 
-                        <img fetchpriority="low" src="{{ plugin_path('GuardiansBasic') }}/images/logo-outlet-new.svg" alt="Outlet46.de" class="o-logo"/>
+                        <img fetchpriority="low" src="{{ plugin_path('GuardiansBasic') }}/images/logo-outlet-new.svg" alt="Outlet46.de" width="332" height="112" class="o-logo"/>
                     </a>
                 </div>  
                 <div class="col-12 col-lg-5 col-xxlg-5 search-box">
@@ -47,7 +44,7 @@
                         <div data-eg-search>
                             <div class="search-wrap">
                                 <form action="{{ langSlug ~ '/search/' }}" method="get"> 
-                                    <input type="text" class="form-control input-ff-search" placeholder="{{ trans("GuardiansBasic::Template.searchinfo") }}" data-eg-event="load" data-eg-handler="initLiveSearch" data-eg-livesearch name="query" autocomplete="off"  /> 
+                                    <input type="text" class="form-control input-ff-search" placeholder="{{ trans("GuardiansBasic::Template.searchinfo") }}" data-eg-event="load" data-eg-handler="initLiveSearch" data-eg-livesearch name="query" autocomplete="off"  />
                                     <button class="btn-set-search fs35" aria-label="search">
                                         <span class="icon-search"></span>
                                     </button>
@@ -59,13 +56,13 @@
                 </div> 
                 <div class="col-7 col-sm-7 col-md-7 col-lg-4">
                     <div class="d-flex justify-content-between justify-content-lg-end">
-                        <button data-eg-event="click" data-eg-handler="tgClass" data-eg-param="html,menu-open" class="d-lg-none btn-mobile-nav text-black" aria-label="Menü öffnen">
+                        <button data-eg-event="click" data-eg-handler="tgClass" data-eg-param="html,menu-open" aria-controls="o46-menu" aria-expanded="false" class="d-lg-none btn-mobile-nav text-black" aria-label="{{ trans('GuardiansBasic::Template.openMenu') }}">
                             <span class="icon-menu1 fs35"></span>
                             <span class="mobile-btn-txt">{{ trans("GuardiansBasic::Template.menu") }}</span>
                         </button>
                         {% if category.id in vuejs %}
                             {% else %}
-                        <button class="d-lg-none btn-mobile-nav text-black" data-eg-event="click" data-eg-param="html,search-open" data-eg-handler="tgClass" aria-label="Suche öffnen">
+                        <button class="d-lg-none btn-mobile-nav text-black" data-eg-event="click" data-eg-param="html,search-open" data-eg-handler="tgClass" aria-label="{{ trans('GuardiansBasic::Template.openSearch') }}">
                             <span class="icon-search-1 fs35"></span>
                             <span class="mobile-btn-txt">{{ trans("GuardiansBasic::Template.search") }}</span>
                         </button>
@@ -87,9 +84,9 @@
                        <div class="btn-unstyled btn-mobile-nav">
                            <a href="{{ basketUrl }}{{ currencyParam }}" class="text-black">
 						   {% if basketItems.itemQuantity < 10 %}
-						   <span class="header-quant-info"></span>
+						   <span data-eg-basket-quantity class="header-quant-info"></span>
 						   {% else %}
-						   <span class="header-quant-info2"></span>
+						   <span data-eg-basket-quantity class="header-quant-info2"></span>
 						   {% endif %}
                            <span class="icon-online-shopping-cart fs35 icon-head-menu"></span>
 							
@@ -104,7 +101,7 @@
 						   <span data-eg-basket-quantity class="header-quant-info2">0</span>
 						   {% endif %}
                            <span class="icon-online-shopping-cart fs35 icon-head-menu"></span>
-				<span class="mobile-btn-txt d-sm-block d-lg-inline-block d-xxl-inline-block header-sum-info"> <span data-basket-sum="" class="d-sm-inline-block padding-l-10" v-basket-item-sum="$store.state.basket.data.itemSum">0,00</span><span data-currency-symbol>{{ services.checkout.getCurrencyData.symbol }}</span></span>
+				<span class="mobile-btn-txt d-sm-block d-lg-inline-block d-xxl-inline-block header-sum-info"> <span data-basket-sum="" class="d-sm-inline-block padding-l-10" v-basket-item-sum="$store.state.basket.data.itemSum">0,00</span><span data-currency-symbol>{{ headerCurrency.symbol }}</span></span>
                            </a>
 
                         </div>   
@@ -119,44 +116,15 @@
     </div>
 </header>
             <header class="main-header headpadding" id="page-header2">
-    {% if isVueView %}     
-        <div class="cat-subcats chechout-title-wrap header2-info">
-            <div class="container">
-                <div class="row">
-                    <div class="col-md-5 cat-undercats-wrap">
-                        {% set checkoutTitle = "" %}
-                        {% if services.template.getCurrentTemplate() == "tpl.basket" %}
-                            {% set checkoutTitle = "Warenkorb" %}
-                        {% endif %}     
-                        {% if services.template.getCurrentTemplate() == "tpl.login" %} 
-                            {% set checkoutTitle = "Login" %}
-                        {% endif %}     
-                        {% if services.template.isCheckout() %}    
-                            {% set checkoutTitle = "Kasse" %}
-                        {% endif %}     
-                        {% if  services.template.getCurrentTemplate() == "tpl.register" %}
-                            {% set checkoutTitle = "Registrierung" %}
-                        {% endif %}     
-                        <div>
-                            <h1 class="category-title">{{ checkoutTitle }}</h1>
-                        </div>
-                    </div>
-                    <div class="col-md-7">
-                        <span class="bg-eck"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% else %}    
     {#{% cacheblock use "nav.categories." ~ lang ~ "." ~ currencycheck %}#}
     <nav class="d-print-none">
         <div class="container">
             <div class="row">
                 <div class="col-lg-12 col-static">
-                    <div class="top-menu-wrapper"  data-eg-event="click" data-eg-target="[data-eg-open-ddown]">
+                    <div class="top-menu-wrapper" id="o46-menu"  data-eg-event="click" data-eg-target="[data-eg-open-ddown]">
                         <div class="basket-prev-title clearfix modal-header d-lg-none">
                             <span class="modal-title">{{ trans("GuardiansBasic::Template.categories") }}</span>
-                            <button class="basket-prev-close close" data-eg-handler="tgClass" data-eg-param="html,menu-open" data-eg-event="click" aria-label="Close">
+                            <button class="basket-prev-close close" data-eg-handler="tgClass" data-eg-param="html,menu-open" aria-controls="o46-menu" aria-expanded="false" data-eg-event="click" aria-label="{{ trans('GuardiansBasic::Template.facetClose') }}">
                                 <span aria-hidden="true">×</span>
                             </button>
                         </div>                        
@@ -169,7 +137,6 @@
         </div> 
     </nav>
     {#{% endcacheblock %}#}
-    {% endif %}     
 </header>
 {#{% cacheblock use "trustbar." ~ lang ~ "." ~ currencycheck %}#}
     <div class="top-top-bar">

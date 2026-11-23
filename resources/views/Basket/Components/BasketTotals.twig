@@ -152,9 +152,9 @@
                 {{ trans("Ceres::Template.basketExportDeliveryWarning", { from: "${ shopCountry && shopCountry.currLangName }", to: "${ currentShippingCountry && currentShippingCountry.currLangName }" }) }}
             </div>
         {% endif %}
-        <template v-if="basket.itemSum<75 && basket.itemSum >=60">
+        <template v-if="basket.shippingCountryId == 1 && basket.currency === 'EUR' && basket.itemSum > 0 && basket.itemSum < 54">
             <div class="basket-mintotal">
-                Dir fehlen noch  ${ 75 - basket.itemSum | currency } für eine Versandkostenfreie Lieferung. 
+                Dir fehlen noch  ${ 54 - basket.itemSum | currency } für eine versandkostenfreie Lieferung.
                 Wir haben hier passende Produkte für dich. Klicke hier.
             </div>
         </template>

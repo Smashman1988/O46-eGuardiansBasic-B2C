@@ -67,11 +67,6 @@
   var WAIT_FOR_FOREIGN_SESSION = true;
   var sawForeignSession = false;
 
-  if (!window.__O46_FETCH_ORIG__)   window.__O46_FETCH_ORIG__   = window.fetch.bind(window);
-  if (!window.__O46_XHROPEN_ORIG__) window.__O46_XHROPEN_ORIG__ = XMLHttpRequest.prototype.open;
-  var origFetch = window.__O46_FETCH_ORIG__;
-  var origOpen  = window.__O46_XHROPEN_ORIG__;
-
   var PAGE_VISIBLE = !document.hidden;
   document.addEventListener('visibilitychange', function(){ PAGE_VISIBLE = !document.hidden; }, {passive:true});
 
@@ -201,6 +196,17 @@
     var nodes = li.querySelectorAll('.o46-rrp-line');
     for (var el of nodes){ if (el && el.parentNode) el.parentNode.removeChild(el); }
   }
+  function updateExtraLine(li, selector, className, anchor, text){
+    var nodes = li.querySelectorAll(selector);
+    var node = nodes[0];
+    for (var i=1;i<nodes.length;i++) nodes[i].remove();
+    if (!node){
+      node = document.createElement('div');
+      node.className = className;
+    }
+    if (node.textContent !== text) node.textContent = text;
+    if (node.previousElementSibling !== anchor) anchor.insertAdjacentElement('afterend', node);
+  }
 
   function renderPerItemRrp(items, currencyFallback){
     var rows = document.querySelectorAll(LIST_ITEM_SEL);
@@ -214,11 +220,16 @@
     }
 
     for (var li of rows){
-      clearRrpLines(li);
       var itemId = getItemIdFromRow(li);
-      if (!itemId || !byItemQueues.has(String(itemId))) continue;
+      if (!itemId || !byItemQueues.has(String(itemId))){
+        clearRrpLines(li);
+        continue;
+      }
       var queue = byItemQueues.get(String(itemId));
-      if (!queue || !queue.length) continue;
+      if (!queue || !queue.length){
+        clearRrpLines(li);
+        continue;
+      }
 
       var matched = null, idx = -1;
       try{
@@ -238,7 +249,7 @@
       queue.splice(idx,1);
 
       var rrp = rrpValue(matched);
-      if (!(rrp > 0)) continue;
+      if (!(rrp > 0)){ clearRrpLines(li); continue; }
 
       var cur = rrpCurrency(matched, currencyFallback);
       var qtyRow = n(matched.quantity || getRowQty(li)); // ✅ Fix: multipliziere mit Warenkorbmenge
@@ -246,14 +257,11 @@
       var anchor = anchorCache.get(li);
       if (!anchor || !document.contains(anchor)) {
         anchor = findRrpAnchor(li);
-        if (!anchor) continue;
+        if (!anchor){ clearRrpLines(li); continue; }
         anchorCache.set(li, anchor);
       }
 
-      var node = document.createElement('div');
-      node.className = 'o46-rrp-line';
-      node.textContent = money(rrp * qtyRow, cur);
-      anchor.insertAdjacentElement('afterend', node);
+      updateExtraLine(li, '.o46-rrp-line', 'o46-rrp-line', anchor, money(rrp * qtyRow, cur));
     }
   }
   // =================================================
@@ -280,8 +288,9 @@
       var txt = money(total, cur);
 
       var job = function(){
+        if (items !== LAST_ITEMS) return;
         if (el.textContent !== txt) el.textContent = txt;
-        runIdle(function(){ renderPerItemRrp(items, cur); }, 300);
+        runIdle(function(){ if (items === LAST_ITEMS) renderPerItemRrp(items, cur); }, 300);
       };
       if (typeof requestAnimationFrame==='function') requestAnimationFrame(job); else job();
     });
@@ -293,6 +302,24 @@
     clearTimeout(maxTimer);
     maxTimer = setTimeout(performUpdate, MAX_WAIT);
   }
+
+  if (document.body.hasAttribute('data-o46-basket-sync')) {
+    window.addEventListener('o46:basket-updated', function (event) {
+      if (!event.detail || !Array.isArray(event.detail.items)) return;
+      LAST_ITEMS = event.detail.items;
+      performUpdate();
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && LAST_ITEMS) performUpdate();
+    });
+    window.o46UpdateNow = performUpdate;
+    return;
+  }
+
+  if (!window.__O46_FETCH_ORIG__) window.__O46_FETCH_ORIG__ = window.fetch.bind(window);
+  if (!window.__O46_XHROPEN_ORIG__) window.__O46_XHROPEN_ORIG__ = XMLHttpRequest.prototype.open;
+  var origFetch = window.__O46_FETCH_ORIG__;
+  var origOpen = window.__O46_XHROPEN_ORIG__;
 
   window.fetch = function(input, init){
     var p = origFetch(input, init);

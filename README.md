@@ -90,3 +90,17 @@ Startseite, Kategorie, Suche, Artikelseite/Quickview und Checkout auf Layout,
 Lazy Loading, Preloading, Skriptausführung und Amazon Pay prüfen.
 Es wurden keine PlentyONE-Einstellungen, Pluginsets oder Bereitstellungen verändert.
 
+
+## Lokale Theme-Prüfung
+
+Die Referenz für die übernommenen Storefront-Funktionen ist B2B `1f154b9`. B2C verwendet `GuardiansBasic` und seine eigenen Kategorien, Sprachziele und Checkout-Einstellungen.
+
+Mit den Dev-Abhängigkeiten aus `package-lock.json` baut `npm run build` die CSS- und JavaScript-Dateien. `npm test` prüft die Pluginidentität, die erzeugten Dateien, Preisformate und die API- und Kontodialoge. Bei Änderungen an ausgelieferten Bytes die betroffenen Einträge in `resources/asset-versions.json` erhöhen. Der Build überprüft die SHA-256-Werte im Manifest.
+
+Die PHP-/Twig- und Browsertests verwenden lokale Testdaten. `tests/ceres-list-query.php` erwartet den Pfad zu Ceres `src`. `tests/seo_pagination.php` und `tests/pdp_render_contract.php` erwarten den Twig-Autoloader und den Pfad zur JSON-Ergebnisdatei. Der lokale Vergleichsbericht liegt unter `.cache/b2c-parity/Auftrag-04-Produktkarten-Grids.html`.
+
+### Lokale Browserprüfung
+
+Nach `npm ci` stellt `npx playwright install chromium firefox webkit` die zu diesem Lockfile passenden lokalen Browser bereit. Die Twig-Fixtures benötigen PHP mit mbstring und einen Twig-Autoloader. Deren Pfade werden über `O46_PHP` und `O46_TWIG_AUTOLOAD` gesetzt.
+
+Mit `npm run test:cross -- --project=chromium` läuft das Desktopprofil. `--project=iphone` startet lokale WebKit-Emulation, `--list` zeigt die verfügbaren Tests. Chrome und Edge verwenden die installierten Browserkanäle. HTML-Bericht, JSON und Fehlertraces liegen in `.cache/cross-browser/`. Die Fixture fängt Netzwerkanfragen ab. Eine CI-Ausführung würde einen separat eingerichteten Workflow erfordern. Für echtes iOS und den aktuellen Plenty-Katalog ist eine native Abnahme erforderlich.

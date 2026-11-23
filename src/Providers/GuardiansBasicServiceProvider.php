@@ -2,17 +2,16 @@
 
 namespace GuardiansBasic\Providers;
 
-use Ceres\Caching\NavigationCacheSettings;
-use Ceres\Caching\SideNavigationCacheSettings;
-use IO\Services\ContentCaching\Services\Container;
 use Plenty\Modules\Webshop\ItemSearch\Helpers\ResultFieldTemplate;
 use Plenty\Plugin\ServiceProvider;
 use Plenty\Plugin\Events\Dispatcher;
 use Plenty\Plugin\Templates\Twig;
 use IO\Helper\TemplateContainer;
+use IO\Services\TemplateService;
 use IO\Extensions\Functions\Partial;
 use Plenty\Plugin\ConfigRepository;
 use GuardiansBasic\Extensions\Base_Extension;
+use GuardiansBasic\Helper\SeoPage;
 use Plenty\Modules\Webshop\Consent\Contracts\ConsentRepositoryContract;
 
 /**
@@ -25,7 +24,6 @@ class GuardiansBasicServiceProvider extends ServiceProvider
 
     public function register()
     {
-        $this->getApplication()->register(\GuardiansBasic\Providers\GuardiansBasicRouteServiceProvider::class);
         $this->getApplication()->register(\GuardiansBasic\Providers\GuardiansBasicRouteServiceProvider::class);
         $consentRepository = pluginApp(ConsentRepositoryContract::class);
         $consentRepository->registerConsent(
@@ -103,34 +101,43 @@ class GuardiansBasicServiceProvider extends ServiceProvider
     public function boot(Twig $twig, Dispatcher $dispatcher, ConfigRepository $config)
     {
         $twig->addExtension(Base_Extension::class);
+        // Apply the same approved page size to the native Ceres listing query.
+        foreach (['IO.ctx.category.item', 'IO.ctx.tags', 'IO.ctx.search'] as $event) {
+            $dispatcher->listen($event, function () {
+                TemplateService::$currentTemplateData['itemsPerPage'] = Base_Extension::SHOPBUILDER_ITEMS_PER_PAGE;
+                TemplateService::$currentTemplateData['page'] = SeoPage::positiveInteger(TemplateService::$currentTemplateData['page'] ?? 1) ?? 1;
+                if (!is_string(TemplateService::$currentTemplateData['sorting'] ?? '')) {
+                    TemplateService::$currentTemplateData['sorting'] = '';
+                }
+            }, self::PRIORITY + 1);
+        }
         $enabledOverrides = explode(", ", $config->get("GuardiansBasic.templates.override"));
+        $overrideAll = in_array("all", $enabledOverrides);
         // Override partials
-        $dispatcher->listen('IO.init.templates', function (Partial $partial) use ($enabledOverrides)
+        $dispatcher->listen('IO.init.templates', function (Partial $partial) use ($enabledOverrides, $overrideAll)
         {
-            //pluginApp(Container::class)->register('GuardiansBasic::PageDesign.Partials.Header.NavigationList.twig', NavigationCacheSettings::class);
-            //pluginApp(Container::class)->register('GuardiansBasic::PageDesign.Partials.Header.SideNavigation.twig', SideNavigationCacheSettings::class);
             $partial->set('head', 'Ceres::PageDesign.Partials.Head');
             $partial->set('header', 'Ceres::PageDesign.Partials.Header.Header');
             $partial->set('page-design', 'Ceres::PageDesign.PageDesign');
             $partial->set('page-metadata', 'GuardiansBasic::PageDesign.Partials.PageMetadata');
             $partial->set('footer', 'Ceres::PageDesign.Partials.Footer');
 
-            if (in_array("head", $enabledOverrides) || in_array("all", $enabledOverrides))
+            if (in_array("head", $enabledOverrides) || $overrideAll)
             {
                 $partial->set('head', 'GuardiansBasic::PageDesign.Partials.Head');
             }
 
-            if (in_array("header", $enabledOverrides) || in_array("all", $enabledOverrides))
+            if (in_array("header", $enabledOverrides) || $overrideAll)
             {
                 $partial->set('header', 'GuardiansBasic::PageDesign.Partials.Header.Header');
             }
 
-            if (in_array("page_design", $enabledOverrides) || in_array("all", $enabledOverrides))
+            if (in_array("page_design", $enabledOverrides) || $overrideAll)
             {
                 $partial->set('page-design', 'GuardiansBasic::PageDesign.PageDesign');
             }
 
-            if (in_array("footer", $enabledOverrides) || in_array("all", $enabledOverrides))
+            if (in_array("footer", $enabledOverrides) || $overrideAll)
             {
                 $partial->set('footer', 'GuardiansBasic::PageDesign.Partials.Footer');
             }
@@ -138,190 +145,34 @@ class GuardiansBasicServiceProvider extends ServiceProvider
             return false;
         }, self::PRIORITY);
 
-        // Override homepage
-        if (in_array("homepage", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.home', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Homepage.Homepage');
-                return false;
-            }, self::PRIORITY);
+        // Keep registration order and configuration keys in one place.
+        $templateOverrides = [
+            'homepage' => ['IO.tpl.home', 'GuardiansBasic::Homepage.Homepage'],
+            'category_content' => ['IO.tpl.category.content', 'GuardiansBasic::Category.Content.CategoryContent'],
+            'category_item' => ['IO.tpl.category.item', 'GuardiansBasic::Category.Item.CategoryItem'],
+            'basket' => ['IO.tpl.basket', 'GuardiansBasic::Basket.Basket'],
+            'checkout' => ['IO.tpl.checkout', 'GuardiansBasic::Checkout.CheckoutView'],
+            'order_confirmation' => ['IO.tpl.confirmation', 'GuardiansBasic::Checkout.OrderConfirmation'],
+            'login' => ['IO.tpl.login', 'GuardiansBasic::Customer.Login'],
+            'register' => ['IO.tpl.register', 'GuardiansBasic::Customer.Register'],
+            'item' => ['IO.tpl.item', 'GuardiansBasic::Item.SingleItem'],
+            'category_view' => ['IO.tpl.search', 'GuardiansBasic::Category.Item.CategoryItem'],
+            'my_account' => ['IO.tpl.my-account', 'GuardiansBasic::MyAccount.MyAccount'],
+            'cancellation_rights' => ['IO.tpl.cancellation-rights', 'Ceres::StaticPages.CancellationRights'],
+            'legal_disclosure' => ['IO.tpl.legal-disclosure', 'Ceres::StaticPages.LegalDisclosure'],
+            'privacy_policy' => ['IO.tpl.privacy-policy', 'Ceres::StaticPages.PrivacyPolicy'],
+            'terms_conditions' => ['IO.tpl.terms-conditions', 'Ceres::StaticPages.TermsAndConditions'],
+            'item_not_found' => ['IO.tpl.item-not-found', 'GuardiansBasic::StaticPages.ItemNotFound'],
+            'page_not_found' => ['IO.tpl.page-not-found', 'GuardiansBasic::StaticPages.PageNotFound'],
+        ];
+        foreach ($templateOverrides as $key => [$event, $template]) {
+            if ($overrideAll || in_array($key, $enabledOverrides)) {
+                $dispatcher->listen($event, function (TemplateContainer $container) use ($template) {
+                    $container->setTemplate($template);
+                    return false;
+                }, self::PRIORITY);
+            }
         }
-
-        // Override template for content categories
-        if (in_array("category_content", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.category.content', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Category.Content.CategoryContent');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override template for item categories
-        if (in_array("category_item", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.category.item', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Category.Item.CategoryItem');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override shopping cart
-        if (in_array("basket", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.basket', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Basket.Basket');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override checkout
-        if (in_array("checkout", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.checkout', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Checkout.CheckoutView');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override order confirmation page
-        if (in_array("order_confirmation", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-            $dispatcher->listen('IO.tpl.confirmation', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Checkout.OrderConfirmation');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override login page
-        if (in_array("login", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-            $dispatcher->listen('IO.tpl.login', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Customer.Login');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override register page
-        if (in_array("register", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.register', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Customer.Register');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override single item page
-        if (in_array("item", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.item', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Item.SingleItem');
-                return false;
-            }, self::PRIORITY);
-        }
-        // Override category view
-        if (in_array("category_view", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.search', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::Category.Item.CategoryItem');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override my account
-        if (in_array("my_account", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.my-account', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::MyAccount.MyAccount');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override cancellation rights
-        if (in_array("cancellation_rights", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.cancellation-rights', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::StaticPages.CancellationRights');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override legal disclosure
-        if (in_array("legal_disclosure", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.legal-disclosure', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::StaticPages.LegalDisclosure');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override privacy policy
-        if (in_array("privacy_policy", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.privacy-policy', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::StaticPages.PrivacyPolicy');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override terms and conditions
-        if (in_array("terms_conditions", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.terms-conditions', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::StaticPages.TermsAndConditions');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override item not found page
-        if (in_array("item_not_found", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.item-not-found', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::StaticPages.ItemNotFound');
-                return false;
-            }, self::PRIORITY);
-        }
-
-        // Override page not found page
-        if (in_array("page_not_found", $enabledOverrides) || in_array("all", $enabledOverrides))
-        {
-
-            $dispatcher->listen('IO.tpl.page-not-found', function (TemplateContainer $container)
-            {
-                $container->setTemplate('GuardiansBasic::StaticPages.PageNotFound');
-                return false;
-            }, self::PRIORITY);
-        }
-        $enabledOverrides = explode(", ", $config->get("GuardiansBasic.templates.override"));
         $resultFieldTemplate = pluginApp(ResultFieldTemplate::class);
         $resultFieldTemplate->setTemplates([
             ResultFieldTemplate::TEMPLATE_LIST_ITEM     => 'GuardiansBasic::ResultFields.ListItem',
@@ -331,18 +182,6 @@ class GuardiansBasicServiceProvider extends ServiceProvider
             ResultFieldTemplate::TEMPLATE_CATEGORY_TREE => 'GuardiansBasic::ResultFields.CategoryTree',
             ResultFieldTemplate::TEMPLATE_VARIATION_ATTRIBUTE_MAP => 'Ceres::ResultFields.VariationAttributeMap'
         ]);
-        /*
-        $dispatcher->listen( 'IO.ResultFields.*', function(ResultFieldTemplate $container) {
-            $container->setTemplates([
-                ResultFieldTemplate::TEMPLATE_LIST_ITEM     => 'GuardiansBasic::ResultFields.ListItem',
-                ResultFieldTemplate::TEMPLATE_SINGLE_ITEM   => 'GuardiansBasic::ResultFields.SingleItem',
-                ResultFieldTemplate::TEMPLATE_BASKET_ITEM   => 'GuardiansBasic::ResultFields.BasketItem',
-                ResultFieldTemplate::TEMPLATE_AUTOCOMPLETE_ITEM_LIST => 'GuardiansBasic::ResultFields.AutoCompleteListItem',
-                ResultFieldTemplate::TEMPLATE_CATEGORY_TREE => 'GuardiansBasic::ResultFields.CategoryTree',
-                ResultFieldTemplate::TEMPLATE_VARIATION_ATTRIBUTE_MAP => 'Ceres::ResultFields.VariationAttributeMap'
-            ]);
-            return false;
-        }, self::PRIORITY);*/
     }
 }
 

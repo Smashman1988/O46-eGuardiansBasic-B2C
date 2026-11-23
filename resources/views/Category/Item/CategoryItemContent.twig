@@ -43,12 +43,12 @@
             <div class="leftsidecat">
                     <div class="row d-lg-none">
                         <div class="col-6">
-                            <button data-eg-event="click" data-eg-param="html,menu-open" data-eg-handler="tgClass" class="btn btn-primary btn-block mb-3" aria-label="Kategorien">
+                            <button data-eg-event="click" data-eg-param="html,menu-open" aria-controls="o46-menu" aria-expanded="false" data-eg-handler="tgClass" class="btn btn-primary btn-block mb-3" aria-label="{{ trans('GuardiansBasic::Template.categories') }}">
                                {{ trans("GuardiansBasic::Template.categories") }}
                             </button>
                         </div>
                         <div class="col-6">
-                            <button data-eg-event="click" data-eg-param="html,filter-open" data-eg-handler="tgClass" class="btn btn-primary btn-block mb-3" aria-label="Filter öffnen">
+                            <button data-eg-event="click" data-eg-param="html,filter-open" aria-controls="o46-filter" aria-expanded="false" data-eg-handler="tgClass" class="btn btn-primary btn-block mb-3" aria-label="{{ trans('GuardiansBasic::Template.openFilter') }}">
                                 {{ trans("GuardiansBasic::Template.whatareyoulookingfor") }}
                             </button>
                         </div>
@@ -57,7 +57,8 @@
             </div>
         </div>
             {% endif %}
-        <div class="col-12">
+        {% set hasCategoryPager = currentPage > 0 and currentPage <= pageMax and pageMax > 1 %}
+        <div class="col-12{% if hasCategoryPager %} category-paging-host{% endif %}">
              <div class="row align-items-center m-b-25">
                 <div class="col-12">
                     <div class="d-flex justify-content-between">
@@ -80,7 +81,7 @@
                             </div>
                         </div>
                         {% endif %}
-                        <div class="eg-pagination">
+                        <div class="eg-pagination{% if hasCategoryPager %} d-none d-lg-block{% endif %}"{% if hasCategoryPager %} data-category-paging-anchor{% endif %}>
                             {% include "GuardiansBasic::Category.Item.Partials.Pagination" %}
                         </div>
                     </div>
@@ -88,44 +89,49 @@
             </div>
                 <div class="category-product-list row" data-eg-handler="initCatItemEvents" data-eg-event="load">
                 {# 🟢 Macro für die beiden Varianten erstellen #} 
-                {% macro categoryItem(item, variant, currencycheck, isShoeCategory, translations, transLabels) %}
+                {% macro categoryItem(item, variant, currencycheck, isShoeCategory, translations, transLabels, cardAttributeMap) %}
                     <article class="post col-6 col-sm-6 col-md-3 col-lg-3 col-xl-2 col-xlg-2 col-xxlg-2">
-                        {% if variant == 1 %}
-                            {% include "GuardiansBasic::Category.Item.Partials.CategoryListItem2" with {
+                        {% include variant == 1 ? 'GuardiansBasic::Category.Item.Partials.CategoryListItem2' : 'GuardiansBasic::Category.Item.Partials.CategoryListItem' with {
                                 'item': item,
                                 'currencycheck': currencycheck,
                                 'isShoeCategory': isShoeCategory,
                                 'translations': translations,
                                 'transLabels': transLabels
                             } %}
-                        {% else %}
-                            {% include "GuardiansBasic::Category.Item.Partials.CategoryListItem" with {
-                                'item': item,
-                                'currencycheck': currencycheck,
-                                'isShoeCategory': isShoeCategory,
-                                'translations': translations,
-                                'transLabels': transLabels
-                            } %}
-                        {% endif %}
                     </article>
                 {% endmacro %}
  
 
-                {# 🟢 Nutzung des Macros in der Schleife #}
+                {% set attributeMapsByItem = getCardAttributeMaps(itemList|default([])|map(item => item.data.variation.itemId)) %}
                 {% for item in itemList %}
-                    {% if loop.index <= 2 and currentPage == 1 %}
-                        {{ _self.categoryItem(item, 1, currencycheck, isShoeCategory, translations, transLabels) }}
-                    {% else %}
-                        {{ _self.categoryItem(item, 2, currencycheck, isShoeCategory, translations, transLabels) }}
-                    {% endif %}
-                {% endfor %}        
+                    <article class="post col-6 col-sm-6 col-md-3 col-lg-3 col-xl-2 col-xlg-2 col-xxlg-2">
+                        {%- include 'GuardiansBasic::Category.Item.Partials.CategoryListItem' with {
+                            'cardEagerImages': currentPage == 1 and loop.index <= 2,
+                            'item': item,
+                            'currencycheck': currencycheck,
+                            'isShoeCategory': isShoeCategory,
+                            'translations': translations,
+                            'transLabels': transLabels,
+                            'cardImageMinViewport': loop.index in [3, 4] ? 768 : (loop.index in [5, 6] ? 1200 : null),
+                            'cardAttributeMap': attributeMapsByItem[item.data.variation.itemId] ?? null
+                        } only -%}
+                    </article>
+                {% endfor %}
                 </div>
+                {# The active page already owns the loader, end and error messages. #}
+                {% if request.get('quickViewItem') != 'true' %}
                 <div class="scroller-status"><div class="loader-wheel infinite-scroll-request"><i><i><i><i><i><i><i><i><i><i><i><i></i></i></i></i></i></i></i></i></i></i></i></i></div>
                     <p class="infinite-scroll-last tcenter">{{ trans("GuardiansBasic::Template.iscrollinfo1") }} {{ itemCountTotal }} {% if isSearch %} "{{ searchString }}"{% else %} {{ trans("GuardiansBasic::Template.items") }} {{ trans("GuardiansBasic::Template.iscrollinfo2") }}{% endif %} {{ trans("GuardiansBasic::Template.iscrollinfo3") }}
                         <br><br>{{ trans("GuardiansBasic::Template.iscrollinfo4") }}
-                        <br><br>{{ trans("GuardiansBasic::Template.iscrollinfo5") }} <a href="{% if lang=="en" %}/en/All-Articles/{% elseif lang=="fr" %}/fr/tous-les-articles/{% else %}/alle-artikel/{% endif %}{% if currencycheck != "EUR" %}?currency={{ currencycheck }}{% endif %}" title="{{ item.data | itemName }}">{{ trans("GuardiansBasic::Template.iscrollinfo6") }}</a></p>
+                        <br><br>{{ trans("GuardiansBasic::Template.iscrollinfo5") }} {% include 'GuardiansBasic::Category.Item.Partials.AllItemsLink' with {'language': lang, 'currency': currencycheck} only %}</p>
                         <p class="infinite-scroll-error tcenter">No more pages to load</p>
                 </div>
+                {% endif %}
+                {% if hasCategoryPager %}
+                <nav class="category-pager-footer" data-category-pager="{{ category.id }}" aria-label="{{ trans('GuardiansBasic::Template.page') }}">
+                    {% include "GuardiansBasic::Category.Item.Partials.Pagination" with {'compactPagination': true} %}
+                </nav>
+                {% endif %}
         </div>
     </div>                      
     {#<div class="row">
