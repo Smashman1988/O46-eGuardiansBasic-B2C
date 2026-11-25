@@ -2,6 +2,11 @@
 
 ## Unreleased · B2C develop
 
+- The home page and basket use their responsive column widths before the main stylesheet loads.
+- Search shows one localized main heading with the result count. Private system pages use NOINDEX and preserve stricter existing robots directives.
+- Structured product data uses measured variation dimensions with units and a verified price expiry date when available.
+- The cookie information describes the seven-day newsletter popup dismissal. The basket dataLayer output reads the basket items once.
+
 - ShopBuilder categories verify the last page using variation IDs. The twelve displayed products still receive their full card data. The newsletter popup uses the checkout context and page configuration for its exclusions.
 - Direct variation links, including language switches, show the linked size and colour. The basket button also uses the current language for its accessible name.
 - Canonical URLs, robots and page titles now use the displayed page even when ShopBuilder supplies a previously rendered item list. Empty pages remain NOINDEX.

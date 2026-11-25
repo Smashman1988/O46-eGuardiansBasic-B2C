@@ -39,6 +39,16 @@
 {% set vuejs = [5482, 5041, 5484,5171] %}
 {% set wkbkasse = [5482, 5484] %}
 {% set currentTemplate = services.template.getCurrentTemplate() %}
+{# Match IO's routed template or the merchant's linked system category. #}
+{% set privateRoutes = ['basket', 'checkout', 'login', 'register', 'my-account', 'wish-list', 'confirmation'] %}
+{% set forceNoIndex = forceNoIndex|default(false) or (currentTemplate starts with 'tpl.' and currentTemplate|slice(4) in privateRoutes) %}
+{% if currentTemplate == 'tpl.category.content' and category.id|default(0) > 0 and not forceNoIndex %}
+    {% for route in privateRoutes %}
+        {% if not forceNoIndex and (('category-' ~ route) in bodyClasses|default([]) or category.id == config('IO.routing.category_' ~ route)) %}
+            {% set forceNoIndex = true %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
 {# IO renders its linked basket category as tpl.category.content; the link is merchant-configurable. #}
 {% set isBasketCategory = currentTemplate == 'tpl.category.content' and (bodyClasses is defined
     ? 'category-basket' in bodyClasses

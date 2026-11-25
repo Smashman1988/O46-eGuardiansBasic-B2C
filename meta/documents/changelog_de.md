@@ -2,6 +2,11 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Startseite und Warenkorb verwenden ihre responsiven Spaltenbreiten bereits vor dem Laden des Hauptstylesheets.
+- Die Suchseite zeigt eine lokalisierte Hauptüberschrift mit Trefferzahl. Persönliche Systemseiten erhalten NOINDEX und behalten strengere bestehende Robots-Regeln.
+- Produktdaten für Suchmaschinen verwenden vorhandene Variantenmaße mit Einheit und ein belegtes Preisablaufdatum, sofern verfügbar.
+- Die Cookie-Informationen beschreiben die siebentägige Ausblendung des Newsletter-Popups. Die Warenkorbausgabe für den dataLayer liest die Positionen einmal.
+
 - ShopBuilder-Kategorien prüfen die tatsächliche Seitengrenze mit Varianten-IDs. Die zwölf sichtbaren Produkte erhalten weiterhin alle Kartenfelder. Das Newsletter-Popup verwendet den Checkout-Kontext und die Seitenkonfiguration für seine Ausschlüsse.
 - Direkte Variantenlinks, etwa nach einem Sprachwechsel, zeigen Größe und Farbe der verlinkten Variante an. Der Kaufbutton verwendet die aktuelle Sprache auch für Screenreader.
 - Auch bei bereits gerenderten ShopBuilder-Artikellisten verwenden Canonical, Robots und Seitentitel die tatsächlich angezeigte Seite. Leere Folgeseiten bleiben auf NOINDEX.

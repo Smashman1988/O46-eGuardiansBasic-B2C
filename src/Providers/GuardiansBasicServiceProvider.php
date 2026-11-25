@@ -31,16 +31,16 @@ class GuardiansBasicServiceProvider extends ServiceProvider
         $consentRepository = pluginApp(ConsentRepositoryContract::class);
         $consentRepository->registerConsent(
             'PoP-UP Anzeige',
-            'PoP-UP Anzeige',
+            'GuardiansBasic::Template.newsletterCookieLabel',
             [
-                'description' => '-',
+                'description' => 'GuardiansBasic::Template.newsletterCookieDescription',
                 'provider' => 'Outlet46.de GmbH',
-                'lifespan' => 'Session',
+                'lifespan' => 'GuardiansBasic::Template.newsletterCookieLifespan',
                 'policyUrl' => 'https://www.outlet46.de/datenschutz/',
                 'group' => 'necessary',
                 'necessary' => true,
                 'isOptOut' => false,
-                'cookieNames' => ['showModal', 'setCookie']
+                'cookieNames' => ['o46_newsletter_dismissed', 'showModal', 'setCookie']
             ]
         );
         $consentRepository->registerConsent(

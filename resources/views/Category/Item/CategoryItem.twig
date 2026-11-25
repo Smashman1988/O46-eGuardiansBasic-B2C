@@ -85,7 +85,7 @@
 
 	{% if rendersItemGrid %}
 <section class="categoriegrid page-content container">
-    {% if isQuickView %}
+    {% if isQuickView and not isSearch %}
     {% if catDetails.description2 and currentPage < 2 %}
         <div class="cat-description2">
             <h1 class="category-title center cat-title">{{ catDetails.name }} ({{ itemCountTotal }})</h1>

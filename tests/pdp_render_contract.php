@@ -224,6 +224,55 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
             }
         }
     }
+    if ($value === null) {
+        // Validate the same Product block the full page emits, with two distinct variations.
+        $schemaContext = $ctx;
+        $data =& $schemaContext['item']['documents'][0]['data'];
+        $measured = $format === 'prepared';
+        $data['variation']['id'] = $measured ? 1011 : 1012;
+        $data['variation']['number'] = 'SKU-'.$data['variation']['id'];
+        $data['variation']['lengthMM'] = $measured ? 120 : 0;
+        $data['variation']['widthMM'] = $measured ? 32 : -1;
+        $data['variation']['heightMM'] = null;
+        $data['variation']['weightG'] = $measured ? 85 : 0;
+        $availability = $measured ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+        $data['variation']['availability']['mappedAvailability'] = $availability;
+        $currency = $measured ? 'CHF' : 'USD';
+        $data['prices']['default'] = ['currency'=>$currency, 'unitPrice'=>['value'=>$measured ? 19.95 : 24],
+            'baseSinglePrice'=>2, 'baseLot'=>1, 'baseUnit'=>'KGM'];
+        $data['barcodes'] = [['type'=>'GTIN_13','code'=>'4006381333931']];
+        $data['item']['feedbackCount'] = $measured ? 8 : 0;
+        $data['item']['feedbackDecimal'] = 4.5;
+        $invalidExpiry = ['de'=>'2097-02-29','en'=>'2001-01-01','fr'=>null,'it'=>'','es'=>'2097-99-10'];
+        $schemaContext['priceValidUntil'] = $measured ? '2096-02-29' : $invalidExpiry[$lang];
+        $schemaContext['manufacturer'] = 'Fixture Manufacturer';
+        $schemaContext['brand'] = 'Fixture Brand';
+        $schemaContext['conditionOfItem'] = 'https://schema.org/NewCondition';
+        $document = new DOMDocument();
+        $document->loadHTML($twig->render('SingleItem',$schemaContext),LIBXML_NOERROR|LIBXML_NOWARNING);
+        $products = [];
+        foreach ((new DOMXPath($document))->query('//script[@type="application/ld+json"]') as $script) {
+            $object = json_decode($script->textContent,true,512,JSON_THROW_ON_ERROR);
+            if (($object['@type'] ?? '') === 'Product') $products[] = $object;
+        }
+        if (count($products) !== 1) throw new RuntimeException('Expected one Product');
+        $product = $products[0];
+        $offer = $product['offers'];
+        if ($offer['priceCurrency'] !== $currency || $offer['price'] !== ($measured ? '19.95' : '24.00')
+            || $offer['availability'] !== $availability || ($offer['priceValidUntil'] ?? null) !== ($measured ? '2096-02-29' : null)
+            || isset($offer['priceSpecification']['priceValidUntil']) || isset($offer['serialNumber'])
+            || $offer['itemCondition'] !== $schemaContext['conditionOfItem']
+            || $product['sku'] !== $data['variation']['number'] || $product['identifier'] !== (string)$data['variation']['id']
+            || $product['manufacturer']['name'] !== 'Fixture Manufacturer' || $product['brand']['name'] !== 'Fixture Brand'
+            || $product['gtin13'] !== '4006381333931' || isset($product['height'])
+            || ($product['aggregateRating']['ratingValue'] ?? null) !== ($measured ? '4.5' : null)
+            || ($product['depth'] ?? null) !== ($measured ? ['@type'=>'QuantitativeValue','value'=>120,'unitCode'=>'MMT'] : null)
+            || ($product['width'] ?? null) !== ($measured ? ['@type'=>'QuantitativeValue','value'=>32,'unitCode'=>'MMT'] : null)
+            || ($product['weight'] ?? null) !== ($measured ? ['@type'=>'QuantitativeValue','value'=>85,'unitCode'=>'GRM'] : null)) {
+            throw new RuntimeException("Incorrect Product metadata for $lang/$format");
+        }
+        unset($data);
+    }
     $rows[]=[$lang,$value,$format];
 }
 file_put_contents($argv[2],json_encode($rows,JSON_THROW_ON_ERROR));

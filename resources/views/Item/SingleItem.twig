@@ -106,18 +106,27 @@
         {% block schemaOrg %}
             {% set offer = {
                 '@type': 'Offer', 'priceCurrency': itemData.prices.default.currency ~ '',
-                'priceValidUntil': '2040-11-20', 'url': detailurl ~ '',
-                'availability': itemData.variation.availability.mappedAvailability ~ '',
-                'itemCondition': conditionOfItem ~ '', 'serialNumber': itemData.variation.number ~ ''
+                'url': detailurl ~ ''
             } %}
+            {% if itemData.variation.availability.mappedAvailability is not empty %}
+                {% set offer = offer|merge({'availability': itemData.variation.availability.mappedAvailability}) %}
+            {% endif %}
+            {% if conditionOfItem is not empty %}
+                {% set offer = offer|merge({'itemCondition': conditionOfItem}) %}
+            {% endif %}
             {% if hasUnitPrice %}
                 {% set offer = offer|merge({'price': unitPriceValue|number_format(2, '.', '')}) %}
+                {# Ceres resolves this optional date from the configured variation property. #}
+                {% set expiry = priceValidUntil|default('') %}
+                {% if expiry matches '/^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$/D' and expiry >= 'now'|date('Y-m-d') and expiry|date('Y-m-d') == expiry %}
+                    {% set offer = offer|merge({'priceValidUntil': expiry}) %}
+                {% endif %}
             {% endif %}
             {% set basePrice = itemData.prices.default.baseSinglePrice ?? null %}
             {% if itemData.prices.default.baseLot > 0 and basePrice matches pricePattern %}
                 {% set offer = offer|merge({'priceSpecification': {
                     '@type': 'UnitPriceSpecification', 'price': basePrice|number_format(2, '.', ''),
-                    'priceCurrency': offer.priceCurrency, 'priceValidUntil': offer.priceValidUntil,
+                    'priceCurrency': offer.priceCurrency,
                     'referenceQuantity': {'@type': 'QuantitativeValue', 'value': itemData.prices.default.baseLot ~ '',
                         'unitCode': itemData.prices.default.baseUnit ~ ''}
                 }}) %}
@@ -131,14 +140,24 @@
                 'image': itemData.images.all[0].urlMiddle ~ '', 'identifier': itemData.variation.id ~ '',
                 'description': itemData.texts.description|default('')|striptags|filterTabs,
                 'disambiguatingDescription': itemData.texts.shortDescription ~ '',
-                'brand': {'@type': 'Brand', 'name': itemData.item.manufacturer.externalName ~ ''},
-                'manufacturer': {'@type': 'Organization', 'name': itemData.item.manufacturer.externalName ~ ''},
-                'sku': itemData.variation.number ~ '', 'offers': offer,
-                'depth': {'@type': 'QuantitativeValue', 'value': '0'},
-                'width': {'@type': 'QuantitativeValue', 'value': '0'},
-                'height': {'@type': 'QuantitativeValue', 'value': '0'},
-                'weight': {'@type': 'QuantitativeValue', 'value': itemData.variation.weightG ~ ''}
+                'sku': itemData.variation.number ~ '', 'offers': offer
             } %}
+            {% set manufacturerName = manufacturer|default(itemData.item.manufacturer.externalName|default('')) %}
+            {% set brandName = brand|default(itemData.item.manufacturer.externalName|default('')) %}
+            {% if brandName is not empty %}
+                {% set product = product|merge({'brand': {'@type': 'Brand', 'name': brandName}}) %}
+            {% endif %}
+            {% if manufacturerName is not empty %}
+                {% set product = product|merge({'manufacturer': {'@type': 'Organization', 'name': manufacturerName}}) %}
+            {% endif %}
+            {% for dimension, value in {'depth': itemData.variation.lengthMM|default(0), 'width': itemData.variation.widthMM|default(0), 'height': itemData.variation.heightMM|default(0)} %}
+                {% if value matches pricePattern and value > 0 %}
+                    {% set product = product|merge({(dimension): {'@type': 'QuantitativeValue', 'value': value, 'unitCode': 'MMT'}}) %}
+                {% endif %}
+            {% endfor %}
+            {% if itemData.variation.weightG matches pricePattern and itemData.variation.weightG > 0 %}
+                {% set product = product|merge({'weight': {'@type': 'QuantitativeValue', 'value': itemData.variation.weightG, 'unitCode': 'GRM'}}) %}
+            {% endif %}
             {% set untypedGtin = '' %}
             {% for barcode in itemData.barcodes|default([]) %}
                 {% set type = barcode.type|default(barcode.barcodeType|default(''))|trim|upper %}

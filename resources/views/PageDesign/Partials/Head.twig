@@ -92,6 +92,21 @@
 @media(max-width:767.98px){.eg-gallery-frame{aspect-ratio:1;max-height:65vh}.eg-gallery-frame .zoombtnnav{--nav-edge:4px;width:44px;height:44px;padding:3px;font-size:23px}.eg-gallery-expand span{display:none}.eg-gallery-counter:not([hidden]){display:block}}
 </style>
 {% endif %}
+{% if currentTemplate in ['tpl.home', 'tpl.home.category'] or 'category-home' in bodyClasses|default([]) %}
+{# The ShopBuilder wrapper has .col without a numbered width. Apply its final grid geometry at first paint. #}
+<style data-eg-home-layout-critical>
+:where(#page-body>.container-max>.row)>.col{position:relative;width:100%;flex-basis:0;flex-grow:1;max-width:100%;padding-right:15px;padding-left:15px}
+@media(max-width:767.98px){:where(#page-body>.container-max>.row)>.col{padding-right:5px;padding-left:5px}}
+</style>
+{% endif %}
+{% if isBasketPage %}
+{# The basket widget's 7/5 columns are 6/6 on tablets and stacked on phones. #}
+<style data-eg-basket-layout-critical>
+@media(max-width:767.98px){:where(#page-body .widget-two-col)>.widget-stacked-mobile:where(.widget-inner.col-12){padding-bottom:1rem}}
+@media(min-width:768px){:where(#page-body .widget-two-col)>.col-md-6:where(.col-lg-7.col-xl-7,.col-lg-5.col-xl-5){flex:0 0 50%;max-width:50%}}
+@media(min-width:992px){:where(#page-body .widget-two-col)>.col-lg-7:where(.col-md-6.col-xl-7){flex:0 0 58.333333%;max-width:58.333333%}:where(#page-body .widget-two-col)>.col-lg-5:where(.col-md-6.col-xl-5){flex:0 0 41.666667%;max-width:41.666667%}}
+</style>
+{% endif %}
 {# Preserve the configured 50/50 ShopBuilder grid before the async Bootstrap rules arrive. #}
 <style data-eg-builder-half-grid-critical>@media(min-width:768px){:where(#page-body .widget-two-col)>.col-md-6:where(.col-lg-6.col-xl-6){-ms-flex:0 0 50%;flex:0 0 50%;max-width:50%}}</style>
 {# Generated from main.css: reserve proportional logo geometry before async CSS. #}

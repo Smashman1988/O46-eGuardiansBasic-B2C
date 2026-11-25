@@ -332,8 +332,25 @@ namespace {
     foreach (['get_additional_styles','get_additional_scripts'] as $name) { addFunction($twig,$name,function () { return []; }); }
     addFunction($twig,'getPartial',function ($name) { return ['page-design'=>'layout','head'=>'head','page-metadata'=>'metadata'][$name] ?? 'empty'; });
     addFunction($twig,'plugin_path',function ($name) { return '/plugins/' . $name; });
-    addFunction($twig,'config',function ($key) { return $key === 'Ceres.meta.robots_home' ? 'NOINDEX,NOFOLLOW' : ''; });
-    addFunction($twig,'trans',function ($key) { return $key; });
+    addFunction($twig,'config',function ($key) {
+        if (strpos($key, 'IO.routing.category_') === 0) {
+            return \IO\Helper\RouteConfig::getCategoryId(substr($key, strlen('IO.routing.category_')));
+        }
+        return $key === 'Ceres.meta.robots_home' ? 'NOINDEX,NOFOLLOW' : '';
+    });
+    $searchLabels = [];
+    foreach (['de','en','fr','it','es'] as $language) {
+        $translations = file_get_contents($root . '/resources/lang/' . $language . '/Template.properties');
+        check(preg_match('/^searchresultfor\s*=\s*(.+)$/m', $translations, $label) === 1, 'Missing search heading in ' . $language);
+        $searchLabels[$language] = trim($label[1]);
+    }
+    $translate = new Callback(function ($context, $key) use ($searchLabels) {
+        if ($key === 'GuardiansBasic::Template.searchresultfor') {
+            return $searchLabels[$context['services']['localizationRepository']->getLanguage()];
+        }
+        return $key;
+    });
+    $twig->addFunction(new Twig\TwigFunction('trans', [$translate,'invoke'], ['needs_context'=>true]));
     addFunction($twig,'queryString',function ($replace = []) use ($request) { $params = array_replace($request->params,$replace); return $params ? '?' . http_build_query($params) : ''; });
     foreach (['filterFields','itemName','specialOffer','formatMonetary','itemURL'] as $name) { $twig->addFilter(new Twig\TwigFilter($name,[new Callback(function ($value) { return $value; }),'invoke'])); }
     $builderCalls = 0; $builderMode = 'single'; $builderSpecs = [];
@@ -368,7 +385,100 @@ namespace {
         'buildHash'=>'fixture', 'forceNoIndex'=>false, 'currencyData'=>['name'=>'EUR'], 'notifications'=>[]];
     // Plenty globals are supplied to nested renders too, as in the shop.
     foreach ($base as $key=>$value) { $twig->addGlobal($key,$value); }
-
+    foreach (['basket','checkout','login','register','my-account','wish-list','confirmation'] as $route) {
+        foreach (['template','body-class','configured-category'] as $mode) {
+            test("robots/system/$route/$mode", function () use ($route,$mode,$twig,$base,$request,$templateService) {
+                $saved = \IO\Helper\RouteConfig::$links;
+                $previous = $templateService->template;
+                try {
+                    $request->params = [];
+                    $templateService->template = $mode === 'template' ? 'tpl.'.$route : 'tpl.category.content';
+                    $ctx = $base;
+                    $ctx['category']['details'][0]['metaRobots'] = 'INDEX,FOLLOW';
+                    $ctx['bodyClasses'] = $mode === 'body-class' ? ['page-category','category-'.$route] : ['page-category'];
+                    if ($mode === 'configured-category') {
+                        \IO\Helper\RouteConfig::$links[$route] = $ctx['category']['id'];
+                    }
+                    $html = $twig->render('regular',$ctx);
+                    check(meta($html,'robots') === 'NOINDEX,FOLLOW' && canonical($html) !== null,'System metadata');
+                    if ($mode !== 'template') {
+                        check(strpos($html,'name="o46-language-route"') !== false,'Missing functional category routes');
+                    }
+                    $ctx['category']['details'][0]['metaRobots'] = 'NOFOLLOW,NOARCHIVE';
+                    check(meta($twig->render('regular',$ctx),'robots') === 'NOINDEX,NOFOLLOW,NOARCHIVE','Stricter directive lost');
+                } finally {
+                    \IO\Helper\RouteConfig::$links = $saved;
+                    $templateService->template = $previous;
+                }
+            });
+        }
+    }
+    foreach (['basket'=>'Basket/Basket','checkout'=>'Checkout/CheckoutView','login'=>'Customer/Login',
+              'register'=>'Customer/Register','confirmation'=>'Checkout/OrderConfirmation'] as $route=>$view) {
+        test("robots/system/$route/theme-head", function () use ($route,$view,$loader,$twig,$base,$request,$templateService) {
+            $previous = $templateService->template;
+            try {
+                $request->params = [];
+                $templateService->template = 'tpl.'.$route;
+                check(preg_match('~(\{% block PartialHead %\}.*?)\{% block PageBody %\}~s',readView($view),$part) === 1,'Missing system head');
+                $loader->setTemplate('system-head-'.$route,'{% extends "layout" %}'.$part[1]);
+                $ctx = $base;
+                $ctx['category'] = null;
+                $html = $twig->render('system-head-'.$route,$ctx);
+                $expected = in_array($route,['checkout','login'],true) ? 'NOINDEX,NOFOLLOW' : 'NOINDEX,FOLLOW';
+                check(str_replace(' ','',meta($html,'robots')) === $expected && canonical($html) !== null,'Incorrect system head');
+            } finally {
+                $templateService->template = $previous;
+            }
+        });
+    }
+    foreach (['de','en','fr','it','es'] as $language) {
+        foreach (['hits','empty','filter','sort','fragment','category'] as $mode) {
+            test("headings/$language/$mode", function () use ($twig,$base,$request,$templateService,$language,$mode,$searchLabels) {
+                $previous = $templateService->template;
+                try {
+                    $templateService->template = $mode === 'category' ? 'tpl.category.item' : 'tpl.search';
+                    $ctx = localizedContext($base,$language);
+                    $ctx['isSearch'] = $mode !== 'category';
+                    $ctx['searchString'] = 'Probe';
+                    $ctx['itemCountTotal'] = $mode === 'empty' ? 0 : 12;
+                    if ($ctx['isSearch']) $ctx['category'] = null;
+                    $request->params = ['filter'=>['facets'=>'3'],'sort'=>['sorting'=>'item.score'],'fragment'=>['quickViewItem'=>'true']][$mode] ?? [];
+                    $html = $twig->render('actual-regular',$ctx);
+                    preg_match_all('~<h1\b[^>]*>(.*?)</h1>~si',$html,$headings);
+                    check(count($headings[1]) === ($mode === 'fragment' ? 0 : 1),'Unexpected number of headings');
+                    if ($ctx['isSearch'] && $mode !== 'fragment') {
+                        $expected = $searchLabels[$language] . ' "Probe" (' . $ctx['itemCountTotal'] . ')';
+                        check(html_entity_decode(trim($headings[1][0])) === $expected,'Wrong localized search heading');
+                    }
+                } finally {
+                    $templateService->template = $previous;
+                    $request->params = [];
+                }
+            });
+        }
+    }
+    foreach ([
+        ['tpl.home', [], 'home'], ['tpl.home.category', [], 'home'],
+        ['tpl.category.content', ['category-home'], 'home'],
+        ['tpl.basket', [], 'basket'], ['tpl.category.content', ['category-basket'], 'basket'],
+        ['tpl.category.content', ['category-checkout'], null], ['tpl.category.item', [], null],
+    ] as [$template,$classes,$layout]) {
+        test('critical-layout/'.$template.'/'.implode('-',$classes), function () use ($template,$classes,$layout,$base,$twig,$templateService) {
+            $previous = $templateService->template;
+            try {
+                $templateService->template = $template;
+                $ctx = $base;
+                $ctx['bodyClasses'] = $classes;
+                $html = $twig->render('regular',$ctx);
+                foreach (['home','basket'] as $name) {
+                    check(substr_count($html, '<style data-eg-'.$name.'-layout-critical>') === (int)($layout === $name),'Incorrect early layout for '.$name);
+                }
+            } finally {
+                $templateService->template = $previous;
+            }
+        });
+    }
     test('b2c/canonical-original-query',function () use ($twig,$base,$request,$search,&$builderMode) {
         $builderMode='single'; $search->total=50;
         $ctx=$base; $ctx['category']['details'][0]['metaRobots']='INDEX,FOLLOW';
