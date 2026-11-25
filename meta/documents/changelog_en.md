@@ -2,6 +2,7 @@
 
 ## Unreleased · B2C develop
 
+- The newsletter popup opens at the top right after scrolling and links to the local signup page for the 7% discount. The language dialog renders all five shop languages directly in the theme and keeps navigation on the current storefront host.
 - Product pages display reviews once. Homepage and promotional cards share the selected currency and localized labels for each list. The footer reuses its plugin path for payment and shipping logos.
 - The Outlet46 logo makes fuller use of the compact header and reaches a width of 247 px on large screens.
 - Home & Living replaces Last Size in all five menus. Italian and Spanish use the English text index with localized product data. German, English and French retain native IO search.

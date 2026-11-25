@@ -6,16 +6,16 @@
       "sha256": "9bf47285af9957edb26e66b14901b94533d2d42acb2522d0df4af3c91aaecaee"
     },
     "css/main.min.css": {
-      "version": 4,
-      "sha256": "3cbf930fae4fc031f216f457340c91dd2319244bd569ff40d0fa5c082ab61ce0"
+      "version": 5,
+      "sha256": "243d15a6d8031185411ad034f529404456b7369ae51749328365f46f8b3dc4ac"
     },
     "js/cat.min.js": {
       "version": 3,
       "sha256": "2d592b4b22657924c6ee4a7f6b504c33d629e0648b9a89c26fbdf2c80963a4ec"
     },
     "js/core.min.js": {
-      "version": 7,
-      "sha256": "200aeb43862e584238ff9f6d0741b80c9ee11780343d1b789ecabf791f8754a0"
+      "version": 8,
+      "sha256": "eb17d473e615e156c7fe3e5d5c56885dba474631e632d7d52ce1d08c5162008d"
     },
     "js/facets.min.js": {
       "version": 1,

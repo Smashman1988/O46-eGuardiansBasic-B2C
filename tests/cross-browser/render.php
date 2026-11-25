@@ -14,6 +14,8 @@ $service = new class {
     public $lang='de';
     function getLanguage() { return $this->lang; }
     function getCurrencyData() { return ['name'=>'EUR','symbol'=>'€']; }
+    public $checkout = false;
+    function isCheckout() { return $this->checkout; }
     function shouldBeCached() { return true; }
     function getCanonicalURL() { return '/scroll/'; }
     function getURLById($id) { return '/category-'.$id.'/'; }
@@ -33,6 +35,7 @@ $twig->addFunction(new Twig\TwigFunction('config', fn($key) => $settings[$key] ?
 $twig->addFunction(new Twig\TwigFunction('queryString',fn($params) => ($query=http_build_query($params)) !== '' ? '?'.$query : ''));
 $twig->addFilter(new Twig\TwigFilter('itemName', fn($item) => 'Laufschuh'));
 $context = ['services'=>array_fill_keys(['localizationRepository','checkout','template','category','url'], $service),
+    'webstoreConfig'=>['domainSsl'=>'https://www.outlet46.de','defaultLanguage'=>'de'],
     'lang'=>'de','pdpBasketForHeader'=>[],'vuejs'=>[],'category'=>['id'=>1],'newsletterUrl'=>'/newsletter/','consentRequired'=>false];
 $twig->addGlobal('services', $context['services']);
 function fragment($source, $start, $end) {
@@ -95,14 +98,31 @@ foreach (array_keys($sortOptions) as $sort) {
     $result['sorting'][$sort]=$twig->createTemplate($sortMenu)->render(['query'=>['sorting'=>$sort],'canonicalURL'=>'/search/',
         'searchOptions'=>['defaultSorting'=>'relevance','sorting'=>$sortOptions]]);
 }
+$newsletter = $twig->createTemplate(fragment($layout, '{% set newsletterPaths', '{% if currentTemplate in vuePages')
+    .fragment($layout, '{% if showNewsletter %}', '{% endif %}').'{% endif %}');
 foreach (['de','en','fr','it','es'] as $lang) {
     $service->lang=$lang;
     $context['lang']=$lang;
     $labels=parse_ini_file($root.'/resources/lang/'.$lang.'/Template.properties',false,INI_SCANNER_RAW);
     $result['languages'][$lang]=[
         'header'=>$twig->render('GuardiansBasic::PageDesign.Partials.Header.Header',$context),
+        'newsletter'=>$newsletter->render($context+['wkbkasse'=>[5482,5484],'currentRequestUri'=>'/']),
         'controls'=>$twig->createTemplate(fragment($category,'<div class="row d-lg-none">','{% include'))->render($context)
     ];
 }
+$excluded = [
+    ['isBasketPage'=>true], ['currentTemplate'=>'tpl.confirmation'], ['isShopBuilder'=>true],
+    ['category'=>['id'=>5482]], ['category'=>['id'=>5484]], ['currentRequestUri'=>'/amazon'],
+    ['currentRequestUri'=>'/expressCheckoutReview'], ['lang'=>'nl']
+];
+foreach ($result['languages'] as $lang => $parts) {
+    if (!preg_match('~<a[^>]+href="([^"]+)"~', $parts['newsletter'], $match)) throw new RuntimeException('Missing newsletter in '.$lang);
+    $excluded[] = ['lang'=>$lang, 'currentRequestUri'=>$match[1].'?utm_source=test'];
+}
+foreach ($excluded as $settings) {
+    if (trim($newsletter->render($settings + $context + ['wkbkasse'=>[5482,5484]])) !== '') throw new RuntimeException('Newsletter exclusion: '.json_encode($settings));
+}
+$service->checkout = true;
+if (trim($newsletter->render($context+['wkbkasse'=>[5482,5484]])) !== '') throw new RuntimeException('Newsletter inside checkout');
 echo json_encode($result,JSON_THROW_ON_ERROR);
 

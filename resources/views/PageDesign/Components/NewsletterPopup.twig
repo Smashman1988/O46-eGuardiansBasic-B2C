@@ -1,0 +1,18 @@
+<aside id="o46-newsletter" class="o46-newsletter" aria-labelledby="o46-newsletter-title" data-consent-required="{{ consentRequired ? '1' : '0' }}" hidden>
+    <button type="button" class="o46-newsletter-close" aria-label="{{ trans('GuardiansBasic::Template.newsletterPopupClose') }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+            <path d="m6 6 12 12M18 6 6 18"/>
+        </svg>
+    </button>
+    <svg class="o46-newsletter-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false">
+        <rect x="3" y="5" width="18" height="14" rx="3"/>
+        <path d="m4 7 8 6 8-6"/>
+    </svg>
+    <div>
+        <h2 id="o46-newsletter-title">{{ trans('GuardiansBasic::Template.newsletterPopupTitle') }}</h2>
+        <p>{{ trans('GuardiansBasic::Template.newsletterPopupText') }}</p>
+        <div class="o46-newsletter-actions">
+            <a class="o46-newsletter-link" href="{{ newsletterUrl }}">{{ trans('GuardiansBasic::Template.newsletterPopupLink') }}</a>
+        </div>
+    </div>
+</aside>

@@ -59,6 +59,23 @@
         and category.right|default('') != 'customer' and not services.category.isHidden(category.id) %}
 {% endif %}
 {% set currentRequestUri = request.getRequestUri() %}
+{% set newsletterPaths = {
+    'de': 'newsletter-anmeldung',
+    'en': 'en/newsletter-sign-up',
+    'fr': 'fr/inscription-a-la-newsletter',
+    'it': 'it/iscriviti-alla-newsletter',
+    'es': 'es/inscribase-al-boletin'
+} %}
+{% set currentPath = currentRequestUri|split('?')|first|split('#')|first|trim('/')|lower %}
+{% set showNewsletter = lang in newsletterPaths|keys
+    and currentPath not in newsletterPaths|map(path => path|lower)
+    and not isShopBuilder
+    and not services.template.isCheckout()
+    and not isBasketPage and currentTemplate != 'tpl.confirmation'
+    and category.id|default(0) not in wkbkasse
+    and not (category.id|default(0) > 0 and category.id == config('IO.routing.category_checkout'))
+    and 'amazon' not in currentRequestUri
+    and 'expressCheckoutReview' not in currentRequestUri %}
 {% if currentTemplate in vuePages|keys or isBasketCategory or isWishListPage or "amazon" in currentRequestUri or "expressCheckoutReview" in currentRequestUri or isShopBuilder or category.id in contentVuePages %}
     {% set isVueView = true %}
 {% endif %} 
@@ -512,7 +529,7 @@
             {% if themeNeedsJquery %}
                 <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js?v=1"></script>
             {% endif %}
-            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=7" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
+            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=8" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
             <script src="{{ plugin_path('GuardiansBasic') }}/js/{{ themePageScript }}"{% if not themeNeedsJquery %} data-eg-vue-logout{% endif %} defer></script>
             {% if isItem %}
                 {# After item.js defines mzOptions, before DOMContentLoaded initializes the gallery. #}
@@ -528,7 +545,12 @@
                 <script src="https://static-eu.payments-amazon.com/checkout.js" defer></script>
                 <script src="{{ plugin_path('AmazonPayCheckout') }}/js/amazon-pay.min.js"></script>
             {% endif %}
-            {% include "GuardiansBasic::PageDesign.Components.gutschein" ~ langCodeMap[lang] %}
+            {% if showNewsletter %}
+                {% include 'GuardiansBasic::PageDesign.Components.NewsletterPopup' with {
+                    newsletterUrl: '/' ~ newsletterPaths[lang] ~ '/',
+                    consentRequired: ceresConfig.global.blockCookies|default(false)
+                } only %}
+            {% endif %}
             
             <div class="ccklayer"></div> 
             {% if orderId == "" and category.id in salenti %}

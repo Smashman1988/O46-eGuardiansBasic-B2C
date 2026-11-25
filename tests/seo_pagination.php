@@ -257,6 +257,7 @@ namespace {
     $baselineExtension = new GuardiansBasic\Extensions\BaselineBaseExtension($factory,$renderer,$request);
     $templates = [
         'layout'=>readView('PageDesign/PageDesign'),
+        'GuardiansBasic::PageDesign.Components.NewsletterPopup'=>readView('PageDesign/Components/NewsletterPopup'),
         'head'=>readView('PageDesign/Partials/Head'),
         'metadata'=>readView('PageDesign/Partials/PageMetadata'),
         'metadata-block-title'=>'{% embed "metadata" %}{% block title fixtureTitle %}{% endembed %}',
@@ -286,7 +287,7 @@ namespace {
     // The surrounding layout is real. Unrelated UI components are inert fixtures.
     preg_match_all('/\{%\s*(?:include|import)\s+"([^"]+)"/', $templates['layout'], $includes);
     foreach ($includes[1] as $name) { $templates[$name] = $templates[$name] ?? ''; }
-    foreach (['DE','EN','FR','IT','ES'] as $lang) { $templates['GuardiansBasic::PageDesign.Components.nl-element' . $lang] = ''; $templates['GuardiansBasic::PageDesign.Components.gutschein' . $lang] = ''; }
+    foreach (['DE','EN','FR','IT','ES'] as $lang) { $templates['GuardiansBasic::PageDesign.Components.nl-element' . $lang] = ''; }
     $loader = new Twig\Loader\ArrayLoader($templates);
     $twig = new Twig\Environment($loader, ['cache'=>false, 'autoescape'=>'html']);
     $renderer->environment = $twig;

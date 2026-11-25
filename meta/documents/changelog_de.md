@@ -2,6 +2,7 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Das Newsletter-Popup erscheint nach dem Scrollen oben rechts und verlinkt die lokale Anmeldung mit 7 % Rabatt. Der Sprachdialog zeigt die fünf Shopsprachen direkt im Theme an und hält die Navigation auf dem aktuellen Shophost.
 - Produktbewertungen erscheinen einmal auf der Detailseite. Startseiten- und Aktionskarten verwenden die gewählte Währung und die lokalisierten Kartenbeschriftungen für die gesamte Liste. Der Footer verwendet denselben Pluginpfad für Zahlungs- und Versandlogos.
 - Das Outlet46-Logo nutzt den Platz im kompakten Header besser und erreicht auf großen Bildschirmen 247 px Breite.
 - Home & Living ersetzt Letzte Größe in den fünf Sprachmenüs. IT und ES durchsuchen den englischen Textindex mit lokalisierten Produktdaten. DE, EN und FR verwenden weiterhin IO.

@@ -738,4 +738,3 @@ for (i = 0; i < coll.length; i++) {
     }
   });
 }
-// Gutschein/NL Pop-UP

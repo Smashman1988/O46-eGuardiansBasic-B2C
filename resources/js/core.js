@@ -313,6 +313,12 @@ O46Core.ui = O46Core.ui || function (messageDuration) {
                 if (clickOpener && !modal.contains(clickOpener)) modal.egOpener = clickOpener;
                 $(modal).modal('show');
                 if (generation !== dialogGeneration) return;
+                const options = languageMessage !== undefined && document.getElementById('eg-language-options');
+                if (options) {
+                    body.replaceChildren(options.content.cloneNode(true));
+                    this.languageLinks(modal, languageMessage, options.dataset);
+                    return;
+                }
                 dialogRequest = eGuardians.apiservice.get(route, data, function(response, code){
                     if (generation !== dialogGeneration) return;
                     dialogRequest = null;
@@ -336,14 +342,22 @@ O46Core.ui = O46Core.ui || function (messageDuration) {
             },
             // The existing modal owns language links on every page. IO already emitted
             // the routes in the head; facets supply state only, never another route map.
-            languageLinks: function(modal, unavailable){
+            languageLinks: function(modal, unavailable, context = {}){
                 if (!modal) return;
                 const routes = new Map();
                 document.head.querySelectorAll('link[rel="alternate"][hreflang], meta[name="o46-language-route"][lang]').forEach(link => {
                     const code = (link.getAttribute('hreflang') || link.lang).toLowerCase().split('-')[0];
-                    if (code !== 'x') routes.set(code, link.dataset.egLanguageUrl || link.getAttribute('content') || link.href);
+                    const target = link.dataset.egLanguageUrl || link.getAttribute('content') || link.href;
+                    if (code !== 'x') routes.set(code, target);
+                    else if (context.defaultLanguage && !routes.has(context.defaultLanguage)) routes.set(context.defaultLanguage, target);
                 });
                 const current = new URL(location.href);
+                // IO can return the public webstore origin while a preview runs on another host.
+                // Keep navigation, cookies and the pluginset on the current origin.
+                let shopOrigin;
+                if (context.shopUrl) {
+                    try { shopOrigin = new URL(context.shopUrl, current).origin; } catch { /* No alternate trusted origin. */ }
+                }
                 const knownCurrencies = Intl.supportedValuesOf?.('currency');
                 const currencyCode = params => {
                     for (const key of ['currency', 'Currency']) {
@@ -379,9 +393,14 @@ O46Core.ui = O46Core.ui || function (messageDuration) {
                     if (target && link.origin === current.origin) {
                         try { url = new URL(target, current); } catch { /* Use the existing unavailable-language state. */ }
                     }
-                    if (url && url.origin === current.origin && /^https?:$/.test(url.protocol)) {
+                    if (url && /^https?:$/.test(url.protocol) && !url.username && !url.password &&
+                        (url.origin === current.origin || url.origin === shopOrigin)) {
+                        url.protocol = current.protocol;
+                        url.host = current.host;
+                        url.port = current.port;
                         // Preserve the page choice and IO route first; the widget carries the session currency.
-                        const currency = pageCurrency || currencyCode(url.searchParams) || currencyCode(new URLSearchParams(link.search));
+                        const currency = pageCurrency || currencyCode(url.searchParams) || currencyCode(new URLSearchParams(link.search)) ||
+                            (context.currency !== 'EUR' && currencyCode(new URLSearchParams({currency: context.currency || ''})));
                         if (!item && window.egFacets) url = window.egFacets.languageURL(url.href) || url;
                         if (item && selectedVariation) {
                             // IO's registered itemId_variationId route accepts both IDs.
@@ -961,3 +980,84 @@ u=-1===u.indexOf("url(")?"url("+u+")":u,1===d.length?t.style.backgroundImage=u:t
     O46Core.installed.lazyImages = true;
 };
 
+// The deferred core runs once the full-page markup is available.
+(function initNewsletter() {
+    const popup = document.getElementById('o46-newsletter');
+    if (!popup || popup.dataset.initialized) return;
+    popup.dataset.initialized = '1';
+
+    const cookieName = 'o46_newsletter_dismissed';
+    const scrollLimit = 2000;
+    const cookieLifetime = 7 * 24 * 60 * 60;
+    const controls = document.querySelectorAll('#page-header, #page-header2, .top-top-bar, .filter-container, .btnfilter-mobile');
+    const lowerControls = document.querySelectorAll('#totop');
+    let reachedScrollLimit = window.scrollY >= scrollLimit;
+    let dismissed = false;
+    let frame = 0;
+
+    function consentReady() {
+        return typeof ConsentManager !== 'undefined'
+            ? ConsentManager.hasResponse()
+            : popup.dataset.consentRequired !== '1';
+    }
+
+    function wasDismissed() {
+        try {
+            return document.cookie.split(';').some(cookie => cookie.trim() === cookieName + '=1' || cookie.trim() === 'showModal=false');
+        } catch {
+            return false;
+        }
+    }
+
+    function update() {
+        frame = 0;
+        if (dismissed || !reachedScrollLimit || !consentReady() || wasDismissed()) {
+            popup.hidden = true;
+            return;
+        }
+
+        let top = 12;
+        for (const control of controls) {
+            const rect = control.getBoundingClientRect();
+            if (rect.width && rect.height && rect.right > 0 && rect.left < window.innerWidth
+                && rect.bottom > 0 && rect.top < window.innerHeight / 3) {
+                top = Math.max(top, Math.ceil(rect.bottom) + 12);
+            }
+        }
+        let bottom = window.innerHeight - 12;
+        for (const control of lowerControls) {
+            if (control.getClientRects().length) {
+                const controlTop = control.getBoundingClientRect().top;
+                if (controlTop > 0) bottom = Math.min(bottom, controlTop - 12);
+            }
+        }
+        const availableHeight = Math.floor(bottom - top);
+        popup.style.setProperty('--o46-newsletter-top', top + 'px');
+        popup.style.setProperty('--o46-newsletter-height', availableHeight + 'px');
+        popup.hidden = availableHeight < 132;
+    }
+
+    function scheduleUpdate() {
+        reachedScrollLimit = reachedScrollLimit || window.scrollY >= scrollLimit;
+        if (reachedScrollLimit && !dismissed && !frame) frame = window.requestAnimationFrame(update);
+    }
+
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+    window.addEventListener('pageshow', scheduleUpdate);
+    document.addEventListener('consent-change', scheduleUpdate);
+
+    popup.querySelector('.o46-newsletter-close').addEventListener('click', function () {
+        dismissed = true;
+        popup.hidden = true;
+        if (consentReady()) {
+            try {
+                // Host-only preference written only when the visitor dismisses the card.
+                document.cookie = cookieName + '=1; Max-Age=' + cookieLifetime + '; Path=/; SameSite=Lax; Secure';
+            } catch {
+                // The card stays closed in this document when the browser blocks cookies.
+            }
+        }
+    });
+    scheduleUpdate();
+})();
