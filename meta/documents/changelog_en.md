@@ -2,6 +2,10 @@
 
 ## Unreleased · B2C develop
 
+- ShopBuilder categories verify the last page using variation IDs. The twelve displayed products still receive their full card data. The newsletter popup uses the checkout context and page configuration for its exclusions.
+- Direct variation links, including language switches, show the linked size and colour. The basket button also uses the current language for its accessible name.
+- Canonical URLs, robots and page titles now use the displayed page even when ShopBuilder supplies a previously rendered item list. Empty pages remain NOINDEX.
+
 - The language picker uses the translated category, variation or configured IO system route on NOINDEX pages as well. Missing translations are shown as unavailable.
 - Paginated ShopBuilder category lists verify the reported hit count against the documents the search actually returns. The displayed total, page links, infinite scroll and SEO use the same boundary.
 

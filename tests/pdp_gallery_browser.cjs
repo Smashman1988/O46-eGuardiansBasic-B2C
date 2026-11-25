@@ -129,7 +129,43 @@ async function run() {
         await picker.waitFor({state:'hidden'});
         assert.equal(await heart.getAttribute('aria-pressed'),'true');
         results.push({wishlist:'B2C variation selection, rejected write, retry and confirmation'});save();
-        console.log(results.length+' local gallery and wishlist checks passed');
+        const dir = require('node:path').dirname(process.argv[2]);
+        for (const [language, pathname] of [['de','/42_1012/'],['en','/en/42_1012/']]) {
+            const linked = render(require('node:path').join(dir, 'pdp-linked-'+language+'.html'));
+            await page.route(url => url.origin === 'https://store.example.test' && url.pathname.replace(/\/?$/,'/') === pathname, route => route.fulfill({contentType:'text/html',body:linked}));
+        }
+        async function mountItem(language) {
+            for (const file of ['jquery-3.7.1.min.js','core.min.js','item.min.js']) {
+                await page.addScriptTag({path:'resources/js/'+file});
+            }
+            await page.evaluate(lang=>{
+                window.activeLang=lang;
+                window.messageServiceTranslations={};
+                eGuardians.initialize();
+            },language);
+        }
+        await page.goto('https://store.example.test/42_1012/');
+        await mountItem('de');
+        const selected = page.locator('article.single [data-eg-selected-attribute]');
+        assert.deepEqual(await selected.allTextContents(),['M','Grau']);
+        await page.locator('[data-eg-language-switch]').click();
+        const english = page.locator('.dynamicModal a[hreflang="en"]');
+        const target = new URL(await english.getAttribute('href'));
+        assert.equal(target.origin,'https://store.example.test');
+        assert.equal(target.pathname.replace(/\/?$/,'/'),'/en/42_1012/');
+        await english.click();
+        await page.waitForURL(target.href);
+        await mountItem('en');
+        assert.deepEqual(await selected.allTextContents(),['M','Grey']);
+        assert.equal(await page.locator('article.single [data-item-variation-select] [data-selected]').count(),2);
+        await page.evaluate(()=>{
+            window.basketWrites=[];
+            eGuardians.apiservice.post=(url,data)=>window.basketWrites.push([url,data.variationId,data.quantity]);
+        });
+        await page.locator('article.single [data-item-tobasket]').click();
+        assert.deepEqual(await page.evaluate(()=>window.basketWrites),[['/rest/io/basket/items/','1012',1]]);
+        results.push({languageSwitch:'DE to EN with size and colour, correct variation passed to basket'});save();
+        console.log(results.length+' local gallery, wishlist and product checks passed');
     } finally { await browser.close(); }
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});

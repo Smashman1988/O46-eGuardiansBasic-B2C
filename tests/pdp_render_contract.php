@@ -13,11 +13,13 @@ set_error_handler(function ($level,$message,$file,$line) use (&$notices) {
     if (in_array($level,[E_DEPRECATED,E_USER_DEPRECATED],true)) { $notices[$message] = [$file,$line]; return true; }
     throw new ErrorException($message,0,$level,$file,$line);
 });
-class GuardRequest { public $value; function __construct($v){$this->value=$v;} function get($key){return $key==='quickViewItem'?$this->value:null;} function getRequestUri(){return '/product/?quickViewItem='.(is_scalar($this->value)?(string)$this->value:'');} }
+class GuardRequest { public $value, $uri; function __construct($v){$this->value=$v;} function get($key){return $key==='quickViewItem'?$this->value:null;} function getRequestUri(){return $this->uri ?? '/product/?quickViewItem='.(is_scalar($this->value)?(string)$this->value:'');} }
 class GuardServices {
     public $calls=[],$lang,$request,$containers=[],$texts=[],$quantity=0,$sorts=0;
     public $wishListSnapshot = [], $wishListHit = false;
     public $singleVariation = false;
+    public $blockedVariation = true;
+    public $linkedVariations;
     function __construct($lang,$request){$this->lang=$lang;$this->request=$request;}
     function feedbackList() {
         $this->calls[] = 'feedbackList';
@@ -31,7 +33,7 @@ class GuardServices {
         $this->calls[]=$name;
         switch($name){
             case 'setType': return null;
-            case 'getVariationAttributeMap': return $this->singleVariation ? [] : [['variationId'=>1011,'attributes'=>[['attributeId'=>1,'attributeValueId'=>1]]],['variationId'=>1012,'attributes'=>[['attributeId'=>1,'attributeValueId'=>2]]]];
+            case 'getVariationAttributeMap': return $this->linkedVariations ?? ($this->singleVariation ? [] : [['variationId'=>1011,'attributes'=>[['attributeId'=>1,'attributeValueId'=>1]]],['variationId'=>1012,'attributes'=>[['attributeId'=>1,'attributeValueId'=>2]]]]);
             case 'getBasketForTemplate': return ['itemQuantity'=>$this->quantity,'currency'=>'EUR'] + $this->wishListSnapshot;
             case 'getBasketQuantity': return $this->quantity;
             case 'getURLById': return '/'.$this->lang.'/category-'.$args[0].'/';
@@ -45,7 +47,7 @@ class GuardServices {
             case 'shouldBeCached': return true;
             case 'getCanonicalURL': return '/'.($args[0]??$this->lang).'/product/a-42/';
             case 'getLanguageURLs': return array_combine(['de','en','fr','it','es'],array_map(function($l){return '/'.$l.'/product/a-42/';},['de','en','fr','it','es']));
-            case 'getVariationIsSalable': return true;
+            case 'getVariationIsSalable': return $this->blockedVariation;
             case 'getVariationURL': return new class { function getPath(){return '/product/a-42/';} };
             case 'getCategoryURL': return new class { function toAbsoluteUrl($v){return '/category/';} };
             case 'getCurrentCategory': return null;
@@ -63,7 +65,14 @@ class GuardServices {
     function partial($key){return ['page-design'=>'PageDesign','head'=>'Head','page-metadata'=>'Metadata','header'=>'Header','footer'=>'fixture-footer'][$key];}
     function trans($key,$params=[]){$this->texts[]=$key;return $this->lang.':'.$key;}
     function pluginPath($name){return '/plugins/'.$name;}
-    function languageRoutes(){ return []; }
+    function languageRoutes($template,$category,$itemId,$variationId) {
+        if ($template !== 'tpl.item' || !$itemId || !$variationId) return [];
+        $routes = [];
+        foreach (['de','en','fr','it','es'] as $code) {
+            $routes[$code] = 'https://store.example.test/'.($code === 'de' ? '' : $code.'/').$itemId.'_'.$variationId.'/';
+        }
+        return $routes;
+    }
     function styles(){ $this->calls[]='additionalStyles';return [['path'=>'fixture-external-style','params'=>[]]]; }
     function scripts(){ $this->calls[]='additionalScripts';return [['path'=>'fixture-external-script','params'=>[]]]; }
     function component($name){$this->calls[]='component:'.$name;return '';}
@@ -176,6 +185,42 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
                 || substr_count($feedbackHtml, 'id="quickrating"') !== $expected
                 || substr_count($feedbackHtml, '<section class="feedback-container">') !== $expected) {
                 throw new RuntimeException('Unexpected feedback markup or service count: '.json_encode([$value, $feedbackCount, $calls]));
+            }
+        }
+    }
+    if ($format === 'prepared' && $value === null) {
+        $svc->singleVariation = false;
+        $ctx['attributes'] = [['attributeId'=>1,'name'=>'Size','values'=>[
+            ['attributeValueId'=>1,'name'=>'S'], ['attributeValueId'=>2,'name'=>'M']]]];
+        $colour = ['de'=>'Grau','en'=>'Grey','fr'=>'Gris','it'=>'Grigio','es'=>'Gris'][$lang];
+        $ctx['attributes'][] = ['attributeId'=>2,'name'=>'Colour','values'=>[['attributeValueId'=>3,'name'=>$colour]]];
+        $svc->linkedVariations = $svc->getVariationAttributeMap(42);
+        foreach ($svc->linkedVariations as &$variation) {
+            $variation['attributes'][] = ['attributeId'=>2,'attributeValueId'=>3];
+        }
+        unset($variation);
+        $ctx['item']['documents'][0]['data']['variation']['id'] = 1012;
+        foreach ([['/42_1012/',false,1,true],['/product/a-42/',false,1,false],
+            ['/42_1011/',false,1,false],['/42_1012/',true,1,false],['/42_1012/',false,5,false]] as [$path,$blocked,$availability,$enabled]) {
+            $req->uri = '/'.$lang.$path.'?currency=USD';
+            $svc->blockedVariation = $blocked;
+            $ctx['item']['documents'][0]['data']['variation']['availability']['id'] = $availability;
+            $result = new DOMDocument();
+            $linkedHtml = $twig->render('SingleItem',$ctx);
+            $result->loadHTML($linkedHtml,LIBXML_NOERROR|LIBXML_NOWARNING);
+            if (in_array($lang,['de','en'],true) && $enabled) {
+                file_put_contents(dirname($argv[2]).'/pdp-linked-'.$lang.'.html',$linkedHtml);
+            }
+            $selectors = new DOMXPath($result);
+            $buy = $selectors->query('//article//button[@data-item-tobasket]')->item(0);
+            $marked = $selectors->query('//article//*[@data-eg-value="2" and @data-selected]')->length;
+            $label = $selectors->query('//article//*[@data-eg-selected-attribute and normalize-space(.)="M"]')->length;
+            $colourMarked = $selectors->query('//article//*[@data-eg-value="3" and @data-selected]')->length;
+            $colourLabel = $selectors->query('//article//*[@data-eg-selected-attribute and normalize-space(.)="'.$colour.'"]')->length;
+            if ((bool)$colourMarked !== (bool)$marked || (bool)$colourLabel !== (bool)$marked
+                || !$buy || (strpos($buy->getAttribute('class'),'inBasketBtnDisabled') === false) !== $enabled
+                || (bool)$marked !== ($enabled || $availability === 5) || (bool)$label !== (bool)$marked) {
+                throw new RuntimeException('Incorrect linked selection or availability in '.$lang.' '.$path.' blocked='.(int)$blocked.' availability='.$availability);
             }
         }
     }

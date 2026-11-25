@@ -36,8 +36,6 @@ class Base_Extension extends Twig_Extension
     private $factory;
     private $req;
     private $twig;
-    /** Active only inside prepareSeoContent(); restored even if rendering fails. */
-    private $seoPageCapture = null;
     /**
      * BlogTwigExtension constructor.
      * @param TwigFactory $factory
@@ -526,15 +524,16 @@ class Base_Extension extends Twig_Extension
         if ($page->shopBuilderHtml !== null) {
             return '';
         }
-        $previousCapture = $this->seoPageCapture;
-        $this->seoPageCapture = $page;
-        try {
-            $page->shopBuilderHtml = $this->twig->render(
-                'GuardiansBasic::Category.Content.PreparedShopBuilder',
-                ['seoCategoryId' => $categoryId]
-            );
-        } finally {
-            $this->seoPageCapture = $previousCapture;
+        $page->shopBuilderHtml = $this->twig->render(
+            'GuardiansBasic::Category.Content.PreparedShopBuilder',
+            ['seoCategoryId' => $categoryId]
+        );
+        // ShopBuilder can return an already rendered widget or use another Twig instance.
+        // Read the bounds from the same markup the visitor receives, including empty lists.
+        $offset = 0;
+        while (preg_match('~ data-eg-list-page="([1-9][0-9]*):([0-9]+):([0-9]+):([0-9]+|-)"~', $page->shopBuilderHtml, $list, PREG_OFFSET_CAPTURE, $offset)) {
+            $page->addList((int)$list[1][0], (int)$list[2][0], (int)$list[3][0], $list[4][0] === '-' ? null : (int)$list[4][0]);
+            $offset = $list[4][1] + 1; // Resume past the start of the last numeric field.
         }
         return '';
     }
@@ -547,10 +546,17 @@ class Base_Extension extends Twig_Extension
             return $start + $count;
         }
 
-        // A probe covers up to four regular pages. Preserve the preset, sort,
-        // grouping, filters and language. No facets or additional Twig rendering.
-        $window = $estimate > $size * 4 ? $size * 4 : $size;
         $known = $count > 0 ? $start + $count : 0;
+        $window = $size;
+        if ($estimate > $size * 4 && $estimate > $known) {
+            // setPage has no independent offset. Of two nearly equal windows, use the
+            // one with fewer rows before the estimated last hit. The hit count below
+            // still proves the boundary when the estimate is wrong in either direction.
+            $window = $size * 4;
+            if (($estimate - 1) % ($window + 1) < ($estimate - 1) % $window) {
+                $window++;
+            }
+        }
         $low = (int)floor($known / $window); // blocks known to be full
         $high = $count === 0 ? (int)ceil($start / $window) : null; // first known empty block (zero-based)
         $block = (int)floor($estimate / $window);
@@ -565,7 +571,10 @@ class Base_Extension extends Twig_Extension
             }
             $options['page'] = $block + 1;
             $options['itemsPerPage'] = $window;
-            $probe = $search->getResults(['boundary' => CategoryItems::getSearchFactory($options)]);
+            // Only count hits. Keep the platform preset's grouping and visibility filters.
+            $factory = CategoryItems::getSearchFactory($options);
+            $factory->withResultFields(['variation.id']);
+            $probe = $search->getResults(['boundary' => $factory]);
             $documents = $probe['boundary']['documents'] ?? null;
             if (!is_array($documents)) {
                 throw pluginApp(\UnexpectedValueException::class, ['message' => 'Missing category boundary documents']);
@@ -671,10 +680,6 @@ class Base_Extension extends Twig_Extension
         $resultItems['itemSorting'] = $sorting;
         $resultItems['query'] = ['items' => $effectiveSize, 'sorting' => $itemListOptions['sorting']];
         $resultItems['selectedFacets'] = $ownFacets;
-
-        if ($this->seoPageCapture !== null) {
-            $this->seoPageCapture->addList($effectivePage, $pageMax, $total, $documentCount);
-        }
 
         return  $this->twig->render('GuardiansBasic::Category.Item.CategoryItemContent', $resultItems);
     }

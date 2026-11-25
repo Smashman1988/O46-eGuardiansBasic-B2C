@@ -65,9 +65,9 @@ namespace Plenty\Modules\Webshop\ItemSearch\Helpers {
     }
 }
 namespace Plenty\Modules\Webshop\ItemSearch\SearchPresets {
-    class CategoryItems { public static function getSearchFactory($options) { return $options; } }
-    class Facets extends CategoryItems {}
-    class VariationAttributeMap extends CategoryItems {}
+    require_once __DIR__ . '/fixtures/CategoryListSearch.php';
+    class Facets { public static function getSearchFactory($options) { return $options; } }
+    class VariationAttributeMap extends Facets {}
 }
 namespace Plenty\Modules\Webshop\ItemSearch\Services {
     class ItemSearchService {
@@ -76,6 +76,11 @@ namespace Plenty\Modules\Webshop\ItemSearch\Services {
         public $boundaryRequests = [];
         public function getResults($params) {
             $key = isset($params['boundary']) ? 'boundary' : 'itemList';
+            $factory = $params[$key];
+            if ($key === 'boundary' && $factory->fields !== ['variation.id']) {
+                throw new \RuntimeException('Boundary must request only variation.id');
+            }
+            $params[$key] = $factory->options;
             if ($key === 'boundary') { $this->boundaryRequests[] = $params; }
             else { $this->requests[] = $params; }
             $o = $params[$key];

@@ -362,6 +362,8 @@
                     <hr class="hr-style">
                 {% endif %}
 
+                {% set linkedAttributes = [] %}
+                {% set linkedSelectionComplete = false %}
                 {% if variationsWithAttributes[0].attributes  | length > 0 %}
                  {% if itemData.item.flagTwo!=3 %}   
                     {% set variationsWithAttributesWithFilter = [] %}
@@ -383,9 +385,21 @@
                                   </p>
                                 {% endif %}
                               {% endfor %}
+                {# IO's explicit itemId_variationId route already renders the chosen variation. #}
+                {% if request.get('quickViewItem') is empty and (request.getRequestUri()|split('?')|first|trim('/')|split('/')|last) == (itemData.item.id ~ '_' ~ itemData.variation.id) %}
+                    {% for candidate in (itemData.item.flagTwo == 3 ? variationsWithAttributes : variationsWithAttributesWithFilter) %}
+                        {% if candidate.variationId == itemData.variation.id and (itemData.item.flagTwo == 3 or candidate.isSalable) %}
+                            {% set linkedAttributes = candidate.attributes %}
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
                 <div data-item-variation class="row" data-eg-handler="initVariation" data-eg-event="load" data-eg-variations="{{ variationsWithAttributes | json_encode() }}">
+                {% set linkedSelectionComplete = linkedAttributes is not empty and linkedAttributes|length == attributes|length %}
                 {% for itemAttribute in attributes %}
                     {% set activeAttrName = "" %}
+                    {% set linkedAttribute = linkedAttributes|filter(a => a.attributeId == itemAttribute.attributeId)|first %}
+                    {% set linkedValue = linkedAttribute ? itemAttribute.values|filter(v => v.attributeValueId == linkedAttribute.attributeValueId)|first : null %}
+                    {% if not linkedValue %}{% set linkedSelectionComplete = false %}{% endif %}
                     <div class="col-md-12 padding-10-0">
                         {% set isColorAttr = false %}
                         {% set setBoxAttr = true %}
@@ -393,7 +407,7 @@
                             {% set isColorAttr = true %}
                         {% endif %}
                          <div data-item-variation-select class="{% if isColorAttr==true or setBoxAttr==true %}attribute-box{% else %}attribute-dropdown{% endif %}">
-                             <p class="select-attr-name">{{ itemAttribute.name }}: <span data-eg-selected-attribute>{{ trans("GuardiansBasic::Template.selection") }}</span></p>
+                             <p class="select-attr-name">{{ itemAttribute.name }}: <span data-eg-selected-attribute>{{ linkedValue ? linkedValue.name : trans("GuardiansBasic::Template.selection") }}</span></p>
                              <p class="data-stock-warn"></p>
                             {% if "<table" in itemData.texts.technicalData|raw %}
                                 <p class="size-chart-linkname">{{ trans("GuardiansBasic::Template.sizetable") }}</p>
@@ -425,7 +439,7 @@
                                 
                                 {% endif %}
                                 {% if itemData.item.flagTwo!=3 %}
-                                <li {% if attrIsSalable != false %}data-eg-value="{{ itemAttributeValue.attributeValueId }}" data-eg-attrname="{{ itemAttributeValue.name  }}"{% else %}class="nosalable"{% endif %} data-eg-issalable="{{ attrIsSalable | json_encode() }}">
+                                <li {% if attrIsSalable != false %}{% if linkedValue and itemAttributeValue.attributeValueId == linkedValue.attributeValueId %}data-selected {% endif %}data-eg-value="{{ itemAttributeValue.attributeValueId }}" data-eg-attrname="{{ itemAttributeValue.name  }}"{% else %}class="nosalable"{% endif %} data-eg-issalable="{{ attrIsSalable | json_encode() }}">
                                     {% if itemAttribute.type=="image" %}
                                         <img src="" data-src="{{ itemAttributeValue.imageUrl }}" alt="{{ itemAttributeValue.name }}" class="lozad" />
                                     {% else %}
@@ -433,7 +447,7 @@
                                     {% endif %}
                                 </li>
                                 {% else %}
-                                <li data-eg-value="{{ itemAttributeValue.attributeValueId }}" data-eg-attrname="{{ itemAttributeValue.name  }}">
+                                <li {% if linkedValue and itemAttributeValue.attributeValueId == linkedValue.attributeValueId %}data-selected {% endif %}data-eg-value="{{ itemAttributeValue.attributeValueId }}" data-eg-attrname="{{ itemAttributeValue.name  }}">
                                     {% if itemAttribute.type=="image" %}
                                         <img src="" data-src="{{ itemAttributeValue.imageUrl }}" alt="{{ itemAttributeValue.name }}" class="lozad" />
                                     {% else %}
@@ -470,7 +484,7 @@
                             </div>
                             {% endif %}
                 <div class="align-items-center item-actions-wrap padding-top-15">   
-                    <div class="d-flex align-items-center item-actions"><button aria-label="In den Warenkorb" data-item-tobasket data-eg-event="click" data-eg-handler="addItemToBasket" class="btn btn-primary d-flex align-items-center justify-content-center btn-big product-list add-to-basket-lg-container {% if variationsWithAttributes[0].attributes | length > 0 or itemData.variation.availability.id==5 %}inBasketBtnDisabled{% endif %}"><span class="icon-online-shopping-cart mr-2"></span>{{ trans("GuardiansBasic::Template.inbasket") }}</button></div> 
+                    <div class="d-flex align-items-center item-actions"><button aria-label="{{ trans('GuardiansBasic::Template.inbasket') }}" data-item-tobasket data-eg-event="click" data-eg-handler="addItemToBasket" class="btn btn-primary d-flex align-items-center justify-content-center btn-big product-list add-to-basket-lg-container {% if (variationsWithAttributes[0].attributes | length > 0 and not linkedSelectionComplete) or itemData.variation.availability.id==5 %}inBasketBtnDisabled{% endif %}"><span class="icon-online-shopping-cart mr-2"></span>{{ trans("GuardiansBasic::Template.inbasket") }}</button></div>
                 </div>
                 {% if isQuickView %}
                     <hr>

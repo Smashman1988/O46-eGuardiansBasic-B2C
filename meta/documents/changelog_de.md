@@ -2,6 +2,10 @@
 
 ## Unveröffentlicht · B2C develop
 
+- ShopBuilder-Kategorien prüfen die tatsächliche Seitengrenze mit Varianten-IDs. Die zwölf sichtbaren Produkte erhalten weiterhin alle Kartenfelder. Das Newsletter-Popup verwendet den Checkout-Kontext und die Seitenkonfiguration für seine Ausschlüsse.
+- Direkte Variantenlinks, etwa nach einem Sprachwechsel, zeigen Größe und Farbe der verlinkten Variante an. Der Kaufbutton verwendet die aktuelle Sprache auch für Screenreader.
+- Auch bei bereits gerenderten ShopBuilder-Artikellisten verwenden Canonical, Robots und Seitentitel die tatsächlich angezeigte Seite. Leere Folgeseiten bleiben auf NOINDEX.
+
 - Der Sprachdialog nutzt die übersetzte Kategorie, Variante oder konfigurierte IO-Systemroute auch auf NOINDEX-Seiten. Fehlende Sprachziele werden im Dialog als nicht verfügbar angezeigt.
 - Paginierte ShopBuilder-Kategorielisten prüfen die gemeldete Trefferzahl anhand der tatsächlich abrufbaren Artikeldokumente. Artikelzähler, Seitenlinks, Infinite Scroll und SEO verwenden dieselbe Seitengrenze.
 

@@ -73,9 +73,7 @@
     and not services.template.isCheckout()
     and not isBasketPage and currentTemplate != 'tpl.confirmation'
     and category.id|default(0) not in wkbkasse
-    and not (category.id|default(0) > 0 and category.id == config('IO.routing.category_checkout'))
-    and 'amazon' not in currentRequestUri
-    and 'expressCheckoutReview' not in currentRequestUri %}
+    and not (category.id|default(0) > 0 and category.id == config('IO.routing.category_checkout')) %}
 {% if currentTemplate in vuePages|keys or isBasketCategory or isWishListPage or "amazon" in currentRequestUri or "expressCheckoutReview" in currentRequestUri or isShopBuilder or category.id in contentVuePages %}
     {% set isVueView = true %}
 {% endif %} 

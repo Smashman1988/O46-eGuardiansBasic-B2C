@@ -36,7 +36,7 @@
 {% if isQuickView %}
 <p class="tcenter h1">({{ itemCountTotal }})</p>
 {% endif %}
-<section class="categoriegrid page-content container">
+<section class="categoriegrid page-content container" data-eg-list-page="{{ currentPage }}:{{ pageMax }}:{{ itemCountTotal }}:{{ itemList is iterable ? itemList|length : '-' }}">
     <div class="row">
         {% if isQuickView %}
         <div class="col-12">

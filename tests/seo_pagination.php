@@ -84,7 +84,7 @@ namespace Ceres\Helper {
     }
 }
 namespace Plenty\Modules\Webshop\ItemSearch\SearchPresets {
-    class CategoryItems { public static function getSearchFactory($options) { return $options; } }
+    require_once __DIR__ . '/fixtures/CategoryListSearch.php';
     class Facets { public static function getSearchFactory($options) { return $options; } }
 }
 namespace Plenty\Modules\Webshop\ItemSearch\Services {
@@ -98,6 +98,11 @@ namespace Plenty\Modules\Webshop\ItemSearch\Services {
         public $totalResolver = null;
         public function getResults($factories) {
             $key = isset($factories['boundary']) ? 'boundary' : 'itemList';
+            $factory = $factories[$key];
+            if ($key === 'boundary' && $factory->fields !== ['variation.id']) {
+                throw new \RuntimeException('Boundary must request only variation.id');
+            }
+            $factories[$key] = $factory->options;
             if ($key === 'boundary') {
                 $this->boundaryCalls[] = $factories;
             } else {
@@ -334,6 +339,7 @@ namespace {
     $builderCalls = 0; $builderMode = 'single'; $builderSpecs = [];
     addFunction($twig,'shop_builder_category_template',function ($id) use (&$builderCalls,&$builderMode,&$builderSpecs,$extension) {
         $builderCalls++;
+        if ($builderMode === 'rendered-widget') { return $builderSpecs['html']; }
         if ($builderMode === 'none') { return '<section class="editorial">Editorial</section>'; }
         if ($builderMode === 'empty') { return ''; }
         if ($builderMode === 'throw') { throw new RuntimeException('fixture builder failure'); }
@@ -477,6 +483,31 @@ namespace {
             });
         }
     }
+    test('content/rendered-widget-seo', function () use (&$builderMode,&$builderSpecs,$request,$extension,$search,$twig,$base) {
+        $oldMode = $builderMode;
+        $oldSpecs = $builderSpecs;
+        try {
+            $search->total = 3241;
+            $search->documentTotal = 3272;
+            $builderMode = 'rendered-widget';
+            $base['category']['details'][0]['metaRobots'] = 'INDEX,FOLLOW';
+            foreach ([2=>true,273=>true,274=>false] as $page=>$indexable) {
+                $request->params = ['page'=>(string)$page];
+                // The widget result exists before the outer layout requests its HTML.
+                $builderSpecs['html'] = $extension->getItemsFromCat(60,12,[]);
+                $search->calls = $search->boundaryCalls = [];
+                $html = $twig->render('content',$base);
+                check(canonical($html) === 'https://example.test/damen/' . ($indexable ? '?page='.$page : ''), 'Rendered widget lost its canonical on page '.$page);
+                check(meta($html,'robots') === ($indexable?'INDEX,FOLLOW':'NOINDEX,FOLLOW'), 'Wrong robots on page '.$page);
+                check(!$search->calls && !$search->boundaryCalls, 'Rendering cached widget triggered a search');
+            }
+        } finally {
+            $builderMode = $oldMode;
+            $builderSpecs = $oldSpecs;
+            $search->total = 1654; $search->documentTotal = null;
+            $request->params = [];
+        }
+    });
     test('capture/exception-and-repeated-prepare',function () use (&$builderMode,&$builderCalls,$extension,$request,$twig) {
         $request->params = ['page'=>'2']; $page = $extension->createSeoPage('tpl.category.content'); $builderMode = 'throw';
         try { $extension->prepareSeoContent($page,100); throw new RuntimeException('Expected render exception'); }
@@ -802,7 +833,7 @@ namespace {
                 $request->params = ['page'=>(string)$number];
                 $search->totalResolver = function ($options, $key) use ($arguments,$filteredTotal) {
                     check($options['categoryId'] === $arguments[0], 'ShopBuilder source category changed');
-                    check($key === 'boundary' ? in_array($options['itemsPerPage'], [12,48], true) : $options['itemsPerPage'] === 12, 'Unexpected document or boundary window');
+                    check($key === 'boundary' ? ($options['itemsPerPage'] >= 12 && $options['itemsPerPage'] <= 49) : $options['itemsPerPage'] === 12, 'Unexpected document or boundary window');
                     check($options['facets'] === $arguments[2], 'ShopBuilder facets lost before filtered total');
                     check([$options['priceMin'],$options['priceMax']] === array_map('floatval',$arguments[3] ?? [0,0]), 'Widget price range changed');
                     return $filteredTotal;
@@ -1298,7 +1329,7 @@ namespace {
                     foreach ($search->boundaryCalls as $probe) {
                         check(array_keys($probe) === ['boundary'],'Facet or other search in boundary query');
                         $options = $probe['boundary'];
-                        check($options['itemsPerPage'] <= 48,'Unbounded document probe');
+                        check($options['itemsPerPage'] <= 49,'Unbounded document probe');
                         foreach (['sorting','facets','categoryId','priceMin','priceMax'] as $key) {
                             check($options[$key] === $primary[$key],'Boundary query changed '.$key);
                         }
@@ -1313,6 +1344,35 @@ namespace {
                 check($ids === range(1,$available),'Missing or duplicate IDs on '.$language.' traversal');
             }
             return $runs;
+        } finally {
+            $search->total=1654; $search->documentTotal=null; $request->params=[];
+            $search->calls=$search->boundaryCalls=[];
+        }
+    });
+    test('b2c/boundary-probe-cost-and-cardinality',function () use ($search,$extension,$renderer,$request) {
+        try {
+            // Estimated and exact grouped totals, including estimates on either side of a block.
+            foreach ([[3240,3276,1,1,42], [3241,3272,2,1,38], [3272,3272,1,1,8],
+                [3272,3272,273,0,0], [3300,3271,2,null,null], [2400,25,3,0,0],
+                [0,61,1,null,null], [3272,3271,274,null,null]] as [$estimate,$available,$page,$limitCalls,$limitIds]) {
+                $search->total = $estimate;
+                $search->documentTotal = $available;
+                $search->calls = $search->boundaryCalls = [];
+                $request->params = ['page'=>$page,'facets'=>'27','sorting'=>'texts.name1_asc'];
+                $extension->getItemsFromCat(60,48,[]);
+                check($renderer->params['itemCountTotal'] === $available,'Wrong total for '.$estimate.'/'.$available);
+                $ids = 0;
+                foreach ($search->boundaryCalls as $probe) {
+                    $options = $probe['boundary'];
+                    $width = $options['itemsPerPage'];
+                    $offset = ($options['page'] - 1) * $width;
+                    $ids += max(0,min($width,$available - $offset));
+                }
+                if ($limitCalls !== null) {
+                    check(count($search->boundaryCalls) <= $limitCalls && $ids <= $limitIds,'Excess boundary work for '.$estimate.'/'.$available);
+                }
+                check(count($search->calls) === 1 && $search->calls[0]['itemList']['itemsPerPage'] === 12,'Unexpected primary query');
+            }
         } finally {
             $search->total=1654; $search->documentTotal=null; $request->params=[];
             $search->calls=$search->boundaryCalls=[];

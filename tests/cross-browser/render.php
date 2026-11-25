@@ -85,7 +85,7 @@ $variants = [['variationId'=>101,'attributes'=>[['attributeId'=>9,'attributeValu
 $attributes = [['attributeId'=>9,'name'=>'Farbe','type'=>'text','values'=>[
     ['attributeValueId'=>1,'name'=>'Grün'], ['attributeValueId'=>2,'name'=>'Rot']]]];
 $result['selection'] = $twig->createTemplate(divSource($pdp,'<div data-item-variation class='))->render([
-    'attributes'=>$attributes, 'variationsWithAttributes'=>$variants, 'variationsWithAttributesWithFilter'=>$variants]);
+    'linkedAttributes'=>[], 'attributes'=>$attributes, 'variationsWithAttributes'=>$variants, 'variationsWithAttributesWithFilter'=>$variants]);
 $result['singleGallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>[$images[0]],'mainImg'=>$images[0],'galleryCount'=>1,'itemData'=>[]]);
 $homepage=$templates['GuardiansBasic::Homepage.Homepage'];
 $result['slider']=$twig->createTemplate(fragment($homepage,'<section class="section-slider-wrap">','<section class="section-banner-first">'))->render($context);
@@ -113,8 +113,7 @@ foreach (['de','en','fr','it','es'] as $lang) {
 }
 $excluded = [
     ['isBasketPage'=>true], ['currentTemplate'=>'tpl.confirmation'], ['isShopBuilder'=>true],
-    ['category'=>['id'=>5482]], ['category'=>['id'=>5484]], ['currentRequestUri'=>'/amazon'],
-    ['currentRequestUri'=>'/expressCheckoutReview'], ['lang'=>'nl']
+    ['category'=>['id'=>5482]], ['category'=>['id'=>5484]], ['lang'=>'nl']
 ];
 foreach ($result['languages'] as $lang => $parts) {
     if (!preg_match('~<a[^>]+href="([^"]+)"~', $parts['newsletter'], $match)) throw new RuntimeException('Missing newsletter in '.$lang);
@@ -122,6 +121,9 @@ foreach ($result['languages'] as $lang => $parts) {
 }
 foreach ($excluded as $settings) {
     if (trim($newsletter->render($settings + $context + ['wkbkasse'=>[5482,5484]])) !== '') throw new RuntimeException('Newsletter exclusion: '.json_encode($settings));
+}
+if (trim($newsletter->render(['lang'=>'de','currentRequestUri'=>'/alle-artikel/?source=amazon'] + $context + ['wkbkasse'=>[5482,5484]])) === '') {
+    throw new RuntimeException('An ordinary storefront URL was excluded by its query string');
 }
 $service->checkout = true;
 if (trim($newsletter->render($context+['wkbkasse'=>[5482,5484]])) !== '') throw new RuntimeException('Newsletter inside checkout');
