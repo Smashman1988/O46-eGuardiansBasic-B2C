@@ -2,6 +2,7 @@
 
 ## Unreleased · B2C develop
 
+- The Outlet46 logo makes fuller use of the compact header and reaches a width of 247 px on large screens.
 - Home & Living replaces Last Size in all five menus. Italian and Spanish use the English text index with localized product data. German, English and French retain native IO search.
 - The gallery and purchase area share a row from 768 px. On small screens, options and the buy button use the full width. The brand directory links to populated initials and the first numeric group and loads without a product or facet query. Single variations show the low-stock quantity only when it is available.
 - Filtered, sorted and ambiguous follow-up pages use clean canonicals. Product and Quickview links normalize the selected currency. Early menu, filter and basket styles and two legacy Twig templates have been corrected.

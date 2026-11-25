@@ -2,6 +2,7 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Das Outlet46-Logo nutzt den Platz im kompakten Header besser und erreicht auf großen Bildschirmen 247 px Breite.
 - Home & Living ersetzt Letzte Größe in den fünf Sprachmenüs. IT und ES durchsuchen den englischen Textindex mit lokalisierten Produktdaten. DE, EN und FR verwenden weiterhin IO.
 - Galerie und Kaufbereich teilen sich ab 768 px eine Zeile. Einzelvarianten zeigen den Hinweis auf knappen Bestand nur bei bekannter Stückzahl. Auf kleinen Geräten nutzen Auswahl und Kaufbutton die volle Breite. Das Markenverzeichnis verlinkt belegte Buchstaben und die erste Zahlengruppe und benötigt keine Artikel- oder Facettenabfrage.
 - Gefilterte, sortierte und mehrdeutige Folgeseiten liefern bereinigte Canonicals. Produkt- und Quickview-Links übernehmen die gewählte Währung einmalig. Frühe Menü-, Filter- und Warenkorbgeometrie sowie zwei ältere Twig-Vorlagen wurden korrigiert.

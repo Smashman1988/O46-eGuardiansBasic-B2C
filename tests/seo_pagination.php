@@ -1022,7 +1022,14 @@ namespace {
                 check(strpos($scripts[0][0],' defer') !== false,'Page bundle lost defer');
                 check(strpos($html,'/js/cat.js') === false,'Unminified source loaded into shop');
                 check(strpos($html,'.brandTiles .col-xl-3 {') === false,'Brand critical CSS leaked into an item list or editorial page');
-                $hasLogoGeometry = strpos($html,'<style data-eg-logo-critical>') !== false && strpos($html,'object-fit:contain') !== false && strpos($html,'aspect-ratio:332 / 112') !== false && strpos($html,'.company-logo img{--o46-logo-max-height:35px') !== false;
+                preg_match('/<style data-eg-logo-critical>(.*?)<\/style>/s', $html, $logoBlock);
+                $logoCss = $logoBlock[1] ?? '';
+                $hasLogoGeometry = strpos($logoCss, '.company-logo{') !== false
+                    && strpos($logoCss, 'aspect-ratio:332 / 86') !== false
+                    && strpos($logoCss, '.company-logo img{') !== false
+                    && strpos($logoCss, 'aspect-ratio:332 / 112') !== false
+                    && strpos($logoCss, 'object-fit:contain') !== false
+                    && strpos($logoCss, 'clamp(198px, 18vw, 247px)') !== false;
                 check($hasLogoGeometry,'Proportional logo geometry missing before async CSS');
                 check(!preg_match('/\\.company-logo img\\s*\\{\\s*height:\\s*[0-9]+px/', $html),'Legacy fixed logo height remains in critical CSS');
                 return ['script'=>$url];

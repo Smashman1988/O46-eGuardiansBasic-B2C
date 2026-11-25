@@ -12256,20 +12256,27 @@ h4, .h4, .font-face-4 {
     vertical-align: middle;
 }
 /* B2C responsive logo: also used by the existing critical CSS path. */
+.company-logo {
+    display: flex;
+    align-items: center;
+    width: clamp(180px, 28vw, 224px);
+    max-width: 100%;
+    /* The 332 × 112 SVG paints rows 18–99. Reserve rows 16–101 for the link. */
+    aspect-ratio: 332 / 86;
+    overflow: hidden;
+}
 .company-logo img {
-    --o46-logo-max-height: 35px;
+    display: block;
     width: 100%;
     height: auto;
-    max-width: calc(var(--o46-logo-max-height) * 332 / 112);
-    max-height: var(--o46-logo-max-height);
     aspect-ratio: 332 / 112;
     object-fit: contain;
-    vertical-align: middle;
+    /* The artwork is centered at y=59, three units below the SVG center. */
+    transform: translateY(-2.68%);
 }
-@media (min-width: 576px) { .company-logo img { --o46-logo-max-height: 47px; } }
-@media (min-width: 768px) { .company-logo img { --o46-logo-max-height: 59px; } }
-@media (min-width: 992px) { .company-logo img { --o46-logo-max-height: 46px; } }
-@media (min-width: 1400px) { .company-logo img { --o46-logo-max-height: 64px; } }
+@media (min-width: 992px) {
+    .company-logo { width: clamp(198px, 18vw, 247px); }
+}
 /* End B2C responsive logo */
 [data-eg-facet-itemcount="0"]{ display: none; }
 .article-item-wrapper{
