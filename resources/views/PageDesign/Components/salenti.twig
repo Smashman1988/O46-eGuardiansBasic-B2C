@@ -1,21 +1,13 @@
   <div id="salenti"></div>
 <script>
 var customer = customer || {};
-customer.title = '';
-customer.firstName = '{{ data.order.billingAddress.name2 }}';
-customer.lastName = '{{ data.order.billingAddress.name3 }}';
-customer.company = '';
-customer.street = '{{ data.order.billingAddress.address1 }}';
-customer.houseNumber = '{{ data.order.billingAddress.address2 }}';
-customer.additionalAddressLine = '';
-customer.postalCode = '{{ data.order.billingAddress.postalCode }}';
-customer.city = '{{ data.order.billingAddress.town }}';
-customer.country = 'DE';
-customer.email = '';
-customer.combinedPhone = '';
-customer.birthdate = '';
-customer.birthplace = ''; // z.B München
-customer.nationality = ''; // z.B. DE (ISO 3166 ALPHA2)
+{% set address = data.order.billingAddress|default({}) %}
+Object.assign(customer, {{ {
+    'title': '', 'firstName': address.name2 ~ '', 'lastName': address.name3 ~ '',
+    'company': '', 'street': address.address1 ~ '', 'houseNumber': address.address2 ~ '',
+    'additionalAddressLine': '', 'postalCode': address.postalCode ~ '', 'city': address.town ~ '',
+    'country': 'DE', 'email': '', 'combinedPhone': '', 'birthdate': '', 'birthplace': '', 'nationality': ''
+}|json_encode(15)|raw }});
 </script>
 <script>
 function loadSalentiScript() {

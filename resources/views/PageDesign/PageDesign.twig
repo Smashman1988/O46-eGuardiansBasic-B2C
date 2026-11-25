@@ -195,6 +195,7 @@
             } %}
             {% if data.order.referrerId in trackingMapping|keys %}
                 {% include "GuardiansBasic::PageDesign.Components." ~ trackingMapping[data.order.referrerId] %}
+                {% set renderedOrderReferrer = data.order.referrerId %}
             {% endif %}
         {% endif %}
         {% include "GuardiansBasic::PageDesign.Components.AdtractionReferrerTracker" %}

@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Idealo überträgt Sonderzeichen in Positionsdaten korrekt und fragt identische Varianten je Bestellung einmal ab. Treffen derselbe Adtraction-Partner im Bestell- und URL-Referrer zusammen, lädt sein Skript einmal. Salenti erhält die bisherigen Adressfelder auch bei Anführungszeichen und Zeilenumbrüchen korrekt.
+
 - Startseite und Warenkorb verwenden ihre responsiven Spaltenbreiten bereits vor dem Laden des Hauptstylesheets.
 - Die Suchseite zeigt eine lokalisierte Hauptüberschrift mit Trefferzahl. Persönliche Systemseiten erhalten NOINDEX und behalten strengere bestehende Robots-Regeln.
 - Produktdaten für Suchmaschinen verwenden vorhandene Variantenmaße mit Einheit und ein belegtes Preisablaufdatum, sofern verfügbar.
