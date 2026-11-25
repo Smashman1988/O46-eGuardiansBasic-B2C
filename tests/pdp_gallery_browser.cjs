@@ -4,8 +4,9 @@ const assert = require('node:assert/strict');
 const {chromium} = require(process.env.O46_PLAYWRIGHT_MODULE || 'playwright');
 
 async function run() {
-    const html = fs.readFileSync(process.argv[2], 'utf8')
+    const render = file => fs.readFileSync(file, 'utf8')
         .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<link\b[^>]*>/gi, '');
+    const html = render(process.argv[2]);
     const browser = await chromium.launch({executablePath:process.env.O46_BROWSER_EXECUTABLE});
     const results = [];
     const save = () => fs.writeFileSync(process.argv[3], JSON.stringify(results,null,2));
@@ -98,6 +99,23 @@ async function run() {
             O46Core.basketHeader.refreshAfterWrite=()=>{};
         });
         const heart=page.locator('article.single button[data-eg-handler="watchListTrigger"]');
+        await heart.click();
+        assert.deepEqual(await page.evaluate(()=>writes),['1011']);
+        await page.evaluate(()=>reply({data:{variationId:1011}},201));
+        assert.equal(await heart.getAttribute('aria-pressed'),'true');
+        results.push({wishlist:'Single variation without an attribute selector'}); save();
+        const multi = render(require('node:path').join(require('node:path').dirname(process.argv[2]),'pdp-multi.html'));
+        await page.route('**/multi-item/', route => route.fulfill({contentType:'text/html',body:multi}));
+        await page.goto('https://shop.test/multi-item/');
+        for (const file of ['jquery-3.7.1.min.js','core.min.js','item.min.js']) {
+            await page.addScriptTag({path:'resources/js/'+file});
+        }
+        await page.evaluate(()=>{
+            window.activeLang='fr';window.messageServiceTranslations={wishlistplus:'Added',wishlistminus:'Removed',searchexample:'Recherche'};
+            eGuardians.initialize();window.writes=[];
+            eGuardians.item.watchList.add=(id,cb)=>{writes.push(id);window.reply=cb;};
+            O46Core.basketHeader.refreshAfterWrite=()=>{};
+        });
         await heart.click();
         const picker=page.locator('#eg-wish-picker');
         await picker.waitFor({state:'visible'});

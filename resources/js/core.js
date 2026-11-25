@@ -316,7 +316,10 @@ O46Core.ui = O46Core.ui || function (messageDuration) {
                 const options = languageMessage !== undefined && document.getElementById('eg-language-options');
                 if (options) {
                     body.replaceChildren(options.content.cloneNode(true));
-                    this.languageLinks(modal, languageMessage, options.dataset);
+                    this.languageLinks(modal, languageMessage, {
+                        ...options.dataset,
+                        currency: document.getElementById('page-header')?.dataset.egBasketCurrency
+                    });
                     return;
                 }
                 dialogRequest = eGuardians.apiservice.get(route, data, function(response, code){
@@ -345,11 +348,8 @@ O46Core.ui = O46Core.ui || function (messageDuration) {
             languageLinks: function(modal, unavailable, context = {}){
                 if (!modal) return;
                 const routes = new Map();
-                document.head.querySelectorAll('link[rel="alternate"][hreflang], meta[name="o46-language-route"][lang]').forEach(link => {
-                    const code = (link.getAttribute('hreflang') || link.lang).toLowerCase().split('-')[0];
-                    const target = link.dataset.egLanguageUrl || link.getAttribute('content') || link.href;
-                    if (code !== 'x') routes.set(code, target);
-                    else if (context.defaultLanguage && !routes.has(context.defaultLanguage)) routes.set(context.defaultLanguage, target);
+                document.head.querySelectorAll('meta[name="o46-language-route"][lang]').forEach(route => {
+                    routes.set(route.lang, route.content);
                 });
                 const current = new URL(location.href);
                 // IO can return the public webstore origin while a preview runs on another host.

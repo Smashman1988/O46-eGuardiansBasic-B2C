@@ -2,6 +2,12 @@
 
 ## Unreleased · B2C develop
 
+- The language picker uses the translated category, variation or configured IO system route on NOINDEX pages as well. Missing translations are shown as unavailable.
+- Paginated ShopBuilder category lists verify the reported hit count against the documents the search actually returns. The displayed total, page links, infinite scroll and SEO use the same boundary.
+
+- The account button also uses its translated label for screen readers in all five languages.
+- Saving a single-variation product now uses its active variation ID when no size selector is rendered.
+- The language picker survives the Ceres mount. Category pages verify translated destinations against the category loaded for the target language.
 - The newsletter popup opens at the top right after scrolling and links to the local signup page for the 7% discount. The language dialog renders all five shop languages directly in the theme and keeps navigation on the current storefront host.
 - Product pages display reviews once. Homepage and promotional cards share the selected currency and localized labels for each list. The footer reuses its plugin path for payment and shipping logos.
 - The Outlet46 logo makes fuller use of the compact header and reaches a width of 247 px on large screens.

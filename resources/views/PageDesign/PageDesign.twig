@@ -238,6 +238,16 @@
             {% include getPartial('footer') %}
         </div>
         <!-- /SSR -->
+        <template id="eg-language-options" data-shop-url="{{ webstoreConfig.domainSsl }}" data-default-language="{{ webstoreConfig.defaultLanguage }}">
+            <ul class="eg-language-list">
+                {% for code, name in {'de':'Deutsch', 'en':'English', 'fr':'Français', 'it':'Italiano', 'es':'Español'} %}
+                    <li><a class="eg-language-choice" href="#" data-eg-facet-language="{{ code }}" lang="{{ code }}" hreflang="{{ code }}" aria-current="{{ code == lang ? 'page' : 'false' }}">
+                        <img src="{{ plugin_path('Ceres') }}/images/flags/4x3/{{ code == 'en' ? 'gb' : code }}.svg" width="28" height="21" alt="">
+                        <span>{{ name }}</span><span class="eg-language-mark" aria-hidden="true"></span>
+                    </a></li>
+                {% endfor %}
+            </ul>
+        </template>
         <template id="o46-basket-toast">{% include "GuardiansBasic::DynamicContent.DynamicBasketPreviewSmall" %}</template>
         <div class="modal dynamicModal" data-eg-dialog aria-labelledby="eg-info-title" tabindex="-1" role="dialog">
             <div class="modal-dialog" role="document">
@@ -523,13 +533,13 @@
             {% elseif category.id or isSearch %}
                 {% set themePageScript = 'cat.min.js?v=3' %}
             {% elseif isItem %}
-                {% set themePageScript = 'item.min.js?v=2' %}
+                {% set themePageScript = 'item.min.js?v=3' %}
 
             {% endif %}
             {% if themeNeedsJquery %}
                 <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js?v=1"></script>
             {% endif %}
-            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=8" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
+            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=10" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
             <script src="{{ plugin_path('GuardiansBasic') }}/js/{{ themePageScript }}"{% if not themeNeedsJquery %} data-eg-vue-logout{% endif %} defer></script>
             {% if isItem %}
                 {# After item.js defines mzOptions, before DOMContentLoaded initializes the gallery. #}

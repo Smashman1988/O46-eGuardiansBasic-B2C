@@ -44,22 +44,18 @@
 {% set canAlternate = isFirstPage and not forcedCanonical and not hasConfiguredCanonical and canonicalTarget
     and not (visibleRobots starts with 'NOINDEX')
     and (isCategoryRoute or routeTemplate in ['tpl.home','tpl.home.category','tpl.item']) %}
-{% for language, href in services.url.getLanguageURLs() %}
-    {% set code = (language == 'x-default' ? webstoreConfig.defaultLanguage : language)|lower|replace({'_':'-'})|split('-')|first %}
-    {% if code in ['de','en','fr','it','es'] and href|trim %}
-        {% set routeUrl = services.url.getCanonicalURL(code, true) %}
-        {% if routeUrl|trim and (not isCategoryRoute or (services.category.getDetails(category, code) and services.url.getCategoryURL(category.id, code).getPath()))
-            and (routeTemplate != 'tpl.item' or (itemData.item.id and itemData.variation.id and services.url.getVariationURL(itemData.item.id, itemData.variation.id, code).getPath())) %}
-            {% if routeTemplate == 'tpl.search' %}{% set routeUrl = (code == 'de' ? '' : '/' ~ code) ~ '/search/' %}{% endif %}
-            {% if canAlternate and href == routeUrl %}
-                <link rel="alternate" hreflang="{{ language }}" href="{{ href }}">
-            {% elseif language != 'x-default' %}
-                {# IO confirms the entity route. Foreign pagination has no verified inventory. #}
-                <meta name="o46-language-route" lang="{{ language }}" content="{{ routeUrl }}">
-            {% endif %}
-        {% endif %}
-    {% endif %}
+{% set storefrontRoutes = getStorefrontLanguageRoutes(routeTemplate, category|default(null), itemData.item.id|default(null), itemData.variation.id|default(null)) %}
+{% for code, href in storefrontRoutes %}
+    <meta name="o46-language-route" lang="{{ code }}" content="{{ href }}">
 {% endfor %}
+{% if canAlternate %}
+    {% for language, href in services.url.getLanguageURLs() %}
+        {% set code = (language == 'x-default' ? webstoreConfig.defaultLanguage : language)|lower|replace({'_':'-'})|split('-')|first %}
+        {% if href and storefrontRoutes[code]|default(null) == href %}
+            <link rel="alternate" hreflang="{{ language }}" href="{{ href }}">
+        {% endif %}
+    {% endfor %}
+{% endif %}
 {% endif %}
 
 {% if isQuickView %}

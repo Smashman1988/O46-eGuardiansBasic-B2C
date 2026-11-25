@@ -31,8 +31,8 @@ function render(fragments, kind, lang, options) {
     const tags = languages.map((code,i) => {
         if (code === options.missing) return '';
         const url = (code === options.foreign ? 'https://unknown.example' : publicOrigin) + routes[kind][i];
-        return kind === 'category' ? '<meta name="o46-language-route" lang="'+code+'" content="'+url+'">'
-            : '<link rel="alternate" hreflang="'+code+'" href="'+url+'">';
+        return '<meta name="o46-language-route" lang="'+code+'" content="'+url+'">'+
+            (kind === 'category' ? '' : '<link rel="alternate" hreflang="'+code+'" href="'+url+'">');
     }).join('');
     const title = {home:'Outlet46',category:'Alle Artikel',item:'Artikel 42',content:'Newsletter'}[kind];
     const tiles = ['d1','h1','all1','d1','h1','all1','d1','h1','all1','d1','h1','all1'].map(image =>
@@ -41,7 +41,7 @@ function render(fragments, kind, lang, options) {
     return '<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+tags+critical+
         '<link rel="stylesheet" href="/assets/main.min.css"></head><body data-eg-shop-dialogs>'+parts.header+
         '<main class="container" id="page-body" style="min-height:4600px"><h1>'+title+'</h1>'+product+'<div class="row" style="min-height:1800px;align-content:start">'+tiles+'</div><img class="w-100" src="/plugin/GuardiansBasic/images/home/all1.webp" alt=""><div class="row">'+tiles+'</div></main>'+
-        (kind==='content'?'':parts.newsletter)+fragments.footer+fragments.dynamicModal+fragments.backdrop+
+        (kind==='content'?'':parts.newsletter)+fragments.footer+parts.languageOptions+fragments.dynamicModal+fragments.backdrop+
         '<script>window.activeLang="'+lang+'";window.messageServiceTranslations={searchexample:"Beispiele"};window.addEventListener("load",function(){eGuardians.initialize();document.body.dataset.ready="1"})</script>'+
         '<script src="/assets/jquery-3.7.1.min.js"></script><script defer src="/assets/core.min.js"></script><script defer src="/assets/'+bundle+'.min.js"></script>'+
         (kind==='category'?'<script defer src="/assets/facets.min.js"></script>':'')+'</body></html>';
@@ -194,9 +194,9 @@ test('Standardsprachroute, Sessionwährung und einmalige Initialisierung', async
     });
     await store.open('/fr/');
     await page.evaluate(()=>{
-        // Model IO returning the default URL only once and a non-default session currency.
+        // SEO may advertise x-default while the functional default route stays available.
         document.querySelector('link[hreflang="de"]').hreflang='x-default';
-        document.querySelector('#eg-language-options').dataset.currency='USD';
+        document.querySelector('#page-header').dataset.egBasketCurrency='USD';
     });
     await page.addScriptTag({url:preview+'/assets/core.min.js'});
     expect(await page.evaluate(()=>window.newsletterCloseBindings)).toBe(1);

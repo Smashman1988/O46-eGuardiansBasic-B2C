@@ -7,7 +7,7 @@ $functions = ['getCardLinks','sortSizes','sortCatByKey','component','config','cs
     'getFacetsFromCat','getFacetView','getBrandGroups','getFeedbackItemList','getImageAttributeList','getListFeedbackAverages',
     'getPartial','get_additional_scripts','get_additional_styles','get_consent_scripts',
     'get_filtered_tags','get_json_data','get_shop_builder_scripts','plugin_path','queryString',
-    'shop_builder_category_template','ssr_entry','trans','createSeoPage','prepareSeoContent'];
+    'shop_builder_category_template','ssr_entry','trans','getStorefrontLanguageRoutes','createSeoPage','prepareSeoContent'];
 $filters = ['addressOptionType','filterFields','filterTabs','formatDateTime','formatMonetary',
     'getObjectValue','int','itemName','itemURL','orderByKey','specialOffer','trimNewlines'];
 $syntaxOnly = function () { throw new RuntimeException('Syntax-only Plenty placeholder was executed'); };

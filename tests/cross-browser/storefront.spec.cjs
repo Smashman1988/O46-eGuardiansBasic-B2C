@@ -194,8 +194,11 @@ test('Quickview schließt per X und Escape, wechselt Produkt und gibt Fokus zur�
     for(const [index,mode] of [[0,'schnell'],[1,'escape'],[0,'x']]){
         const trigger=buttons.nth(index);
         if(mode==='schnell') {
+            // Hold the entrance phase long enough to send the trusted pointer event on a busy worker.
+            const transition=await page.addStyleTag({content:'.modal-cross.fade .modal-dialog{transition-duration:1s!important}'});
             await pressCloseDuringEntrance(page,hasTouch,()=>act(trigger,hasTouch));
             expect(await page.evaluate(()=>window.closePhase)).toEqual({phase:'opening',trusted:true});
+            await transition.evaluate(style=>style.remove());
         } else {
             await act(trigger,hasTouch);
             await expect(modal.locator('h1')).toHaveText('Artikel /product-'+(10001+index)+'/');
@@ -255,7 +258,7 @@ test('B2C-Einzelvariante wählt die passende IO-Variation',async({page,shop,hasT
 test('Konto, Merkliste und Footer',async({page,shop,hasTouch})=>{
     await shop.open('/?long-page');
     const modal=page.locator('.dynamicModal');
-    await act(page.getByLabel('Mein Konto öffnen'),hasTouch);
+    await act(page.getByRole('button', {name:'Konto', exact:true}),hasTouch);
     await expect(modal.locator('h2')).toHaveText('Anmelden');await act(modal.locator('.close'),hasTouch);
     await expect(modal).toBeHidden();
     await expect(page.locator('footer').first()).toBeVisible();

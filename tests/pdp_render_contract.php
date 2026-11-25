@@ -63,6 +63,7 @@ class GuardServices {
     function partial($key){return ['page-design'=>'PageDesign','head'=>'Head','page-metadata'=>'Metadata','header'=>'Header','footer'=>'fixture-footer'][$key];}
     function trans($key,$params=[]){$this->texts[]=$key;return $this->lang.':'.$key;}
     function pluginPath($name){return '/plugins/'.$name;}
+    function languageRoutes(){ return []; }
     function styles(){ $this->calls[]='additionalStyles';return [['path'=>'fixture-external-style','params'=>[]]]; }
     function scripts(){ $this->calls[]='additionalScripts';return [['path'=>'fixture-external-script','params'=>[]]]; }
     function component($name){$this->calls[]='component:'.$name;return '';}
@@ -125,7 +126,7 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
         $svc->wishListHit = $case['hit'];
     }
     $twig=new Twig\Environment(new Twig\Loader\ArrayLoader(['SingleItem'=>$source,'Header'=>$headers[$version]]+$actual+$stubs+$catalog),['cache'=>false,'autoescape'=>'html','strict_variables'=>false]);
-    foreach(['getPartial'=>'partial','config'=>'config','trans'=>'trans','plugin_path'=>'pluginPath','createSeoPage'=>'seo','get_additional_styles'=>'styles','get_additional_scripts'=>'scripts','component'=>'component','recordContainer'=>'container','getCardAttributeMaps'=>'maps'] as $name=>$method)$twig->addFunction(new Twig\TwigFunction($name,[$svc,$method]));
+    foreach(['getPartial'=>'partial','config'=>'config','trans'=>'trans','plugin_path'=>'pluginPath','getStorefrontLanguageRoutes'=>'languageRoutes','createSeoPage'=>'seo','get_additional_styles'=>'styles','get_additional_scripts'=>'scripts','component'=>'component','recordContainer'=>'container','getCardAttributeMaps'=>'maps'] as $name=>$method)$twig->addFunction(new Twig\TwigFunction($name,[$svc,$method]));
     $twig->addFunction(new Twig\TwigFunction('getFeedbackItemList',[$svc,'feedbackList']));
     $twig->addFunction(new Twig\TwigFunction('getListFeedbackAverages',[$svc,'feedbackAverage']));
     $twig->addFunction(new Twig\TwigFunction('getItemPropertiesById',[$propertyExtension,'getItemPropertiesById']));
@@ -161,7 +162,9 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     if ($value===null && $xp->query('//article//div[contains(concat(" ",@class," ")," property-box ") and not(*) and normalize-space(.)=""]')->length) {
         throw new RuntimeException('Empty property section reserves space');
     }
-    if ($value===null && $lang==='de' && $format==='prepared') file_put_contents(dirname($argv[2]).'/pdp.html',$html);
+    if ($value===null && $format==='prepared' && in_array($lang,['de','fr'],true)) {
+        file_put_contents(dirname($argv[2]).($lang==='de' ? '/pdp.html' : '/pdp-multi.html'),$html);
+    }
     if ($lang === 'de' && $format === 'prepared') {
         foreach ([0, 3, null] as $feedbackCount) {
             $ctx['item']['documents'][0]['data']['item']['feedbackCount'] = $feedbackCount;

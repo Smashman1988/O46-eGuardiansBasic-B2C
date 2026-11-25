@@ -106,6 +106,7 @@ foreach (['de','en','fr','it','es'] as $lang) {
     $labels=parse_ini_file($root.'/resources/lang/'.$lang.'/Template.properties',false,INI_SCANNER_RAW);
     $result['languages'][$lang]=[
         'header'=>$twig->render('GuardiansBasic::PageDesign.Partials.Header.Header',$context),
+        'languageOptions'=>$twig->createTemplate(fragment($layout, '<template id="eg-language-options"', '</template>').'</template>')->render($context),
         'newsletter'=>$newsletter->render($context+['wkbkasse'=>[5482,5484],'currentRequestUri'=>'/']),
         'controls'=>$twig->createTemplate(fragment($category,'<div class="row d-lg-none">','{% include'))->render($context)
     ];

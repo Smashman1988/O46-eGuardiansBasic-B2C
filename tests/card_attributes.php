@@ -66,7 +66,7 @@ foreach (['Ceres::PageDesign.Macros.LayoutContainer','Ceres::PageDesign.Macros.I
     $templates[$name] = '';
 }
 $twig = new \Twig\Environment(new \Twig\Loader\ArrayLoader($templates));
-foreach (['config','plugin_path','queryString','createSeoPage'] as $name) {
+foreach (['config','plugin_path','queryString','getStorefrontLanguageRoutes','createSeoPage'] as $name) {
     $twig->addFunction(new \Twig\TwigFunction($name, callback(function () { return ''; })));
 }
 $twig->addFunction(new \Twig\TwigFunction('getPartial', callback(function () { return 'layout'; })));

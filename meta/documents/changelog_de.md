@@ -2,6 +2,12 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Der Sprachdialog nutzt die übersetzte Kategorie, Variante oder konfigurierte IO-Systemroute auch auf NOINDEX-Seiten. Fehlende Sprachziele werden im Dialog als nicht verfügbar angezeigt.
+- Paginierte ShopBuilder-Kategorielisten prüfen die gemeldete Trefferzahl anhand der tatsächlich abrufbaren Artikeldokumente. Artikelzähler, Seitenlinks, Infinite Scroll und SEO verwenden dieselbe Seitengrenze.
+
+- Der Kontoschalter verwendet in allen fünf Sprachen die übersetzte Beschriftung auch für Screenreader.
+- Das Merken eines Artikels mit nur einer Variante verwendet auch ohne Größenauswahl dessen aktive Varianten-ID.
+- Die Sprachauswahl bleibt nach dem Ceres-Mount im Dialog verfügbar. Kategorieseiten prüfen fremdsprachige Ziele anhand der zur Zielsprache geladenen Kategorie.
 - Das Newsletter-Popup erscheint nach dem Scrollen oben rechts und verlinkt die lokale Anmeldung mit 7 % Rabatt. Der Sprachdialog zeigt die fünf Shopsprachen direkt im Theme an und hält die Navigation auf dem aktuellen Shophost.
 - Produktbewertungen erscheinen einmal auf der Detailseite. Startseiten- und Aktionskarten verwenden die gewählte Währung und die lokalisierten Kartenbeschriftungen für die gesamte Liste. Der Footer verwendet denselben Pluginpfad für Zahlungs- und Versandlogos.
 - Das Outlet46-Logo nutzt den Platz im kompakten Header besser und erreicht auf großen Bildschirmen 247 px Breite.

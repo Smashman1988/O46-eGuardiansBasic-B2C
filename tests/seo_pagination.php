@@ -43,10 +43,23 @@ namespace Ceres\Contexts {
 namespace IO\Services {
     class CategoryService {
         public $route;
-        public function get($id, $lang = null) { return ['id' => $id, 'details' => [['name' => 'Category ' . $id, 'description' => '', 'description2' => '']]]; }
+        public function get($id, $lang = null) { return ['id' => $id, 'details' => in_array($lang ?? 'de', $this->languages, true) ? [['lang'=>$lang ?? 'de', 'name'=>'Category ' . $id, 'description'=>'', 'description2'=>'']] : []]; }
         public function getCurrentCategory() { return $this->route; }
         public $languages = ['de','en','fr','it','es'];
-        public function getDetails($category, $lang) { return in_array($lang, $this->languages,true) ? ['lang'=>$lang] : null; }
+        public function getDetails($category, $lang) {
+            foreach ($category['details'] ?? [] as $detail) {
+                if (($detail['lang'] ?? null) === $lang) { return $detail; }
+            }
+            return null;
+        }
+    }
+}
+namespace IO\Helper {
+    class RouteConfig {
+        public static $links = [];
+        public static $disabled = [];
+        public static function getCategoryId($route) { return self::$links[$route] ?? 0; }
+        public static function isActive($route) { return !in_array($route,self::$disabled,true); }
     }
 }
 namespace Ceres\Helper {
@@ -77,23 +90,31 @@ namespace Plenty\Modules\Webshop\ItemSearch\SearchPresets {
 namespace Plenty\Modules\Webshop\ItemSearch\Services {
     class ItemSearchService {
         public $calls = [];
+        public $boundaryCalls = [];
         public $total = 1654;
         public $documentTotal = null;
+        public $boundaryDocumentTotal = null;
         public $omitDocuments = false;
         public $totalResolver = null;
         public function getResults($factories) {
-            $this->calls[] = $factories;
-            $options = $factories['itemList'];
-            $total = $this->totalResolver ? ($this->totalResolver)($options) : $this->total;
+            $key = isset($factories['boundary']) ? 'boundary' : 'itemList';
+            if ($key === 'boundary') {
+                $this->boundaryCalls[] = $factories;
+            } else {
+                $this->calls[] = $factories;
+            }
+            $options = $factories[$key];
+            $total = $this->totalResolver ? ($this->totalResolver)($options, $key) : $this->total;
             $result = isset($factories['facets']) ? ['facets'=>[]] : [];
-            if ($this->omitDocuments) { return $result + ['itemList'=>['total'=>$total]]; }
+            if ($this->omitDocuments) { return $result + [$key=>['total'=>$total]]; }
             $first = ((int)$options['page'] - 1) * (int)$options['itemsPerPage'];
             $items = [];
-            for ($id = $first + 1; $id <= min($this->documentTotal ?? $total, $first + (int)$options['itemsPerPage']); $id++) {
+            $available = $key === 'boundary' ? ($this->boundaryDocumentTotal ?? $this->documentTotal) : $this->documentTotal;
+            for ($id = $first + 1; $id <= min($available ?? $total, $first + (int)$options['itemsPerPage']); $id++) {
                 $items[] = ['data' => ['variation' => ['id' => $id], 'images' => ['all' => []],
                     'item' => ['manufacturer' => ['logo' => '']]]];
             }
-            return $result + ['itemList' => ['total' => $total, 'documents' => $items]];
+            return $result + [$key => ['total' => $total, 'documents' => $items]];
         }
     }
 }
@@ -118,6 +139,14 @@ namespace {
     $factoryCalls = [];
     function pluginApp($class, array $parameters = []) {
         global $services, $factoryCalls;
+        if ($class === Plenty\Modules\Webshop\Helpers\UrlQuery::class) {
+            return new class($parameters) {
+                private $p;
+                public function __construct($p) { $this->p = $p; }
+                public function getPath() { return $this->p['path']; }
+                public function toAbsoluteUrl($include) { return 'https://example.test/' . ($include ? $this->p['lang'].'/' : '') . $this->getPath() . '/'; }
+            };
+        }
         if ($class === SeoPage::class) {
             $factoryCalls[] = ['class'=>$class,'parameters'=>$parameters];
             // Explicit transient-container fixture, not the real Plenty container.
@@ -154,8 +183,9 @@ namespace {
             if ($this->base === null) { return null; }
             return $lang && $lang !== 'de' ? 'https://example.test/' . $lang . '/damen/' : $this->base;
         }
-        public function getCategoryURL($id, $lang) { return $this; }
-        public function getVariationURL($itemId, $variationId, $lang) { return $this; }
+        public function getCategoryURL($id, $lang) { $url = clone $this; $url->base = $this->getCanonicalURL($lang,true); return $url; }
+        public function toAbsoluteUrl($includeLanguage) { return $this->base; }
+        public function getVariationURL($itemId, $variationId, $lang) { return $this->getCategoryURL($itemId,$lang); }
         public function getPath() { return '/entity/'; }
         public function getLanguageURLs() {
             $urls = [];
@@ -292,7 +322,7 @@ namespace {
     $twig = new Twig\Environment($loader, ['cache'=>false, 'autoescape'=>'html']);
     $renderer->environment = $twig;
     function addFunction($twig, $name, $callback) { $twig->addFunction(new Twig\TwigFunction($name, [new Callback($callback),'invoke'])); }
-    foreach (['getBrandGroups','getFacetView','createSeoPage','prepareSeoContent','getItemsFromCat','getItemsFromCatSimple','getCardAttributeMaps'] as $name) { addFunction($twig, $name, [$extension,$name]); }
+    foreach (['getBrandGroups','getFacetView','getStorefrontLanguageRoutes','createSeoPage','prepareSeoContent','getItemsFromCat','getItemsFromCatSimple','getCardAttributeMaps'] as $name) { addFunction($twig, $name, [$extension,$name]); }
     foreach (['get_consent_scripts','get_filtered_tags','get_json_data','get_shop_builder_scripts','component','ssr_entry','csrf_token'] as $name) { addFunction($twig,$name,function () { return ''; }); }
     foreach (['get_additional_styles','get_additional_scripts'] as $name) { addFunction($twig,$name,function () { return []; }); }
     addFunction($twig,'getPartial',function ($name) { return ['page-design'=>'layout','head'=>'head','page-metadata'=>'metadata'][$name] ?? 'empty'; });
@@ -319,6 +349,11 @@ namespace {
         return '<section class="builder">' . $html . '</section>';
     });
     $templateService = new TemplateService(); $urls = new UrlService(); $emptyService = new EmptyService();
+    $services[IO\Services\UrlService::class] = $urls;
+    $services[Plenty\Modules\Webshop\Contracts\WebstoreConfigurationRepositoryContract::class] = new class {
+        public function getWebstoreConfiguration() { return (object)['defaultLanguage'=>'de']; }
+        public function getActiveLanguageList() { return ['de','en','fr','it','es']; }
+    };
     $base = ['request'=>$request, 'category'=>$context->category, 'lang'=>'de', 'isShopBuilder'=>false,
         'services'=>['template'=>$templateService,'category'=>$categoryService,'url'=>$urls,'localizationRepository'=>new LocalizationRepository(),'checkout'=>$emptyService,'customer'=>$emptyService,'webstoreConfig'=>$emptyService],
         'context'=>new class { public function renderState() { return ''; } },
@@ -500,7 +535,7 @@ namespace {
         [1315,1323,110,12,110,111,true], [1315,1323,111,3,111,111,true], [1315,1323,112,0,110,110,false],
         [1314,1322,111,2,111,111,true],
         [1271,1277,107,5,107,107,true], [1271,1277,999,0,106,106,false], [1654,1658,139,2,139,139,true],
-        [36,13,3,0,3,3,false], [24,24,2,12,2,2,true], [23,23,2,11,2,2,true],
+        [36,13,3,0,3,3,false], [24,24,2,12,2,2,true], [24,25,2,12,2,3,true], [3240,3276,270,12,270,273,true], [3241,3276,273,12,273,273,true], [3241,3276,274,0,273,273,false], [23,23,2,11,2,2,true],
         [2468,2460,205,12,206,206,true], [2468,2460,206,0,206,206,false],
         [0,13,1,12,1,2,true], [0,13,2,1,2,2,true], [0,0,2,0,0,0,false],
         [12,49,4,12,4,5,true], [12,49,5,1,5,5,true],
@@ -514,12 +549,12 @@ namespace {
                 $state = json_decode(meta($html,'o46-pagination'),true);
                 $suffix = $valid && $number > 1 ? ' – Seite ' . $number : '';
                 check(count($renderer->params['itemList']) === $docs && substr_count($html,'<article ') === $docs,'Wrong number of rendered documents');
-                check($renderer->params['itemCountTotal'] === $total && (int)$renderer->params['pageMax'] === $navMax,'Total or navigation bound changed unexpectedly');
-                check($state['valid'] === $valid && $state['pageMax'] === $seoMax,'SEO bound conflicts with the page evidence');
+                check($renderer->params['itemCountTotal'] === $available && (int)$renderer->params['pageMax'] === (int)ceil($available / 12),'Total or navigation bound changed unexpectedly');
+                check($state['valid'] === $valid && $state['pageMax'] === (int)ceil($available / 12),'SEO bound conflicts with the page evidence');
                 check(meta($html,'robots') === ($valid ? 'INDEX,FOLLOW' : 'NOINDEX,FOLLOW'),'Incorrect indexing decision');
                 check(canonical($html) === 'https://example.test/damen/' . ($suffix ? '?page=' . $number : ''),'Incorrect canonical');
                 check(strpos($html,'<title>Route title' . $suffix . '</title>') !== false && meta($html,'description') === 'Route description' . $suffix,'Incorrect page suffix');
-                check((strpos($html,'class="pagination__next"') !== false) === ($number < $navMax),'Incorrect Infinite Scroll next link');
+                check((strpos($html,'class="pagination__next"') !== false) === ($number < ceil($available / 12)),'Incorrect Infinite Scroll next link');
                 check($builderCalls === 1 && count($search->calls) === 1,'Extra render or query to discover a page');
                 return $state;
             } finally { $search->total = 1654; $search->documentTotal = null; }
@@ -765,9 +800,9 @@ namespace {
             test('shopbuilder-arguments/' . json_encode($arguments) . '/page-' . $number,function () use ($arguments,$filteredTotal,$number,$last,$request,$twig,$base,$search,$renderer,&$builderMode,&$builderSpecs,&$builderCalls) {
                 $builderMode = 'configured'; $builderSpecs = [$arguments]; $builderCalls = 0; $search->calls = [];
                 $request->params = ['page'=>(string)$number];
-                $search->totalResolver = function ($options) use ($arguments,$filteredTotal) {
+                $search->totalResolver = function ($options, $key) use ($arguments,$filteredTotal) {
                     check($options['categoryId'] === $arguments[0], 'ShopBuilder source category changed');
-                    check($options['itemsPerPage'] === 12, 'Legacy widget argument changed the page size');
+                    check($key === 'boundary' ? in_array($options['itemsPerPage'], [12,48], true) : $options['itemsPerPage'] === 12, 'Unexpected document or boundary window');
                     check($options['facets'] === $arguments[2], 'ShopBuilder facets lost before filtered total');
                     check([$options['priceMin'],$options['priceMax']] === array_map('floatval',$arguments[3] ?? [0,0]), 'Widget price range changed');
                     return $filteredTotal;
@@ -1157,7 +1192,7 @@ namespace {
     test('compatibility/production-source',function () use ($root) {
         $fragments = ['SeoPage'=>file_get_contents($root . '/src/Helper/SeoPage.php')];
         $lines = file($root . '/src/Extensions/Base_Extension.php');
-        foreach (['requestedFacetIds','getFacetView','createSeoPage','prepareSeoContent','getItemsFromCat','cardAttributeFactory','getCardAttributeMaps','restGetContent'] as $name) {
+        foreach (['getStorefrontLanguageRoutes','categoryHasLanguage','categoryDocumentTotal','requestedFacetIds','getFacetView','createSeoPage','prepareSeoContent','getItemsFromCat','cardAttributeFactory','getCardAttributeMaps','restGetContent'] as $name) {
             $method = new ReflectionMethod(Base_Extension::class,$name);
             $fragments[$name] = "<?php\n" . implode('',array_slice($lines,$method->getStartLine()-1,$method->getEndLine()-$method->getStartLine()+1));
         }
@@ -1194,6 +1229,17 @@ namespace {
             }
         }
     }
+    test('b2c/language-route-with-current-language-only',function () use ($twig,$request,$base,$templateService) {
+        $templateService->template = 'tpl.category.content';
+        $request->params = [];
+        $ctx = $base;
+        $ctx['category']['details'][0]['lang'] = 'de';
+        $ctx['category']['details'][0]['metaRobots'] = 'ALL';
+        $html = $twig->render('regular',$ctx);
+        foreach (['de','en','fr','it','es'] as $code) {
+            check(preg_match('~<(?:link rel="alternate" hreflang|meta name="o46-language-route" lang)="'. $code .'"~', $html) === 1, 'Missing resolved category language ' . $code);
+        }
+    });
     test('b2c/translated-targets-and-page-boundary',function () use ($twig,$request,$base,$categoryService,$templateService) {
         $ctx = $base;
         $ctx['category']['details'][0]['metaRobots'] = 'ALL';
@@ -1207,13 +1253,151 @@ namespace {
                 $request->params = ['page'=>(string)$page];
                 $html = $twig->render('regular',$ctx);
                 check(substr_count($html,'rel="alternate"') === ($page === 1 ? 4 : 0),'Foreign page membership assumed');
-                check(strpos($html,'hreflang="' . $missing . '"') === false,'Missing translation emitted');
+                check(!preg_match('~<(?:link rel="alternate" hreflang|meta name="o46-language-route" lang)="'.preg_quote($missing,'~').'"~', $html),'Missing head translation emitted');
                 check(meta($html,'robots') === ($page === 4 ? 'NOINDEX,FOLLOW' : 'INDEX,FOLLOW'),'Wrong robots at boundary');
             }
         }
         $categoryService->languages = ['de','en','fr','it','es'];
         $templateService->template = 'tpl.category.content';
         $request->params = [];
+    });
+    test('documents/catalog-change-between-primary-and-probe', function () use ($extension,$renderer,$search,$request) {
+        try {
+            $search->total = 3241;
+            $search->documentTotal = 3276;
+            foreach ([[273,3264],[274,3299],[274,3312]] as [$page,$availableAtProbe]) {
+                $search->boundaryDocumentTotal = $availableAtProbe;
+                $request->params = ['page'=>$page];
+                $extension->getItemsFromCat(60,12,[]);
+                check((int)$renderer->params['pageMax'] === 273, 'Pager contradicted the primary documents');
+                check($renderer->params['itemCountTotal'] === 3276, 'Primary lower or upper bound was lost');
+            }
+        } finally {
+            $search->total = 1654;
+            $search->documentTotal = $search->boundaryDocumentTotal = null;
+            $request->params = [];
+        }
+    });
+    test('documents/contiguous-pages-and-probe-scope',function () use ($extension,$renderer,$search,$request) {
+        $runs = [];
+        try {
+            foreach (['de'=>48,'en'=>49,'fr'=>37,'it'=>24,'es'=>25] as $language=>$available) {
+                // Per-language inventories differ, with both low and high estimates.
+                $search->total = $language === 'fr' ? 2400 : 24;
+                $search->documentTotal = $available;
+                $ids = [];
+                $last = (int)ceil($available / 12);
+                for ($page=1;$page<=$last+1;$page++) {
+                    $search->calls = $search->boundaryCalls = [];
+                    $request->params = ['page'=>$page,'sorting'=>'texts.name1_asc','facets'=>'12,27','priceMin'=>3,'priceMax'=>80];
+                    $extension->getItemsFromCat(60,48,[27]);
+                    $list = $renderer->params;
+                    check(count($search->calls) === 1,'Expected one primary search');
+                    $primary = $search->calls[0]['itemList'];
+                    check($primary['itemsPerPage'] === 12,'Primary page size changed');
+                    foreach ($search->boundaryCalls as $probe) {
+                        check(array_keys($probe) === ['boundary'],'Facet or other search in boundary query');
+                        $options = $probe['boundary'];
+                        check($options['itemsPerPage'] <= 48,'Unbounded document probe');
+                        foreach (['sorting','facets','categoryId','priceMin','priceMax'] as $key) {
+                            check($options[$key] === $primary[$key],'Boundary query changed '.$key);
+                        }
+                    }
+                    check($list['itemCountTotal'] === $available && (int)$list['pageMax'] === $last,'Inconsistent count');
+                    $documents = $list['itemList'];
+                    check(count($documents) === max(0,min(12,$available-($page-1)*12)),'Wrong page slice');
+                    if ($documents && count($documents)<12) { check(!$search->boundaryCalls,'Short page triggered a probe'); }
+                    foreach ($documents as $doc) { $ids[]=$doc['data']['variation']['id']; }
+                    $runs[$language][] = ['page'=>$page,'documents'=>count($documents),'probes'=>count($search->boundaryCalls)];
+                }
+                check($ids === range(1,$available),'Missing or duplicate IDs on '.$language.' traversal');
+            }
+            return $runs;
+        } finally {
+            $search->total=1654; $search->documentTotal=null; $request->params=[];
+            $search->calls=$search->boundaryCalls=[];
+        }
+    });
+    test('b2c/storefront-route-matrix', function () use ($twig,$request,$base,$categoryService,$templateService,$urls,&$services) {
+        $codes = ['de','en','fr','it','es'];
+        $fixtureUrls = new class extends UrlService {
+            public function getCanonicalURL($lang = null,$ignore = false) {
+                return 'https://example.test/' . (!$lang || $lang === 'de' ? '' : $lang.'/');
+            }
+            public function getLanguageURLs() { return []; } // IO has no SEO alternatives for these fixtures.
+            public function getCategoryURL($id,$lang) {
+                $url = clone $this;
+                $newsletter = ['de'=>'newsletter-anmeldung', 'en'=>'newsletter-sign-up', 'fr'=>'inscription-a-la-newsletter', 'it'=>'iscriviti-alla-newsletter', 'es'=>'inscribase-al-boletin'];
+                $slug = $id === 113 ? $newsletter[$lang] : 'category-' . $id . '-' . $lang;
+                $url->base = $this->getCanonicalURL($lang) . $slug . '/';
+                return $url;
+            }
+            public function getVariationURL($itemId,$variationId,$lang) {
+                return $this->getCategoryURL($itemId.'-'.$variationId,$lang);
+            }
+        };
+        $kinds = [
+            'home'=>['tpl.home',null], 'item'=>['tpl.item',null], 'category'=>['tpl.category.item',111],
+            'shopbuilder'=>['tpl.category.content',112], 'newsletter'=>['tpl.category.content',113],
+            'unsubscribe'=>['tpl.newsletter.opt-out',null], 'login'=>['tpl.login',null],
+            'registration'=>['tpl.register',null], 'account'=>['tpl.my-account',null],
+            'wish-list'=>['tpl.wish-list',null], 'basket'=>['tpl.basket',null],
+            'checkout'=>['tpl.checkout',null], 'contact'=>['tpl.contact',null],
+            'privacy'=>['tpl.privacy-policy',null], 'content'=>['tpl.category.content',114],
+            'search'=>['tpl.search',null], 'tag'=>['tpl.tags',null], 'blog'=>['tpl.category.blog',117],
+            'legal'=>['tpl.legal-disclosure',null], 'terms'=>['tpl.terms-conditions',null],
+            'newsletter-content-unsubscribe'=>['tpl.category.content',118]
+        ];
+        $services[IO\Services\UrlService::class] = $fixtureUrls;
+        $templateBefore = $templateService->template;
+        $uriBefore = $request->rawUri;
+        IO\Helper\RouteConfig::$links = ['contact'=>115,'basket'=>116];
+        $ctx = $base;
+        $ctx['services']['url'] = $fixtureUrls;
+        $ctx['isQuickView'] = true;
+        $ctx['forceNoIndex'] = true;
+        $ctx['itemData'] = ['item'=>['id'=>42],'variation'=>['id'=>101]];
+        $result = [];
+        try {
+            foreach ($kinds as $kind=>[$template,$id]) {
+                $templateService->template = $template;
+                $ctx['category']['id'] = $id;
+                $request->rawUri = $kind === 'tag' ? '/fr/sale_t207/?sorting=price_asc' : null;
+                $html = $twig->render('head',$ctx);
+                check(strpos($html,'rel="alternate"') === false,'Unexpected SEO alternate');
+                preg_match_all('~<meta name="o46-language-route" lang="([^"]+)" content="([^"]+)">~',$html,$hits);
+                $map = array_combine($hits[1],$hits[2]);
+                check(array_keys($map) === $codes,'Incomplete functional routes on '.$kind);
+                check(count(array_unique($map)) === 5,'Language targets collapsed');
+                foreach ($map as $code=>$target) {
+                    $prefix = $code === 'de' ? '/' : '/'.$code.'/';
+                    $expected = [
+                        'home'=>'', 'item'=>'category-42-101-'.$code.'/',
+                        'contact'=>'category-115-'.$code.'/', 'basket'=>'category-116-'.$code.'/',
+                        'unsubscribe'=>'newsletter/unsubscribe/', 'registration'=>'register/', 'account'=>'my-account/',
+                        'tag'=>'sale_t207/', 'legal'=>'legal-disclosure/', 'terms'=>'gtc/',
+                        'newsletter'=>['de'=>'newsletter-anmeldung/', 'en'=>'newsletter-sign-up/', 'fr'=>'inscription-a-la-newsletter/', 'it'=>'iscriviti-alla-newsletter/', 'es'=>'inscribase-al-boletin/'][$code],
+                        'privacy'=>'privacy-policy/'
+                    ][$kind] ?? ($id ? 'category-'.$id.'-'.$code.'/' : $kind.'/');
+                    check($target === 'https://example.test'.$prefix.$expected,'Unexpected '.$kind.' target for '.$code);
+                }
+                $result[$kind] = $map;
+            }
+            $templateService->template = 'tpl.contact';
+            $categoryService->languages = ['de','en','fr','it'];
+            $html = $twig->render('head',$ctx);
+            check(strpos($html,'name="o46-language-route" lang="es"') === false,'Untranslated linked category fell back');
+            IO\Helper\RouteConfig::$disabled = ['login'];
+            $templateService->template = 'tpl.login';
+            check(strpos($twig->render('head',$ctx),'name="o46-language-route"') === false,'Disabled native route was offered');
+            return $result;
+        } finally {
+            $request->rawUri = $uriBefore;
+            $services[IO\Services\UrlService::class] = $urls;
+            $templateService->template = $templateBefore;
+            $categoryService->languages = $codes;
+            IO\Helper\RouteConfig::$links = IO\Helper\RouteConfig::$disabled = [];
+        }
     });
     // Optional browser input. Render full and transport URLs independently through the real templates.
     if ($historyFile = getenv('O46_SEO_HISTORY_FIXTURES')) {

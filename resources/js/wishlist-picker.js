@@ -5,12 +5,12 @@ O46Core.wishPicker = (function () {
         const article = heart.closest('article[data-item]');
         const modal = document.getElementById('eg-wish-picker');
         const wrap = article.querySelector('[data-eg-variations]');
-        if (!modal || !wrap) return;
+        if (!modal) return;
         const labels = modal.dataset;
         const names = JSON.parse(labels.attributes);
         const units = new Map(Object.values(JSON.parse(labels.units || '[]')));
         const variations = new Map();
-        for (const row of Object.values(JSON.parse(wrap.dataset.egVariations))) {
+        for (const row of Object.values(JSON.parse(wrap?.dataset.egVariations || '[]'))) {
             if (/^[1-9]\d*$/.test(row.variationId)) variations.set(String(row.variationId), Object.values(row.attributes || {}));
         }
         const base = article.dataset.egActiveVariation;

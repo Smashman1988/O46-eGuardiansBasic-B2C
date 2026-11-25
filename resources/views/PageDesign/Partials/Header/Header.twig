@@ -25,16 +25,6 @@
            <span class="f-size16"><a href="{{ googlereviewlink }}">{{ trans("GuardiansBasic::Template.trustpilotinfo") }} <img fetchpriority="low" src="{{ plugin_path('GuardiansBasic') }}/images/g-Logo.svg" alt="Outlet46.de" class="margin-right-10" style="vertical-align: middle;max-height: 25px;max-width: 80px;"></a></span>
             <button href="#" class="btn-small margin-right7-5 text-black" data-eg-handler="modalContent" data-eg-type="modal-lg" data-eg-event="click" data-eg-href="{{ langSlug }}/getShopBuilderContent/?categoryId=5638" data-eg-currency data-eg-title="{{ trans('GuardiansBasic::Template.currencyDialogTitle') }}">{{ headerCurrency.symbol }}</button>
             <button type="button" class="btn-small margin-right7-5 text-black" data-eg-handler="modalContent" data-eg-type="modal-lg" data-eg-language-switch data-eg-language-unavailable="{{ trans('GuardiansBasic::Template.facetLanguageUnavailable') }}" aria-haspopup="dialog" data-eg-title="{{ trans('GuardiansBasic::Template.langchange') }}" aria-label="{{ trans('GuardiansBasic::Template.langchange') }}"><img fetchpriority="low" src="{{ plugin_path('Ceres') }}/images/flags/4x3/{{ flags[lang]|default('de') }}.svg" class="flag-icon" alt="flag-{{ flags[lang]|default('de') }}"></button>
-            <template id="eg-language-options" data-shop-url="{{ webstoreConfig.domainSsl }}" data-currency="{{ currencycheck }}" data-default-language="{{ webstoreConfig.defaultLanguage }}">
-                <ul class="eg-language-list">
-                    {% for code, name in {'de':'Deutsch', 'en':'English', 'fr':'Français', 'it':'Italiano', 'es':'Español'} %}
-                        <li><a class="eg-language-choice" href="#" data-eg-facet-language="{{ code }}" lang="{{ code }}" hreflang="{{ code }}" aria-current="{{ code == lang ? 'page' : 'false' }}">
-                            <img src="{{ plugin_path('Ceres') }}/images/flags/4x3/{{ flags[code] }}.svg" width="28" height="21" alt="">
-                            <span>{{ name }}</span><span class="eg-language-mark" aria-hidden="true"></span>
-                        </a></li>
-                    {% endfor %}
-                </ul>
-            </template>
         </div>
 </div>
 {#{% endcacheblock %}#}
@@ -82,7 +72,7 @@
                             <span class="mobile-btn-txt ml-1">{{ trans("GuardiansBasic::Template.bookmarks") }}</span>
                             </span>
                         </a>
-                        <button data-eg-event="click" data-eg-handler="modalContent" data-eg-href="{{ loginPreviewUrl }}" data-eg-title="{{ loginTitles[lang]|default('Login') }}" class="btn-unstyled btn-login-open btn-mobile-nav text-black" aria-label="Mein Konto öffnen">
+                        <button data-eg-event="click" data-eg-handler="modalContent" data-eg-href="{{ loginPreviewUrl }}" data-eg-title="{{ loginTitles[lang]|default('Login') }}" class="btn-unstyled btn-login-open btn-mobile-nav text-black" aria-label="{{ trans('GuardiansBasic::Template.mykonto') }}">
                             <span class="icon-user fs35"></span> 
                             <span class="d-sm-block d-lg-block d-xxl-inline-block mobile-btn-txt">
                                 <span>

@@ -14,16 +14,16 @@
       "sha256": "2d592b4b22657924c6ee4a7f6b504c33d629e0648b9a89c26fbdf2c80963a4ec"
     },
     "js/core.min.js": {
-      "version": 8,
-      "sha256": "eb17d473e615e156c7fe3e5d5c56885dba474631e632d7d52ce1d08c5162008d"
+      "version": 10,
+      "sha256": "2a7fda152ae43fbfd041b6847ffc5fd3e78271d97fd3c91e1c76071e79248932"
     },
     "js/facets.min.js": {
       "version": 1,
       "sha256": "838495844a40d52b99cc50f1e7ef69be19dcaa27a5d3ec4591c0bc8b462cd2f3"
     },
     "js/item.min.js": {
-      "version": 2,
-      "sha256": "8d262292c040ae11e1f25bd47d1ca610a17727942b2aaf26d5183d18f6840d0e"
+      "version": 3,
+      "sha256": "47d7a5ba60926cc7eb461b4b6519e9513510b81edc34a78d38a43153eff6104b"
     },
     "js/jquery-3.7.1.min.js": {
       "version": 1,

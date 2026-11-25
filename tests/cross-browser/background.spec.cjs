@@ -18,7 +18,16 @@ const test=base.extend({
                 await control.detach();
                 const arg=command.arguments.find(arg=>arg.startsWith('--user-data-dir='));
                 if(!arg) throw Error('Playwright browser profile missing');
-                const endpoint=await fs.readFile(path.join(arg.slice('--user-data-dir='.length),'DevToolsActivePort'),'utf8');
+                const endpointFile=path.join(arg.slice('--user-data-dir='.length),'DevToolsActivePort');
+                let endpoint;
+                await expect.poll(async()=>{
+                    try { endpoint=await fs.readFile(endpointFile,'utf8'); }
+                    catch(error) {
+                        if(!['ENOENT','EBUSY'].includes(error.code)) throw error;
+                        return false;
+                    }
+                    return /^\d+\r?\n\/devtools\/browser\//.test(endpoint);
+                },{timeout:4000,intervals:[30,80,150]}).toBe(true);
                 const [port,route]=endpoint.trim().split(/\r?\n/);
                 observer=await chromium.connectOverCDP('ws://127.0.0.1:'+Number(port)+route,{noDefaults:true});
                 observedContext=observer.contexts()[0];

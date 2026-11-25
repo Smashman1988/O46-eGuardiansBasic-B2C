@@ -73,12 +73,15 @@ namespace Plenty\Modules\Webshop\ItemSearch\Services {
     class ItemSearchService {
         public $total;
         public $requests = [];
+        public $boundaryRequests = [];
         public function getResults($params) {
-            $this->requests[] = $params;
-            $o = $params['itemList'];
+            $key = isset($params['boundary']) ? 'boundary' : 'itemList';
+            if ($key === 'boundary') { $this->boundaryRequests[] = $params; }
+            else { $this->requests[] = $params; }
+            $o = $params[$key];
             $ids = array_slice($this->total ? range(1, $this->total) : [], ($o['page'] - 1) * $o['itemsPerPage'], $o['itemsPerPage']);
             $docs = array_map(fn($id) => ['data' => ['item'=>['id'=>$id], 'variation'=>['id'=>$id,'itemId'=>$id], 'texts'=>['name1'=>'Artikel '.$id], 'images'=>['all'=>[['urlPreview'=>'/fixture-image']]], 'prices'=>['default'=>['unitPrice'=>['value'=>19.95,'formatted'=>'19,95 €']]]]], $ids);
-            return ['itemList'=>['total'=>$this->total,'documents'=>$docs], 'facets'=>[]];
+            return [$key=>['total'=>$this->total,'documents'=>$docs], 'facets'=>[]];
         }
     }
 }

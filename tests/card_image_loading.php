@@ -43,7 +43,7 @@ function imageEnvironment($baseline, $fixture) {
     $twig=new Twig\Environment(new Twig\Loader\ArrayLoader($templates));
     $extension = (new ReflectionClass(GuardiansBasic\Extensions\Base_Extension::class))->newInstanceWithoutConstructor();
     $twig->addFunction(new Twig\TwigFunction('getCardLinks',[$extension,'getCardLinks']));
-    foreach(['trans'=>'trans','plugin_path'=>'path','getPartial'=>'partial','config'=>'noop','queryString'=>'noop','createSeoPage'=>'noop','getAttributesWithImages'=>'attributes','getCardAttributeMaps'=>'batch'] as $name=>$method)$twig->addFunction(new Twig\TwigFunction($name,[$fixture,$method]));
+    foreach(['trans'=>'trans','plugin_path'=>'path','getPartial'=>'partial','config'=>'noop','queryString'=>'noop','getStorefrontLanguageRoutes'=>'noop','createSeoPage'=>'noop','getAttributesWithImages'=>'attributes','getCardAttributeMaps'=>'batch'] as $name=>$method)$twig->addFunction(new Twig\TwigFunction($name,[$fixture,$method]));
     foreach(['itemURL'=>'url','itemName'=>'name','orderByKey'=>'order'] as $name=>$method)$twig->addFilter(new Twig\TwigFilter($name,[$fixture,$method]));
     return $twig;
 }

@@ -14,6 +14,10 @@ use Plenty\Modules\Webshop\ItemSearch\SearchPresets\Facets;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\SearchItems;
 use Plenty\Modules\Webshop\ItemSearch\Services\ItemSearchService;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\CrossSellingItems;
+use IO\Helper\RouteConfig;
+use IO\Services\UrlService;
+use Plenty\Modules\Webshop\Contracts\WebstoreConfigurationRepositoryContract;
+use Plenty\Modules\Webshop\Helpers\UrlQuery;
 use IO\Services\BasketService;
 use Plenty\Plugin\Http\Request;
 use IO\Services\CategoryService;
@@ -67,6 +71,7 @@ class Base_Extension extends Twig_Extension
             $this->factory->createSimpleFunction('restGetContent', [$this, 'restGetContent']),
             $this->factory->createSimpleFunction('getItemsFromCat', [$this, 'getItemsFromCat']),
             $this->factory->createSimpleFunction('getItemsFromCatSimple', [$this, 'getItemsFromCatSimple']),
+            $this->factory->createSimpleFunction('getStorefrontLanguageRoutes', [$this, 'getStorefrontLanguageRoutes']),
             $this->factory->createSimpleFunction('createSeoPage', [$this, 'createSeoPage']),
             $this->factory->createSimpleFunction('prepareSeoContent', [$this, 'prepareSeoContent']),
             $this->factory->createSimpleFunction('sortSizes', [$this, 'sortSizes']),
@@ -76,6 +81,93 @@ class Base_Extension extends Twig_Extension
             $this->factory->createSimpleFunction('getCardAttributeMaps', [$this, 'getCardAttributeMaps']),
             $this->factory->createSimpleFunction('getItemPropertiesById', [$this, 'getItemPropertiesById']),
         ];
+    }
+
+    /** Resolve navigable destinations from IO route configuration, independently of indexing policy. */
+    public function getStorefrontLanguageRoutes($template, $category, $itemId, $variationId): array
+    {
+        $config = pluginApp(WebstoreConfigurationRepositoryContract::class);
+        $defaultLanguage = $config->getWebstoreConfiguration()->defaultLanguage;
+        $urls = pluginApp(UrlService::class);
+        $renderedCategoryId = is_array($category) ? ($category['id'] ?? null) : ($category->id ?? null);
+        $categoryId = $renderedCategoryId;
+        $isCategory = in_array($template, ['tpl.category.item', 'tpl.category.content', 'tpl.category.blog'], true);
+        $isHome = in_array($template, ['tpl.home', 'tpl.home.category'], true);
+        $system = [
+            'tpl.login' => 'login', 'tpl.register' => 'register', 'tpl.my-account' => 'my-account',
+            'tpl.wish-list' => 'wish-list', 'tpl.basket' => 'basket', 'tpl.checkout' => 'checkout',
+            'tpl.contact' => 'contact', 'tpl.privacy-policy' => 'privacy-policy',
+            'tpl.legal-disclosure' => 'legal-disclosure', 'tpl.terms-conditions' => 'gtc',
+            'tpl.cancellation-rights' => 'cancellation-rights', 'tpl.cancellation-form' => 'cancellation-form',
+            'tpl.declaration-of-accessibility' => 'declaration-of-accessibility',
+            'tpl.newsletter.opt-out' => 'newsletter-opt-out', 'tpl.search' => 'search'
+        ];
+        $route = $system[$template] ?? null;
+        $tagPath = null;
+        if ($template === 'tpl.tags' && RouteConfig::isActive('tags')) {
+            // IO identifies tag results by the terminal _t<ID> segment, independently of the language prefix.
+            $path = explode('?', $this->req->getRequestUri(), 2)[0];
+            if (preg_match('~(?:^|/)([^/?#]*_t[0-9]+)/?$~D', $path, $matches)) {
+                $tagPath = $matches[1];
+            }
+        }
+        if ($route !== null) {
+            $categoryId = RouteConfig::getCategoryId($route);
+            if (!$categoryId && !RouteConfig::isActive($route)) {
+                return [];
+            }
+        } elseif (!$isCategory) {
+            $categoryId = null;
+        } elseif (!$categoryId) {
+            $current = pluginApp(CategoryService::class)->getCurrentCategory();
+            $categoryId = is_array($current) ? ($current['id'] ?? null) : ($current->id ?? null);
+        }
+
+        $categories = $categoryId ? pluginApp(CategoryService::class) : null;
+        $routes = [];
+        foreach ($config->getActiveLanguageList() as $language) {
+            if (!in_array($language, ['de', 'en', 'fr', 'it', 'es'], true)) {
+                continue;
+            }
+            if ($categoryId) {
+                $alreadyLoaded = (string)$renderedCategoryId === (string)$categoryId && $this->categoryHasLanguage($category, $language);
+                if (!$alreadyLoaded && !$this->categoryHasLanguage($categories->get($categoryId, $language), $language)) {
+                    continue;
+                }
+                $url = $urls->getCategoryURL($categoryId, $language);
+            } elseif ($template === 'tpl.item' && $itemId && $variationId) {
+                $url = $urls->getVariationURL($itemId, $variationId, $language);
+            } elseif ($tagPath !== null) {
+                $url = pluginApp(UrlQuery::class, ['path' => $tagPath, 'lang' => $language]);
+            } elseif ($route !== null) {
+                // IO uses this alias for its unlinked newsletter opt-out route.
+                $path = $route === 'newsletter-opt-out' ? 'newsletter/unsubscribe' : $route;
+                $url = pluginApp(UrlQuery::class, ['path' => $path, 'lang' => $language]);
+            } elseif ($isHome) {
+                $home = $urls->getCanonicalURL($language, true);
+                if ($home) {
+                    $routes[$language] = $home;
+                }
+                continue;
+            } else {
+                continue;
+            }
+            if ($url && $url->getPath()) {
+                $routes[$language] = $url->toAbsoluteUrl($language !== $defaultLanguage);
+            }
+        }
+        return $routes;
+    }
+
+    private function categoryHasLanguage($category, $language): bool
+    {
+        $details = is_array($category) ? ($category['details'] ?? []) : ($category->details ?? []);
+        foreach ($details as $detail) {
+            if ((is_array($detail) ? ($detail['lang'] ?? null) : ($detail->lang ?? null)) === $language) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function requestedFacetIds(): array
@@ -447,6 +539,68 @@ class Base_Extension extends Twig_Extension
         return '';
     }
 
+    private function categoryDocumentTotal($search, array $options, int $estimate, int $count): int
+    {
+        $size = $options['itemsPerPage'];
+        $start = ($options['page'] - 1) * $size;
+        if ($count < $size && ($count > 0 || $start === 0)) {
+            return $start + $count;
+        }
+
+        // A probe covers up to four regular pages. Preserve the preset, sort,
+        // grouping, filters and language. No facets or additional Twig rendering.
+        $window = $estimate > $size * 4 ? $size * 4 : $size;
+        $known = $count > 0 ? $start + $count : 0;
+        $low = (int)floor($known / $window); // blocks known to be full
+        $high = $count === 0 ? (int)ceil($start / $window) : null; // first known empty block (zero-based)
+        $block = (int)floor($estimate / $window);
+        if ($block < $low) {
+            $block = $low;
+        }
+        $step = 1;
+        $end = null;
+        while ($high === null || $low < $high) {
+            if ($high !== null && $block >= $high) {
+                $block = $high - 1;
+            }
+            $options['page'] = $block + 1;
+            $options['itemsPerPage'] = $window;
+            $probe = $search->getResults(['boundary' => CategoryItems::getSearchFactory($options)]);
+            $documents = $probe['boundary']['documents'] ?? null;
+            if (!is_array($documents)) {
+                throw pluginApp(\UnexpectedValueException::class, ['message' => 'Missing category boundary documents']);
+            }
+            $found = count($documents);
+            if ($found > 0 && $found < $window) {
+                $end = $block * $window + $found;
+                break;
+            }
+            if ($found === 0 && $high === null) {
+                // Exact multiples and small overestimates often end in the preceding block.
+                $high = $block;
+                $block--;
+                continue;
+            }
+            if ($found === 0) {
+                $high = $block;
+            } else {
+                $low = $block + 1;
+            }
+            if ($high !== null) {
+                $block = $low + (int)floor(($high - $low) / 2);
+            } else {
+                $block += $step;
+                $step *= 2;
+            }
+        }
+        $end = $end ?? ($low * $window);
+        // Concurrent updates can make the probe disagree with the already rendered page.
+        if ($count === 0 && $end > $start) {
+            return $start;
+        }
+        return $end < $known ? $known : $end;
+    }
+
     /** The second argument is retained for compatibility with saved ShopBuilder widgets. */
     public function getItemsFromCat($categoryId, $maxItemsPerPage, $ownFacets, $priceFilter = [0,0])
     {
@@ -498,18 +652,16 @@ class Base_Extension extends Twig_Extension
         $total = $resultItems['itemList']['total'];
         $resultItems['itemList'] = $resultItems['itemList']['documents'] ?? null;
         $documentCount = is_array($resultItems['itemList']) ? count($resultItems['itemList']) : null;
-        $reportedPages = $total / $effectiveSize;
-        $pageMax = ceil($reportedPages);
-        if ($documentCount > 0 && $effectivePage > $pageMax) {
-            $pageMax = $effectivePage;
+        // The grouped search reports an estimated cardinality. A short document
+        // page proves the end. On a full page, verify the estimate against the same list.
+        if ($documentCount !== null) {
+            $total = $this->categoryDocumentTotal($itemSearchService, $itemListOptions, (int)$total, $documentCount);
         }
+        $pageMax = ceil($total / $effectiveSize);
         $resultItems['currentPage'] = $effectivePage;
         $resultItems['itemCountTotal'] = $total;
         $resultItems['itemCountPage'] = $effectiveSize;
-        // A full page that already exceeds the total can offer one more navigation
-        // link. Its destination makes its own SEO decision from its own documents.
-        $resultItems['pageMax'] = $documentCount === $effectiveSize && $effectivePage > $reportedPages
-            ? $pageMax + 1 : $pageMax;
+        $resultItems['pageMax'] = $pageMax;
         $resultItems['pageLimit'] = $resultItems['pageMax'];
         $resultItems['categoryId'] = $categoryId;
         $resultItems['category'] = $activeCategory;

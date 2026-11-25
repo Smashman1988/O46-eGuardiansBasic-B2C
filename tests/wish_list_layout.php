@@ -8,6 +8,7 @@ $views = dirname(__DIR__) . '/resources/views/';
 $page = file_get_contents($views . 'PageDesign/PageDesign.twig');
 $partials = ['layout' => $page, 'empty' => ''];
 preg_match_all('/(?:include|import)\s+"((?:Ceres|GuardiansBasic)::[^"]+)"/', $page, $names);
+$partials['GuardiansBasic::PageDesign.Components.NewsletterPopup'] = file_get_contents($views.'PageDesign/Components/NewsletterPopup.twig');
 foreach ($names[1] as $name) {
     $partials[$name] = str_starts_with($name, 'GuardiansBasic::WishList.')
         ? file_get_contents($views . str_replace('.', '/', substr($name, strlen('GuardiansBasic::'))) . '.twig')
@@ -43,7 +44,7 @@ function fixtureTrans($key) {
     return $match[1];
 }
 $twig->addFunction(new Twig\TwigFunction('trans', 'fixtureTrans'));
-foreach (['createSeoPage', 'component', 'get_consent_scripts', 'ssr_entry', 'get_json_data',
+foreach (['getStorefrontLanguageRoutes','createSeoPage', 'component', 'get_consent_scripts', 'ssr_entry', 'get_json_data',
           'get_shop_builder_scripts', 'csrf_token', 'get_filtered_tags', 'plugin_path'] as $name) {
     $twig->addFunction(new Twig\TwigFunction($name, 'fixtureEmpty'));
 }
@@ -84,6 +85,13 @@ foreach ($cases as $name => [$route, $id, $builder, $quick, $expected]) {
     }];
     $html = $twig->render('layout', ['request' => $request, 'services' => $services,
         'category' => ['id' => $id], 'isShopBuilder' => $builder, 'assetName' => 'ceres-base']);
+    $dom = new DOMDocument();
+    $dom->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($dom);
+    if ($xpath->query('//*[@id="eg-language-options"]')->length !== ($quick ? 0 : 1)
+        || $xpath->query('//*[@id="vue-app"]//*[@id="eg-language-options"]')->length) {
+        throw new RuntimeException("Language options must survive mounting on ".$name);
+    }
     $count = substr_count($html, 'data-component="wish-list"');
     if ($count !== (int) $expected) throw new RuntimeException("Wrong override count on $name ($count)");
     if (str_contains($html, '/wish-list/check-stock') || str_contains($html, 'id="csrf-token"') || !$template->shouldBeCached()) {
