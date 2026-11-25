@@ -2,6 +2,7 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Produktbewertungen erscheinen einmal auf der Detailseite. Startseiten- und Aktionskarten verwenden die gewählte Währung und die lokalisierten Kartenbeschriftungen für die gesamte Liste. Der Footer verwendet denselben Pluginpfad für Zahlungs- und Versandlogos.
 - Das Outlet46-Logo nutzt den Platz im kompakten Header besser und erreicht auf großen Bildschirmen 247 px Breite.
 - Home & Living ersetzt Letzte Größe in den fünf Sprachmenüs. IT und ES durchsuchen den englischen Textindex mit lokalisierten Produktdaten. DE, EN und FR verwenden weiterhin IO.
 - Galerie und Kaufbereich teilen sich ab 768 px eine Zeile. Einzelvarianten zeigen den Hinweis auf knappen Bestand nur bei bekannter Stückzahl. Auf kleinen Geräten nutzen Auswahl und Kaufbutton die volle Breite. Das Markenverzeichnis verlinkt belegte Buchstaben und die erste Zahlengruppe und benötigt keine Artikel- oder Facettenabfrage.

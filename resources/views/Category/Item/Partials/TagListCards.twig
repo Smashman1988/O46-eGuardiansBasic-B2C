@@ -1,0 +1,22 @@
+{% set cardCurrency = currencycheck ?? services.checkout.getCurrencyData().name %}
+{% set translations = {
+    tSustainability: translations.tSustainability|default('') ?: trans('GuardiansBasic::Template.sustainability'),
+    tAvailSizes: translations.tAvailSizes|default('') ?: trans('GuardiansBasic::Template.availsizes'),
+    tStatt: translations.tStatt ?? trans('GuardiansBasic::Template.statt'),
+    tInBasket: translations.tInBasket|default('') ?: trans('GuardiansBasic::Template.inbasket')
+} %}
+{% set transLabels = {
+    availsizeonesize: transLabels.availsizeonesize|default('') ?: trans('GuardiansBasic::Template.availsizeonesize')
+} %}
+{% set tagListAttributeMaps = (cardAttributeMap ?? null) is null
+    ? getCardAttributeMaps(itemListHomeTopSell|map(item => item.data.variation.itemId))
+    : [] %}
+{% for item in itemListHomeTopSell %}
+    <div class="{{ cardColumnClass }}">
+        {% include 'GuardiansBasic::Category.Item.Partials.CategoryListItem' with {
+            'item': item,
+            'currencycheck': cardCurrency ?? 'EUR',
+            'cardAttributeMap': cardAttributeMap ?? tagListAttributeMaps[item.data.variation.itemId] ?? null
+        } %}
+    </div>
+{% endfor %}

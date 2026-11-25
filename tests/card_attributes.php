@@ -58,7 +58,7 @@ $view = dirname(__DIR__) . '/resources/views/Category/Item/';
 $prefix = 'GuardiansBasic::Category.Item.Partials.';
 $templates = ['layout'=>'{% block PageBody %}{% endblock %}', 'category'=>file_get_contents($view.'CategoryItem.twig'),
     'content'=>file_get_contents($view.'CategoryItemContent.twig'), 'simple'=>file_get_contents($view.'Partials/CategoryGridOnly.twig')];
-foreach (['CategoryListItem','CategoryListItem2','CategoryAttributes','AllItemsLink'] as $name) {
+foreach (['CategoryListItem','CategoryListItem2','TagListCards','CategoryAttributes','AllItemsLink'] as $name) {
     $templates[$prefix.$name] = file_get_contents($view.'Partials/'.$name.'.twig');
 }
 foreach (['Ceres::PageDesign.Macros.LayoutContainer','Ceres::PageDesign.Macros.ItemName',
@@ -70,7 +70,11 @@ foreach (['config','plugin_path','queryString','createSeoPage'] as $name) {
     $twig->addFunction(new \Twig\TwigFunction($name, callback(function () { return ''; })));
 }
 $twig->addFunction(new \Twig\TwigFunction('getPartial', callback(function () { return 'layout'; })));
-$twig->addFunction(new \Twig\TwigFunction('trans', callback(function ($key) { return $key; })));
+$translationCalls = [];
+$twig->addFunction(new \Twig\TwigFunction('trans', callback(function ($key) use (&$translationCalls) {
+    $translationCalls[] = $key;
+    return $key;
+})));
 $twig->addFunction(new \Twig\TwigFunction('getAttributesWithImages', [$ext,'getAttributesWithImages']));
 $batch = false;
 foreach (['CHF'=>'?ref=x%2By&currency=CHF','EUR'=>'?ref=x%2By'] as $currency=>$query) {
@@ -188,20 +192,49 @@ foreach (['Homepage/Homepage'=>['12',15], 'StaticPages/Topseller'=>['8',50],
                 'prices'=>['default'=>['unitPrice'=>['value'=>5,'formatted'=>'5 EUR']]]]];
         }
         foreach ([false, true] as $inherited) {
-            $context = ['services'=>['itemList'=>$list]];
+            $checkout = new class {
+                public $reads = 0;
+                function getCurrencyData() { ++$this->reads; return ['name'=>'CHF']; }
+            };
+            $context = ['services'=>['itemList'=>$list, 'checkout'=>$checkout]];
             if ($inherited) {
+                $context['currencycheck'] = 'USD';
+                $context['translations'] = ['tInBasket'=>'Inherited label'];
                 $context['cardAttributeMap'] = ['attributes'=>[['type'=>'box',
                     'values'=>[['position'=>1, 'name'=>'Supplied size']]]]];
             }
             foreach ([false, true] as $batch) {
+                $checkout->reads = 0;
+                $translationCalls = [];
                 $list->calls = $service->batches = $service->singles = [];
-                $html = $twig->render($batch ? $path : $path.'.before', $context);
+                $renderContext = $context;
+                if (!$batch && isset($argv[3])) {
+                    // Older tag loops expected their caller to supply these labels.
+                    $renderContext['translations'] = ($context['translations'] ?? []) + [
+                        'tInBasket'=>'GuardiansBasic::Template.inbasket', 'tStatt'=>'GuardiansBasic::Template.statt',
+                        'tAvailSizes'=>'GuardiansBasic::Template.availsizes', 'tSustainability'=>'GuardiansBasic::Template.sustainability'
+                    ];
+                    $renderContext['transLabels'] = ['availsizeonesize'=>'GuardiansBasic::Template.availsizeonesize'];
+                }
+                $html = $twig->render($batch ? $path : $path.'.before', $renderContext);
+                if (isset($argv[3])) {
+                    // The shared loop changes indentation between tags in historical templates.
+                    $html = preg_replace('/>\s*\n\s*</', '><', trim($html));
+                }
                 check($list->calls === [['tag_list',$tag,'sorting.price.avg_asc',$limit]], 'Tag query changed');
                 check(substr_count($html, 'data-eg-item="') === count($ids), 'Tag card count changed');
                 if (!$batch) {
                     $reference = $html;
                     check($service->singles === ($inherited ? [] : $ids), 'Tag card fallback changed');
                     continue;
+                }
+                check($checkout->reads === ($ids && !$inherited ? 1 : 0), 'Tag list currency lookup count: '.$path);
+                $label = $inherited ? 'Inherited label' : 'GuardiansBasic::Template.inbasket';
+                check(substr_count($html, $label.'</button>') === count($ids), 'Unlabelled tag card: '.$path);
+                $lookups = array_count_values($translationCalls);
+                foreach (['sustainability','availsizes','statt','inbasket','availsizeonesize'] as $key) {
+                    $expected = $ids && ($key !== 'inbasket' || !$inherited) ? 1 : 0;
+                    check(($lookups['GuardiansBasic::Template.'.$key] ?? 0) === $expected, 'Unexpected tag translation count: '.$key);
                 }
                 $expectedBatches = $inherited ? [] : array_chunk(array_unique($ids), 24);
                 check($html === $reference && $service->batches === $expectedBatches && !$service->singles,

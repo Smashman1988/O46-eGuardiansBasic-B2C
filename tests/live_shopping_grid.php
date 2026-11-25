@@ -120,7 +120,7 @@ function compareCardImages($oldCards,$newCards,$priorityExpected) {
     }
 }
 $prefix='GuardiansBasic::Category.Item.Partials.';$templates=[];
-foreach (['LiveShoppingItem','LiveShoppingGrid','CategoryGridOnly','CategoryListItem','CategoryAttributes'] as $name) $templates[$prefix.$name]=file_get_contents(__DIR__.'/../resources/views/Category/Item/Partials/'.$name.'.twig');
+foreach (['LiveShoppingItem','LiveShoppingGrid','CategoryGridOnly','TagListCards','CategoryListItem','CategoryAttributes'] as $name) $templates[$prefix.$name]=file_get_contents(__DIR__.'/../resources/views/Category/Item/Partials/'.$name.'.twig');
 $templates['GuardiansBasic::Category.Macros.render-rating']=file_get_contents(__DIR__.'/../resources/views/Category/Macros/render-rating.twig');
 foreach (['Ceres::PageDesign.Macros.LayoutContainer','Ceres::PageDesign.Macros.ItemName'] as $name) $templates[$name]='';
 $templates['old']= <<<'TWIG'

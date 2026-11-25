@@ -19,6 +19,14 @@ class GuardServices {
     public $wishListSnapshot = [], $wishListHit = false;
     public $singleVariation = false;
     function __construct($lang,$request){$this->lang=$lang;$this->request=$request;}
+    function feedbackList() {
+        $this->calls[] = 'feedbackList';
+        return ['entries'=>[], 'totalsCount'=>3];
+    }
+    function feedbackAverage() {
+        $this->calls[] = 'feedbackAverage';
+        return ['ratingsCountTotal'=>3, 'averageValue'=>4, 'ratingsCountOf4'=>3];
+    }
     function __call($name,$args){
         $this->calls[]=$name;
         switch($name){
@@ -101,7 +109,7 @@ $stubs=[
  'fixture-external-style'=>'<style data-probe>{{ [crossSellingList,itemAttributes]|json_encode|raw }}</style>',
  'fixture-external-script'=>'<script data-probe>{{ [crossSellingList,itemAttributes]|json_encode|raw }}</script>'
 ];
-foreach(['Ceres::Widgets.WidgetComponents','Ceres::Widgets.ShopBuilderDataStore','GuardiansBasic::PageDesign.Components.cashinadvance','GuardiansBasic::PageDesign.Components.cookiebar','GuardiansBasic::PageDesign.Components.ContactWidget','GuardiansBasic::PageDesign.Components.NewsletterPopup','GuardiansBasic::Containers.FeedbackContainer'] as $name)$stubs[$name]='<!--fixture '.$name.'-->';
+foreach(['Ceres::Widgets.WidgetComponents','Ceres::Widgets.ShopBuilderDataStore','GuardiansBasic::PageDesign.Components.cashinadvance','GuardiansBasic::PageDesign.Components.cookiebar','GuardiansBasic::PageDesign.Components.ContactWidget','GuardiansBasic::PageDesign.Components.NewsletterPopup'] as $name)$stubs[$name]='<!--fixture '.$name.'-->';
 foreach(['DE','EN','FR','IT','ES'] as $code)foreach(['nl-element','gutschein'] as $prefix)$stubs['GuardiansBasic::PageDesign.Components.'.$prefix.$code]='<!--fixture '.$prefix.$code.'-->';
 foreach(['','DE','EN','FR','IT','ES'] as $language)$stubs['GuardiansBasic::Category.Macros.CategoryTree'.$language.'.twig']='{% macro get_nav_bar(categories,ignored) %}<li>NAVIGATION BOUNDARY</li>{% endmacro %}';
 $source=file_get_contents($root.'/resources/views/Item/SingleItem.twig');
@@ -118,6 +126,8 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     }
     $twig=new Twig\Environment(new Twig\Loader\ArrayLoader(['SingleItem'=>$source,'Header'=>$headers[$version]]+$actual+$stubs+$catalog),['cache'=>false,'autoescape'=>'html','strict_variables'=>false]);
     foreach(['getPartial'=>'partial','config'=>'config','trans'=>'trans','plugin_path'=>'pluginPath','createSeoPage'=>'seo','get_additional_styles'=>'styles','get_additional_scripts'=>'scripts','component'=>'component','recordContainer'=>'container','getCardAttributeMaps'=>'maps'] as $name=>$method)$twig->addFunction(new Twig\TwigFunction($name,[$svc,$method]));
+    $twig->addFunction(new Twig\TwigFunction('getFeedbackItemList',[$svc,'feedbackList']));
+    $twig->addFunction(new Twig\TwigFunction('getListFeedbackAverages',[$svc,'feedbackAverage']));
     $twig->addFunction(new Twig\TwigFunction('getItemPropertiesById',[$propertyExtension,'getItemPropertiesById']));
     foreach(['get_consent_scripts','get_json_data','get_filtered_tags','get_shop_builder_scripts','ssr_entry','csrf_token','prepareSeoContent'] as $name)$twig->addFunction(new Twig\TwigFunction($name,[$svc,'noop']));
     foreach(['filterTabs','filterFields','specialOffer'] as $name)$twig->addFilter(new Twig\TwigFilter($name,[$svc,'identity']));
@@ -152,6 +162,20 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
         throw new RuntimeException('Empty property section reserves space');
     }
     if ($value===null && $lang==='de' && $format==='prepared') file_put_contents(dirname($argv[2]).'/pdp.html',$html);
+    if ($lang === 'de' && $format === 'prepared') {
+        foreach ([0, 3, null] as $feedbackCount) {
+            $ctx['item']['documents'][0]['data']['item']['feedbackCount'] = $feedbackCount;
+            $svc->calls = [];
+            $feedbackHtml = $twig->render('SingleItem', $ctx);
+            $expected = $value === null && $feedbackCount !== 0 ? 1 : 0;
+            $calls = array_count_values($svc->calls);
+            if (($calls['feedbackList'] ?? 0) !== $expected || ($calls['feedbackAverage'] ?? 0) !== $expected
+                || substr_count($feedbackHtml, 'id="quickrating"') !== $expected
+                || substr_count($feedbackHtml, '<section class="feedback-container">') !== $expected) {
+                throw new RuntimeException('Unexpected feedback markup or service count: '.json_encode([$value, $feedbackCount, $calls]));
+            }
+        }
+    }
     $rows[]=[$lang,$value,$format];
 }
 file_put_contents($argv[2],json_encode($rows,JSON_THROW_ON_ERROR));
