@@ -13,6 +13,7 @@ $twig = new Twig\Environment(new Twig\Loader\ArrayLoader($templates));
 $service = new class {
     public $lang='de';
     function getLanguage() { return $this->lang; }
+    function getLanguageURLs() { return []; }
     function getCurrencyData() { return ['name'=>'EUR','symbol'=>'€']; }
     public $checkout = false;
     function isCheckout() { return $this->checkout; }
@@ -25,6 +26,9 @@ $service = new class {
 $labels = parse_ini_file($root.'/resources/lang/de/Template.properties', false, INI_SCANNER_RAW);
 $twig->addFunction(new Twig\TwigFunction('trans', function ($key) use (&$labels) {return $labels[substr(strrchr($key,'.'),1)] ?? $key;}));
 $twig->addFunction(new Twig\TwigFunction('plugin_path', fn($name) => '/plugin/'.$name));
+require_once $root.'/src/Helper/SeoPage.php';
+$twig->addFunction(new Twig\TwigFunction('createSeoPage', fn($template) => new GuardiansBasic\Helper\SeoPage([], $template)));
+$twig->addFunction(new Twig\TwigFunction('getStorefrontLanguageRoutes', fn() => []));
 $settings=[];
 foreach ([1,2] as $i) {
     foreach (['ImageDesktop','ImageMobile'] as $size) $settings['GuardiansBasic.homeSlider'.$size.'_'.$i]='/image/slide-'.$i.'.svg';
@@ -46,6 +50,16 @@ function fragment($source, $start, $end) {
     return substr($source,$a,$b-$a);
 }
 $result=[];
+// Compile the complete production Head for each page type before extracting its style elements.
+foreach (['home'=>'tpl.home','category'=>'tpl.category.item','item'=>'tpl.item'] as $kind=>$template) {
+    $headContext = ['isQuickView'=>true, 'isItem'=>$kind === 'item', 'currentTemplate'=>$template,
+                    'rendersItemGrid'=>true] + $context;
+    $head = $twig->render('GuardiansBasic::PageDesign.Partials.Head', $headContext);
+    preg_match_all('~<style\b[^>]*>[\s\S]*?</style>~i', $head, $styles);
+    if (count($styles[0]) < 2) throw new RuntimeException('Missing rendered header styles for '.$kind);
+    $result['styles'][$kind] = implode("\n", $styles[0]);
+}
+
 foreach (['header'=>'PageDesign.Partials.Header.Header','footer'=>'PageDesign.Partials.Footer'] as $key=>$name)
     $result[$key]=$twig->render('GuardiansBasic::'.$name,$context);
 $category=$templates['GuardiansBasic::Category.Item.CategoryItemContent'];

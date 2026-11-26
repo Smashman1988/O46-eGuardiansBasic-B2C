@@ -4,7 +4,8 @@ const {chromium}=require(process.env.O46_PLAYWRIGHT_MODULE||'playwright');
 const photoDir=path.resolve(process.argv[3]);
 const D=path.resolve(process.argv[2]),root=path.resolve(__dirname,'..'),rows=[];
 const read=p=>fs.readFileSync(p,'utf8');
-const fonts=[...read(root+'/resources/views/PageDesign/Partials/Head.twig').replaceAll("{{ plugin_path('GuardiansBasic') }}",'/theme').matchAll(/@font-face\{[^}]+\}/g)].slice(0,3).map(x=>x[0]).join('');
+// Resolve the Twig resource path before parsing CSS, so the braces cannot truncate a font rule.
+const fonts=[...read(root+'/resources/views/PageDesign/Partials/Head.twig').replaceAll("{{ plugin_path('GuardiansBasic') }}",'/theme').replaceAll('{{ headThemePath }}','/theme').matchAll(/@font-face\{[^}]+\}/g)].slice(0,3).map(x=>x[0]).join('');
 let origin,requests=[];
 const server=http.createServer((req,res)=>{
  const u=new URL(req.url,origin);requests.push({path:u.pathname+u.search,method:req.method});

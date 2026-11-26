@@ -4,8 +4,6 @@ const path = require('node:path');
 const origin = 'https://storefront.test';
 const root = path.resolve(__dirname, '../..');
 const read = file => fs.readFileSync(path.join(root,file));
-const head = read('resources/views/PageDesign/Partials/Head.twig').toString();
-const styles = [...head.matchAll(/<style([^>]*)>([\s\S]*?)<\/style>/g)];
 const svg = color => '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="800"><rect width="640" height="800" fill="'+color+'"/><circle cx="320" cy="400" r="100" fill="white"/></svg>';
 function article(f, id, quick, single = false) {
     const gallery=single ? f.singleGallery : f.gallery;
@@ -21,8 +19,7 @@ function storefront(f,url) {
     const parts = f.languages[lang];
     const sorting = url.searchParams.get('sorting')==='name_desc'?'name_desc':'relevance';
     const bundle = pdp ? 'item' : home ? 'main' : 'cat';
-    const critical = [styles[pdp?0:2],...styles.filter(m=>m[1] && (pdp || !/pdp/.test(m[1])))].map(m=>m[0]).join('')
-        .replaceAll('{{ headThemePath }}','/plugin/GuardiansBasic');
+    const critical = f.styles[pdp ? 'item' : home ? 'home' : 'category'];
     const filterKey = facetKey(f,url);
     const pageNumber=Number(url.searchParams.get('page') || 1);
     const list=f.filteredLists[filterKey]?.html || (sorting==='name_desc'?f.listDesc:f.list);
@@ -59,6 +56,9 @@ const test = base.extend({
                 if(u.origin===origin) {
                     if(/^\/assets\/[a-z0-9.-]+\.(css|js)$/.test(p)) return route.fulfill({path:path.join(root,'resources',p.endsWith('.js')?'js':'css',path.basename(p))});
                     if(p.includes('/documents/fonts/') && /^[\w.-]+\.woff2?$/.test(path.basename(p))) return route.fulfill({path:path.join(root,'resources/documents/fonts',path.basename(p))});
+                    if (p === '/plugin/GuardiansBasic/images/logo-outlet-new.svg') {
+                        return route.fulfill({path: path.join(root, 'resources/images/logo-outlet-new.svg'), contentType: 'image/svg+xml'});
+                    }
                     if(req.resourceType()==='image') {
                         return pic(p.includes('green')?'green':p.includes('red')?'red':'steelblue');
                     }

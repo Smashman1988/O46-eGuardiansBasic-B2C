@@ -396,7 +396,7 @@ namespace {
         $styles = $xpath->query('//head/style[@data-eg-basket-summary-critical]');
         check($styles->length === 1, 'Missing basket summary CSS');
         $css = $styles->item(0)->textContent;
-        check(strpos($css, 'min-inline-size:calc(9ch + 10px)') !== false, 'Desktop basket reservation lost during Twig rendering');
+        check(preg_match('~#page-header\s+\.header-sum-info\s*\{\s*min-inline-size:\s*calc\(9ch \+ 3em\)~', $css) === 1, 'Desktop basket reservation lost during Twig rendering');
         check(strpos($css, '<') === false, 'Basket style swallowed subsequent head markup');
         check($xpath->query('//head/link[@rel="canonical"]')->length === 1, 'Canonical missing from parsed document head');
         return 'Basket reservation and canonical present in rendered HTML';

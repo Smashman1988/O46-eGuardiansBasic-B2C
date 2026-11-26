@@ -2,7 +2,7 @@
 
 B2C führt die laufende Tiefenoptimierung. Diese Datei gehört zum B2C-Repository. Bei jedem Paket die betroffenen IDs aktualisieren, neue IDs anhängen und die getesteten Git-Stände nennen. Eine ID bleibt auch bei abgelehnten Versuchen oder abweichenden B2B-Pfaden erhalten.
 
-**Stand 26.11.2026, Paket 12.** B2C führt, die native Prüfung erfolgt auf 428. Die korrigierte T38-Regel und die sechs temporären Originalassets liegen lokal auf Basis von `1f6dd04`. Die B2B-Entwicklung und Transferprüfung erfolgen derzeit ausschließlich lokal auf Basis von `5d8756b`. Der Betreiber veröffentlicht beide Themes. Die B2B-Abnahme ist bewusst zurückgestellt. Die Freigabeentscheidungen sind unabhängig.
+**Stand 26.11.2026, Paket 13.** B2C führt. Header und SEO-Head von `b169611` sind auf 428 nativ bestätigt. Für T15a steht die bytegenaue Auslieferung eines historischen CSS-Pfads aus dem CDN-Cache von 428 aus. B2B wird auf Basis von `5d8756b` ausschließlich lokal geprüft. Der Betreiber veröffentlicht beide Themes. Die native B2B-Abnahme ist bewusst zurückgestellt.
 
 Pfade gelten jeweils innerhalb des genannten Themes. `Views` steht für `resources/views`, `Head` für `Views/PageDesign/Partials/Head.twig`, `PageDesign` für `Views/PageDesign/PageDesign.twig`, `PDP` für `Views/Item/SingleItem.twig`, `Extension` für `src/Extensions/Base_Extension.php`. Außer den ausdrücklich angegebenen B2B-Testergebnissen wurde für die jeweilige ID kein B2B-Vorher-/Nachher-Test durchgeführt. Die Paketberichte sind lokale Zusatzbelege. Git-Stände, Messwerte und Entscheidungen stehen auch hier im versionierbaren Dokument.
 
@@ -236,3 +236,26 @@ Die 54 bestehenden IDs bleiben erhalten. Die folgenden Einträge aktualisieren d
 | T37 | Such-Smoke in DE, EN, FR, IT und ES auf 428. Alle zehn geprüften Seiten enthielten zwölf Karten. Die vollständige Bestands- und Scrollprüfung steht in Paket 11. | Der eigene Händler-Suchkontext bleibt als gesonderte Transferentscheidung geführt. | B2B-Prüfung ausstehend |
 
 [Abnahmebericht Paket 12 für B2C](../.cache/b2c-audit/Optimierungspaket-12.html)
+
+## Paket 13 · Native Freigabeprüfung
+
+Die 54 IDs bleiben erhalten. Paket 13 aktualisiert die Abnahmen auf Basis von B2C `b169611`. Die lokalen B2B-Arbeitsänderungen aus Paket 12 bleiben bestehen.
+
+| ID | B2C-Nachweis | B2B |
+|---|---|---|
+| T36 / T38 | Nativ auf 428 bestanden. 17 verzögerte Warenkorbantworten bei fünf Breiten und über alle 13 angebotenen Währungen. Keine falsche Zwischenanzeige, je eine Anfrage, 0 px horizontale Bewegung. Die unveränderten HTTP-Antworten von 30 Sprach-/Seitentypkombinationen lieferten geschlossene Style-Elemente, den korrekten Canonical und die erwarteten Sprachmetadaten. | T38 bleibt lokal getestet. Einmaliger Quellscan von 176 B2B-Twig-Dateien ergab keinen weiteren Konflikt zwischen Inline-CSS und Twig-Kommentaren. |
+| T37 | Zwölf Suchtrefferkarten auf der ersten Seite in DE, EN, FR, IT und ES. Beim italienischen Infinite Scroll wuchs die Liste von 12 auf 24 eindeutige Artikel. | B2B-Prüfung ausstehend. |
+| T15a | Origin 428 und öffentliches CDN 425 je 6/6 Originaldateien. CDN 428 am unveränderten Pfad 5/6. Der HIT für `main-111025.min.css` enthält den früheren Git-Blob `d3bce22c`. Ein MISS mit Versionsparameter und der direkte Origin-GET liefern den vereinbarten Blob `9ee4bbb0`. Nächster Freigabenachweis ist der identische SHA-256 auch ohne Parameter. | Die sechs Originalpfade gehören zum B2C-Cacheübergang. |
+
+[Abnahmebericht Paket 13 für B2C](../.cache/b2c-audit/Optimierungspaket-13.html)
+
+## Warenkorbheader und Merkliste im visuellen Vergleich · 26. November 2026
+
+| ID | Problematik und Änderung | B2C-Nachweis | B2B-Nachweis und Transferstatus |
+|---|---|---|---|
+| T36 / T38 | Die rechtsbündige Mindestbreite und der Innenabstand am Zahlenelement verschoben Betrag und Währung gegenüber dem Warenkorbsymbol. Head.twig reserviert die Gesamtbreite am gemeinsamen Block. Header.twig verwendet ihn ohne den zusätzlichen Innenabstand. Auf kleinen Geräten kann die Logospalte Platz an die Warenkorbspalte abgeben. | Desktop auf 428 vor der Änderung rund 29 px Versatz. Mit der lokalen Korrektur auf dem DOM von 428 an acht Breiten unter 0,01 px Versatz und kein horizontaler Dokumentüberlauf. Der Nachweis der lokal korrigierten Dateien als Auslieferung steht aus. Kein Performance-Gewinn beansprucht. | Identischer Fehler im lokalen Händlerheader reproduziert. Desktop und schmale Breiten nach gleicher fachlicher Anpassung im Händler-Theme geprüft. **B2B lokal getestet** |
+| T36 | SingleItem.twig griff bei der Übergabe gespeicherter Varianten nochmals auf einen optionalen Schlüssel im Warenkorbsnapshot zu. Der zweite Zugriff verwendet nun dieselbe Existenzprüfung wie der erste. | Produkt-/Quickview- und Merkliste-Regressionen siehe B2C-Bericht. **B2C lokal umgesetzt** | Mit strikten Twig-Variablen an einer Händlerfixture mit fehlendem Schlüssel überprüft. Prüfung auf dem Händler-Testset zurückgestellt. **B2B lokal getestet** |
+
+Die gemeinsame Schlussprüfung umfasst 509 Betragsmessungen an 125 Breiten je Theme sowie geprüfte Windows-Chrome-Referenzbilder für Desktop und Mobil. Bei identischen Inhalten unterscheidet sich der historische Header in B2C um 3.594 bzw. 5.938 Pixel, in B2B um 3.594 bzw. 5.808 Pixel. Der korrigierte Stand stimmt in allen vier Vergleichen auf das Pixel überein.
+
+[B2C-Prüfbericht und Bilder](../.cache/b2c-audit/qualitaet-428/B2C-Qualitaetsbericht.html) · [Lokaler B2B-Prüfbericht und Bilder](../.cache/b2c-audit/qualitaet-428/B2B-Qualitaetsbericht.html)
