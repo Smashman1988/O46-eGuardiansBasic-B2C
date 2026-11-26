@@ -93,7 +93,7 @@ $twig->addFilter(new \Twig\TwigFilter('orderByKey', callback(function ($rows,$ke
 $report = [];
 foreach (['category','content','simple'] as $template) {
     foreach ([1,2] as $page) {
-        foreach ([0,1,12,24,48,'duplicates'] as $n) {
+        foreach ([0,1,12,24,48,50,100,'duplicates'] as $n) {
             $ids = $n === 'duplicates' ? [100,101,102,100] : ($n ? range(100,99+$n) : []);
             $items = [];
             foreach ($ids as $id) {

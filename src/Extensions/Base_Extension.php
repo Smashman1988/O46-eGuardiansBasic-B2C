@@ -89,6 +89,7 @@ class Base_Extension extends Twig_Extension
             $this->factory->createSimpleFunction('getCardAttributeMaps', [$this, 'getCardAttributeMaps']),
             $this->factory->createSimpleFunction('getItemPropertiesById', [$this, 'getItemPropertiesById']),
             $this->factory->createSimpleFunction('getVariationSalabilityMap', [$this, 'getVariationSalabilityMap']),
+            $this->factory->createSimpleFunction('getSalableAttributeValues', [$this, 'getSalableAttributeValues']),
         ];
     }
 
@@ -128,8 +129,9 @@ class Base_Extension extends Twig_Extension
         } elseif (!$isCategory) {
             $categoryId = null;
         } elseif (!$categoryId) {
-            $current = pluginApp(CategoryService::class)->getCurrentCategory();
-            $categoryId = is_array($current) ? ($current['id'] ?? null) : ($current->id ?? null);
+            $category = pluginApp(CategoryService::class)->getCurrentCategory();
+            $renderedCategoryId = is_array($category) ? ($category['id'] ?? null) : ($category->id ?? null);
+            $categoryId = $renderedCategoryId;
         }
 
         $categories = $categoryId ? pluginApp(CategoryService::class) : null;
@@ -300,6 +302,30 @@ class Base_Extension extends Twig_Extension
         return $salable;
     }
 
+    /** Each visible value is available if at least one salable variation contains the pair. */
+    public function getSalableAttributeValues(iterable $variations, array $salableByVariation): array
+    {
+        $values = [];
+        foreach ($variations as $variation) {
+            if (empty($salableByVariation[$variation['variationId']])) {
+                continue;
+            }
+            foreach ($variation['attributes'] ?? [] as $attribute) {
+                if (is_array($attribute) || $attribute instanceof \ArrayAccess) {
+                    $attributeId = $attribute['attributeId'] ?? null;
+                    $valueId = $attribute['attributeValueId'] ?? null;
+                } else {
+                    $attributeId = $attribute->attributeId ?? null;
+                    $valueId = $attribute->attributeValueId ?? null;
+                }
+                if ($attributeId !== null && $valueId !== null) {
+                    $values[(int)$attributeId][(int)$valueId] = true;
+                }
+            }
+        }
+        return $values;
+    }
+
     public function getCardAttributeMaps(array $itemIds): array
     {
         $mapsByItem = [];
@@ -382,7 +408,8 @@ class Base_Extension extends Twig_Extension
       
         $attributeImageList = $authHelper->processUnguarded(
             function () use ($AttributeValueImageRepositoryContract, $itemId, $attributeNameMap, $ItemImageRepositoryContract) {
-                $associativeArray = array();     
+                $associativeArray = [];
+                $imagesById = [];
                 
                 
                 foreach ($attributeNameMap as $attrGroupKey => $attrGroupValue){
@@ -400,8 +427,12 @@ class Base_Extension extends Twig_Extension
                             foreach ($attributeValueImages as $attributeValueImage) {
                                 //$attrImg = array_first($attributeValueImage);//[0];
                                 //$attrValuesWithImages[$attrKey] = $attributeValueImage;
-                                if($attributeValueImage["imageId"]!=null){ 
-                                    $attrValuesWithImages[$attrKey] = $ItemImageRepositoryContract->show($attributeValueImage["imageId"]);
+                                $imageId = $attributeValueImage["imageId"];
+                                if ($imageId != null) {
+                                    if (!array_key_exists($imageId, $imagesById)) {
+                                        $imagesById[$imageId] = $ItemImageRepositoryContract->show($imageId);
+                                    }
+                                    $attrValuesWithImages[$attrKey] = $imagesById[$imageId];
                                 }else{
                                     $attrValuesWithImages[$attrKey] = "";
                                 }

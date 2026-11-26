@@ -141,6 +141,7 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     $twig->addFunction(new Twig\TwigFunction('getListFeedbackAverages',[$svc,'feedbackAverage']));
     $twig->addFunction(new Twig\TwigFunction('getItemPropertiesById',[$propertyExtension,'getItemPropertiesById']));
     $twig->addFunction(new Twig\TwigFunction('getVariationSalabilityMap',[$svc,'salabilityMap']));
+    $twig->addFunction(new Twig\TwigFunction('getSalableAttributeValues',[$propertyExtension,'getSalableAttributeValues']));
     foreach(['get_consent_scripts','get_json_data','get_filtered_tags','get_shop_builder_scripts','ssr_entry','csrf_token','prepareSeoContent'] as $name)$twig->addFunction(new Twig\TwigFunction($name,[$svc,'noop']));
     foreach(['filterTabs','filterFields','specialOffer'] as $name)$twig->addFilter(new Twig\TwigFilter($name,[$svc,'identity']));
     $twig->addFilter(new Twig\TwigFilter('orderByKey',[$svc,'sortImages']));

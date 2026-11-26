@@ -5,7 +5,7 @@
 {% if services.template.getCurrentTemplate() == "tpl.login" or services.template.getCurrentTemplate() == "tpl.checkout" %}
     {% set isCheckout = true %}
 {% endif %}
-{% set currencycheck = services.checkout.getCurrencyData.name %}
+{% set previewCurrency = services.checkout.getCurrencyData() %}
 {% if basketItems | length > 0 %}
     <div class="basket-prev-wrap">
         <div class="basket-preview-itemlist" data-eg-event="click" data-eg-target="[data-eg-deletefrombasket]">
@@ -33,7 +33,7 @@
                                 <strong>{{ trans("GuardiansBasic::Template.statt") }} <span class="line-trough">{{ basketItem.variation.data.prices.rrp.unitPrice.formatted }}*</span></strong>
                             </div>
                             <div class="col-6 nopadding outlet-green font-18 font-w600">                                 
-                                   <strong>{{ basketItem.price|number_format(2, ',','.') }} {{ services.checkout.getCurrencyData()['symbol'] }}</strong>
+                                   <strong>{{ basketItem.price|number_format(2, ',','.') }} {{ previewCurrency.symbol }}</strong>
                             </div>  
                             </div>                                                                  
                         </div>
@@ -52,24 +52,24 @@
                 <div class="row bold m-t-1">
                     <div class="col-6 outlet-green font-18 mt-auto mb-auto">{{ trans("GuardiansBasic::Template.yourprice") }}</div>
                     <div class="col-6 text-right outlet-green font-18">
-                        {{ basketData.itemSum|number_format(2, ',','.') }} {{ services.checkout.getCurrencyData()['symbol'] }}
+                        {{ basketData.itemSum|number_format(2, ',','.') }} {{ previewCurrency.symbol }}
                     </div>
                 </div>
                   
                 <div class="row bold">
                     <div class="col-9 outlet-green font-18 font-w600"><a href="{{ services.category.getURLById(5548) }}" target="_blank"><u>{{ trans("GuardiansBasic::Template.shipping") }}</u></a></div>
                     <div class="col-3 text-right outlet-green font-18 font-w600  mt-auto mb-auto">
-                        {{ basketData.shippingAmount }} {{ services.checkout.getCurrencyData()['symbol'] }}
+                        {{ basketData.shippingAmount }} {{ previewCurrency.symbol }}
                     </div>
                 </div>
-                    {% if currencycheck=="EUR" %}
+                    {% if previewCurrency.name=="EUR" %}
                     {% if lieferland==1 %}
                 <div class="row m-t-1 frei-haus full-height">
                         <div class="frei-haus-b">
                         </div>
                      {% if basketData.itemSum<29 and lieferland==1  %}
                         <div class="vsk-frei vsku29info">
-                            {{ trans("GuardiansBasic::Template.Orderforanadditional") }} {{ 29 - basketData.itemSum }} {{ services.checkout.getCurrencyData()['symbol'] }} {{ trans("GuardiansBasic::Template.andwellgiveyou699") }} {{ services.checkout.getCurrencyData()['symbol'] }} {{ trans("GuardiansBasic::Template.shippincostsThroughoutGermany") }}
+                            {{ trans("GuardiansBasic::Template.Orderforanadditional") }} {{ 29 - basketData.itemSum }} {{ previewCurrency.symbol }} {{ trans("GuardiansBasic::Template.andwellgiveyou699") }} {{ previewCurrency.symbol }} {{ trans("GuardiansBasic::Template.shippincostsThroughoutGermany") }}
                         </div>
                     {% else %}
                         <div class="vsk-frei vsku29info">
@@ -83,7 +83,7 @@
                         <div class="mt-auto mb-auto f-size30">%
                         </div>
                        <div class="vsk-frei vsku29info">
-                           {{ trans("GuardiansBasic::Template.Orderforanadditional") }} {{ 29 - basketData.itemSum  }} {{ services.checkout.getCurrencyData()['symbol'] }} {{ trans("GuardiansBasic::Template.andwellgiveyou10") }}{{ services.checkout.getCurrencyData()['symbol'] }} {{ trans("GuardiansBasic::Template.oftheshippingcostsoutsideofGermany") }}
+                           {{ trans("GuardiansBasic::Template.Orderforanadditional") }} {{ 29 - basketData.itemSum  }} {{ previewCurrency.symbol }} {{ trans("GuardiansBasic::Template.andwellgiveyou10") }}{{ previewCurrency.symbol }} {{ trans("GuardiansBasic::Template.oftheshippingcostsoutsideofGermany") }}
                         </div>
                         </div>
                         {% endif %}
@@ -101,10 +101,10 @@
             
             <div class="rows basket-prev-button-forward">
                 <div class="col-12">
-                    <a href="{{ services.category.getURLById(5484) }}{% if currencycheck != "EUR" %}?currency={{ currencycheck }}{% endif %}" class="btn btn-primary btn-big">{{ trans("Ceres::Template.singleItemCheckout") }}</a>
+                    <a href="{{ services.category.getURLById(5484) }}{% if previewCurrency.name != "EUR" %}?currency={{ previewCurrency.name }}{% endif %}" class="btn btn-primary btn-big">{{ trans("Ceres::Template.singleItemCheckout") }}</a>
                 </div>
                 <div class="col-12">
-                    <a href="{{ services.category.getURLById(5482) }}{% if currencycheck != "EUR" %}?currency={{ currencycheck }}{% endif %}" class="btn btn-secondary btn-big">{{ trans("Ceres::Template.singleItemBasket") }}</a>
+                    <a href="{{ services.category.getURLById(5482) }}{% if previewCurrency.name != "EUR" %}?currency={{ previewCurrency.name }}{% endif %}" class="btn btn-secondary btn-big">{{ trans("Ceres::Template.singleItemBasket") }}</a>
                 </div>
             </div>
         </div>

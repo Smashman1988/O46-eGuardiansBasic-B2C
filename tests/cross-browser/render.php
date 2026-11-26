@@ -34,6 +34,7 @@ foreach ([1,2] as $i) {
 $twig->addFunction(new Twig\TwigFunction('config', fn($key) => $settings[$key] ?? ''));
 $twig->addFunction(new Twig\TwigFunction('queryString',fn($params) => ($query=http_build_query($params)) !== '' ? '?'.$query : ''));
 $twig->addFilter(new Twig\TwigFilter('itemName', fn($item) => 'Laufschuh'));
+$twig->addFilter(new Twig\TwigFilter('int', 'intval'));
 $context = ['services'=>array_fill_keys(['localizationRepository','checkout','template','category','url'], $service),
     'webstoreConfig'=>['domainSsl'=>'https://www.outlet46.de','defaultLanguage'=>'de'],
     'lang'=>'de','pdpBasketForHeader'=>[],'vuejs'=>[],'category'=>['id'=>1],'newsletterUrl'=>'/newsletter/','consentRequired'=>false];
@@ -84,9 +85,14 @@ $variants = [['variationId'=>101,'attributes'=>[['attributeId'=>9,'attributeValu
     ['variationId'=>102,'attributes'=>[['attributeId'=>9,'attributeValueId'=>2]],'isSalable'=>true]];
 $attributes = [['attributeId'=>9,'name'=>'Farbe','type'=>'text','values'=>[
     ['attributeValueId'=>1,'name'=>'Grün'], ['attributeValueId'=>2,'name'=>'Rot']]]];
+class BrowserTwigExtensionStub {}
+class_alias(BrowserTwigExtensionStub::class, 'Plenty\\Plugin\\Templates\\Extensions\\Twig_Extension');
+require_once $root.'/src/Extensions/Base_Extension.php';
+$attributesExtension = (new ReflectionClass(\GuardiansBasic\Extensions\Base_Extension::class))->newInstanceWithoutConstructor();
+$salableByVariation = array_column($variants,'isSalable','variationId');
 $result['selection'] = $twig->createTemplate(divSource($pdp,'<div data-item-variation class='))->render([
     'linkedAttributes'=>[], 'attributes'=>$attributes, 'variationsWithAttributes'=>$variants,
-    'salableByVariation'=>array_column($variants,'isSalable','variationId')]);
+    'salableAttributeValues'=>$attributesExtension->getSalableAttributeValues($variants,$salableByVariation)]);
 $result['singleGallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>[$images[0]],'mainImg'=>$images[0],'galleryCount'=>1,'itemData'=>[]]);
 $homepage=$templates['GuardiansBasic::Homepage.Homepage'];
 $result['slider']=$twig->createTemplate(fragment($homepage,'<section class="section-slider-wrap">','<section class="section-banner-first">'))->render($context);

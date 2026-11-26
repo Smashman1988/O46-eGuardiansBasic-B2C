@@ -43,7 +43,8 @@ namespace Ceres\Contexts {
 namespace IO\Services {
     class CategoryService {
         public $route;
-        public function get($id, $lang = null) { return ['id' => $id, 'details' => in_array($lang ?? 'de', $this->languages, true) ? [['lang'=>$lang ?? 'de', 'name'=>'Category ' . $id, 'description'=>'', 'description2'=>'']] : []]; }
+        public $reads = [];
+        public function get($id, $lang = null) { $this->reads[] = [$id,$lang]; return ['id' => $id, 'details' => in_array($lang ?? 'de', $this->languages, true) ? [['lang'=>$lang ?? 'de', 'name'=>'Category ' . $id, 'description'=>'', 'description2'=>'']] : []]; }
         public function getCurrentCategory() { return $this->route; }
         public $languages = ['de','en','fr','it','es'];
         public function getDetails($category, $lang) {
@@ -1488,7 +1489,7 @@ namespace {
             $search->calls=$search->boundaryCalls=[];
         }
     });
-    test('b2c/storefront-route-matrix', function () use ($twig,$request,$base,$categoryService,$templateService,$urls,&$services) {
+    test('b2c/storefront-route-matrix', function () use ($twig,$extension,$request,$base,$categoryService,$templateService,$urls,&$services) {
         $codes = ['de','en','fr','it','es'];
         $fixtureUrls = new class extends UrlService {
             public function getCanonicalURL($lang = null,$ignore = false) {
@@ -1520,6 +1521,7 @@ namespace {
         ];
         $services[IO\Services\UrlService::class] = $fixtureUrls;
         $templateBefore = $templateService->template;
+        $previousCategory = $categoryService->route;
         $uriBefore = $request->rawUri;
         IO\Helper\RouteConfig::$links = ['contact'=>115,'basket'=>116];
         $ctx = $base;
@@ -1553,6 +1555,13 @@ namespace {
                 }
                 $result[$kind] = $map;
             }
+            $categoryService->languages = ['de','en','fr','it'];
+            $categoryService->route = (object)['id'=>111,'details'=>[(object)['lang'=>'de'],(object)['lang'=>'en']]];
+            $categoryService->reads = [];
+            $fallback = $extension->getStorefrontLanguageRoutes('tpl.category.item', null, null, null);
+            check(array_keys($fallback) === $categoryService->languages, 'Current category translation availability');
+            check($categoryService->reads === [[111,'fr'],[111,'it'],[111,'es']], 'Only missing category details need a lookup');
+            check($fallback === array_intersect_key($result['category'],array_flip($categoryService->languages)), 'Current category changes language URLs');
             $templateService->template = 'tpl.contact';
             $categoryService->languages = ['de','en','fr','it'];
             $html = $twig->render('head',$ctx);
@@ -1565,6 +1574,7 @@ namespace {
             $request->rawUri = $uriBefore;
             $services[IO\Services\UrlService::class] = $urls;
             $templateService->template = $templateBefore;
+            $categoryService->route = $previousCategory;
             $categoryService->languages = $codes;
             IO\Helper\RouteConfig::$links = IO\Helper\RouteConfig::$disabled = [];
         }

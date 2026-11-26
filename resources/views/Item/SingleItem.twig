@@ -386,6 +386,7 @@
                 {% if variationsWithAttributes[0].attributes  | length > 0 %}
                  {% if itemData.item.flagTwo!=3 %}   
                     {% set salableByVariation = getVariationSalabilityMap(variationsWithAttributes|map(v => v.variationId)) %}
+                    {% set salableAttributeValues = getSalableAttributeValues(variationsWithAttributes, salableByVariation) %}
                 {% endif %}
                               {% for property in item.documents[0].data.properties %}
                                 {% if property.property.id in [110, 73] %}
@@ -425,29 +426,8 @@
                             {% endif %}
                              <ul data-eg-attributes="{{ itemAttribute.attributeId }}"  class="list-no-style clearfix">
                             {% for itemAttributeValue in itemAttribute.values %}
-                                {% set itemSelected = "" %}
-                                {% set isMainItem = true %}
-                                {% set hasValidVariations = false %}
-                                {% set activeVariationId = 0 %}
-                                {% set variationAvailbilityId = 0 %}
                                 {% if item.data.item.flagTwo!=3 %}
-                                {% set mergedAttr = {} %}
-                                {% set mergedAttr = mergedAttr|merge({("attributeId"):itemAttribute.attributeId}) %}
-                                {% set mergedAttr = mergedAttr|merge({("attributeValueId"):itemAttributeValue.attributeValueId}) %}
-                                
-                                {% set mergedAttrArray = [] %}
-                                {% set mergedAttrArray = mergedAttrArray|merge([mergedAttr]) %}
-                                {% set attrIsSalable = false %}
-                                {% for varitionData in variationsWithAttributes %}
-                                        {% for varAttr in varitionData.attributes %}
-                                            {% if varAttr.attributeId == itemAttribute.attributeId and varAttr.attributeValueId == itemAttributeValue.attributeValueId %}
-                                              {% if salableByVariation[varitionData.variationId] %}
-                                                {% set attrIsSalable = true %}
-                                              {% endif %}
-                                            {% endif %}
-                                        {% endfor %}
-                                {% endfor %}
-                                
+                                    {% set attrIsSalable = salableAttributeValues[itemAttribute.attributeId|int][itemAttributeValue.attributeValueId|int] ?? false %}
                                 {% endif %}
                                 {% if itemData.item.flagTwo!=3 %}
                                 <li {% if attrIsSalable != false %}{% if linkedValue and itemAttributeValue.attributeValueId == linkedValue.attributeValueId %}data-selected {% endif %}data-eg-value="{{ itemAttributeValue.attributeValueId }}" data-eg-attrname="{{ itemAttributeValue.name  }}"{% else %}class="nosalable"{% endif %} data-eg-issalable="{{ attrIsSalable | json_encode() }}">

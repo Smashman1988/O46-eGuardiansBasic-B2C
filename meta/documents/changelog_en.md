@@ -2,6 +2,9 @@
 
 ## Unreleased · B2C develop
 
+- Product pages and quickview determine available sizes and colours in one pass over the variations. Each attribute image preview loads shared images once. Language switching reuses translation details already loaded for the current category.
+- The basket preview uses the same currency data for all line items and totals.
+
 - The page head resolves the theme asset path once for fonts, icons and stylesheets. The build removes duplicate critical CSS declarations for each page type. Historical asset copies and unused theme files have been removed.
 
 - Size and colour selectors fetch saleability data for multiple variations together. Missing or ambiguous records use the original IO check.

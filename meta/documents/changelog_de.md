@@ -2,6 +2,9 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Produktdetailseite und Schnellansicht ermitteln verfügbare Größen und Farben in einem Durchlauf über die Varianten. Die Attributbild-Vorschau lädt gemeinsam verwendete Bilder je Aufruf einmal. Der Sprachwechsel verwendet vorhandene Übersetzungsdetails der aktuellen Kategorie.
+- Die Warenkorbvorschau verwendet denselben Währungsdatensatz für alle Positionen und Summen.
+
 - Der Seitenkopf löst den Pluginpfad für Schriften, Icons und Stylesheets einmal auf. Der Build entfernt doppelte Deklarationen aus dem Critical CSS jeder Seitenart. Historische Asset-Kopien und ungenutzte Theme-Dateien wurden entfernt.
 
 - Die Größen- und Farbauswahl liest die Verkaufbarkeitsdaten mehrerer Varianten gemeinsam. Bei fehlenden oder mehrdeutigen Datensätzen verwendet sie die IO-Einzelprüfung.
