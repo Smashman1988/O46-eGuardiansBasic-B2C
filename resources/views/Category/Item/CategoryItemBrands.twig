@@ -26,31 +26,27 @@
                     {% set renderedBrands = 0 %}
                     {% for firstSign, brands in groups %}
                         <div class="col-12"><hr><p class="firstletter" id="{{ firstSign == '0–9' ? 'end' : firstSign }}">{{ firstSign|upper }}</p><hr></div>
-                        {% for child in brands %}
-                                {% set renderedBrands = renderedBrands + 1 %}
-            <div class="mb-3 col-12 col-sm-6 col-lg-4 col-xl-3">
-                <a href="{{ currentScopeUrl }}/{{ child.details[0].nameUrl }}{{ urls.trailingSlashSuffix }}{% if currencycheck != "EUR" %}?currency={{ currencycheck }}{% endif %}" title="{{ child.details[0].metaTitle }}" class="d-flex bg-light border rounded">
-                    <picture class="xy-150 rounded">
-                        {% if child.details[0].image2Path is not empty %}
-                            {% if renderedBrands <= 4 %}
-                            <img src="/documents/{{ child.details[0].image2Path }}" alt="{{ child.details[0].name }}" title="{{ child.details[0].name }}" class="position-relative rounded">
-                            {% else %}
-                            <img src="" alt="{{ child.details[0].name }}" title="{{ child.details[0].name }}" data-src="/documents/{{ child.details[0].image2Path }}" class="lozad position-relative rounded">
-                             <noscript>
-                            <img src="/documents/{{ child.details[0].image2Path }}" alt="{{ child.details[0].name }}" title="{{ child.details[0].name }}">
-                             </noscript>
-                            {% endif %}
-                            </picture>
-                        {% else %}
-                         <img src="{{ plugin_path('GuardiansBasic') }}/images/no-logo-platzhalter.png" alt="{{ child.details[0].name }}" class="position-relative rounded"></picture>
-                         {% endif %}
-                        <span class="align-self-center flex-grow-1 text-center">{{ child.details[0].name }} ({{ child.itemCount[0].count }})</span></a>
-            </div>
-                        {% endfor %}
+                        {%- for child in brands -%}
+                            {%- set renderedBrands = renderedBrands + 1 -%}
+                            {%- set brand = child.details[0] -%}
+                            <div class="mb-3 col-12 col-sm-6 col-lg-4 col-xl-3">
+                                <a href="{{ currentScopeUrl }}/{{ brand.nameUrl }}{{ urls.trailingSlashSuffix }}{% if currencycheck != "EUR" %}?currency={{ currencycheck }}{% endif %}" title="{{ brand.metaTitle }}" class="d-flex bg-light border rounded">
+                                    <picture class="xy-150 rounded">
+                                        {%- if brand.image2Path is empty -%}
+                                            <img src="{{ plugin_path('GuardiansBasic') }}/images/no-logo-platzhalter.png" alt="{{ brand.name }}" class="position-relative rounded">
+                                        {%- elseif renderedBrands <= 4 -%}
+                                            <img src="/documents/{{ brand.image2Path }}" alt="{{ brand.name }}" title="{{ brand.name }}" class="position-relative rounded">
+                                        {%- else -%}
+                                            <img src="" alt="{{ brand.name }}" title="{{ brand.name }}" data-src="/documents/{{ brand.image2Path }}" class="lozad position-relative rounded"><noscript><img src="/documents/{{ brand.image2Path }}" alt="{{ brand.name }}" title="{{ brand.name }}"></noscript>
+                                        {%- endif -%}
+                                    </picture>
+                                    <span class="align-self-center flex-grow-1 text-center">{{ brand.name }} ({{ child.itemCount[0].count }})</span></a>
+                            </div>
+                        {%- endfor -%}
                     {% endfor %}
         </div>
     </div>
-</div> 
-                </div> 
-                </div> 
-                </div> 
+</div>
+                </div>
+                </div>
+                </div>

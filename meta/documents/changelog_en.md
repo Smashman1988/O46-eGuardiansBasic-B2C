@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- The header reads the basket quantity from IO on cacheable pages. The brand directory reads each tile's details once and sends less HTML.
+
 - Variant selection reuses an index per product data set. Infinite scroll registers images on newly appended cards. Late variant responses can no longer overwrite the current selection or its buy button.
 
 - Product lists retain only the first size attribute group needed by the card. Quickview skips basket, wishlist and canonical lookups used by the full product page.

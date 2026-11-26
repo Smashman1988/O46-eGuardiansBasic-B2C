@@ -13,7 +13,9 @@
 {% else %}
   {% import "GuardiansBasic::Category.Macros.CategoryTree.twig" as Tree %}
 {% endif %}
-{% set basketItems = pdpBasketForHeader is defined ? pdpBasketForHeader : services.basket.getBasketForTemplate() %}
+{% set headerIsCacheable = services.template.shouldBeCached() %}
+{% set headerBasket = pdpBasketForHeader is defined ? pdpBasketForHeader
+    : (headerIsCacheable ? {'itemQuantity': services.basket.getBasketQuantity()} : services.basket.getBasketForTemplate()) %}
 {% set headerCurrency = services.checkout.getCurrencyData() %}
 {% set currencycheck = headerCurrency.name %}
 {% set currencyParam = currencycheck != "EUR" ? '?currency=' ~ currencycheck : '' %}
@@ -28,7 +30,7 @@
         </div>
 </div>
 {#{% endcacheblock %}#}
-<header class="main-header stickyhead" id="page-header" data-eg-basket-currency="{{ currencycheck }}"{% if not services.template.shouldBeCached() and basketItems.shippingCountryId is defined %} data-eg-basket-country="{{ basketItems.shippingCountryId }}"{% endif %}>
+<header class="main-header stickyhead" id="page-header" data-eg-basket-currency="{{ currencycheck }}"{% if not headerIsCacheable and headerBasket.shippingCountryId is defined %} data-eg-basket-country="{{ headerBasket.shippingCountryId }}"{% endif %}>
     <div class="eg-backdrop eg-backdrop-basket-prev transition" data-eg-handler="closeBackdrop" data-eg-event="click touchend"></div>
     <div class="header-wrap">
         <div class="container">
@@ -83,7 +85,7 @@
                       {% if category.id in vuejs %}
                        <div class="btn-unstyled btn-mobile-nav">
                            <a href="{{ basketUrl }}{{ currencyParam }}" class="text-black">
-						   {% if basketItems.itemQuantity < 10 %}
+						   {% if headerBasket.itemQuantity < 10 %}
 						   <span data-eg-basket-quantity class="header-quant-info"></span>
 						   {% else %}
 						   <span data-eg-basket-quantity class="header-quant-info2"></span>
@@ -95,7 +97,7 @@
                        {% else %} 
                         <div data-eg-handler="initBasketPreview" data-eg-event="" class="btn-unstyled btn-mobile-nav">
                            <a href="{{ basketUrl }}{{ currencyParam }}" class="text-black">
-						   {% if basketItems.itemQuantity < 10 %}
+						   {% if headerBasket.itemQuantity < 10 %}
 						   <span data-eg-basket-quantity class="header-quant-info">0</span>
 						   {% else %}
 						   <span data-eg-basket-quantity class="header-quant-info2">0</span>
