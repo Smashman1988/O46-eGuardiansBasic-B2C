@@ -6,8 +6,8 @@
       "sha256": "9bf47285af9957edb26e66b14901b94533d2d42acb2522d0df4af3c91aaecaee"
     },
     "css/main.min.css": {
-      "version": 5,
-      "sha256": "243d15a6d8031185411ad034f529404456b7369ae51749328365f46f8b3dc4ac"
+      "version": 6,
+      "sha256": "648f9184283eae498c2a4d2926fb40001fd6517a458419218adb17c60888ccdd"
     },
     "js/cat.min.js": {
       "version": 3,
@@ -18,8 +18,8 @@
       "sha256": "2a7fda152ae43fbfd041b6847ffc5fd3e78271d97fd3c91e1c76071e79248932"
     },
     "js/facets.min.js": {
-      "version": 1,
-      "sha256": "838495844a40d52b99cc50f1e7ef69be19dcaa27a5d3ec4591c0bc8b462cd2f3"
+      "version": 2,
+      "sha256": "a25b058952485c5418363c8177df35314c3b206028ad5429dafd5f4ec0a684cf"
     },
     "js/item.min.js": {
       "version": 3,

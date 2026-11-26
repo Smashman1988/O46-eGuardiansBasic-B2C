@@ -85,7 +85,8 @@ $variants = [['variationId'=>101,'attributes'=>[['attributeId'=>9,'attributeValu
 $attributes = [['attributeId'=>9,'name'=>'Farbe','type'=>'text','values'=>[
     ['attributeValueId'=>1,'name'=>'Grün'], ['attributeValueId'=>2,'name'=>'Rot']]]];
 $result['selection'] = $twig->createTemplate(divSource($pdp,'<div data-item-variation class='))->render([
-    'linkedAttributes'=>[], 'attributes'=>$attributes, 'variationsWithAttributes'=>$variants, 'variationsWithAttributesWithFilter'=>$variants]);
+    'linkedAttributes'=>[], 'attributes'=>$attributes, 'variationsWithAttributes'=>$variants,
+    'salableByVariation'=>array_column($variants,'isSalable','variationId')]);
 $result['singleGallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>[$images[0]],'mainImg'=>$images[0],'galleryCount'=>1,'itemData'=>[]]);
 $homepage=$templates['GuardiansBasic::Homepage.Homepage'];
 $result['slider']=$twig->createTemplate(fragment($homepage,'<section class="section-slider-wrap">','<section class="section-banner-first">'))->render($context);

@@ -19,6 +19,7 @@ class GuardServices {
     public $wishListSnapshot = [], $wishListHit = false;
     public $singleVariation = false;
     public $blockedVariation = true;
+    function salabilityMap($ids) { return array_fill_keys($ids, !$this->blockedVariation); }
     public $linkedVariations;
     function __construct($lang,$request){$this->lang=$lang;$this->request=$request;}
     function feedbackList() {
@@ -139,6 +140,7 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     $twig->addFunction(new Twig\TwigFunction('getFeedbackItemList',[$svc,'feedbackList']));
     $twig->addFunction(new Twig\TwigFunction('getListFeedbackAverages',[$svc,'feedbackAverage']));
     $twig->addFunction(new Twig\TwigFunction('getItemPropertiesById',[$propertyExtension,'getItemPropertiesById']));
+    $twig->addFunction(new Twig\TwigFunction('getVariationSalabilityMap',[$svc,'salabilityMap']));
     foreach(['get_consent_scripts','get_json_data','get_filtered_tags','get_shop_builder_scripts','ssr_entry','csrf_token','prepareSeoContent'] as $name)$twig->addFunction(new Twig\TwigFunction($name,[$svc,'noop']));
     foreach(['filterTabs','filterFields','specialOffer'] as $name)$twig->addFilter(new Twig\TwigFilter($name,[$svc,'identity']));
     $twig->addFilter(new Twig\TwigFilter('orderByKey',[$svc,'sortImages']));

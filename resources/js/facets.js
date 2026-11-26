@@ -174,7 +174,9 @@
     }
     function init(root) {
         if (states.has(root)) return;
-        const data = JSON.parse(root.querySelector('[data-eg-facet-data]').textContent);
+        const dataElement = root.querySelector('[data-eg-facet-data]');
+        if (!dataElement || !dataElement.textContent.trim()) return;
+        const data = JSON.parse(dataElement.textContent);
         const state = {...data, selected: new Set(data.selected.map(String)), sequence: 0, timer: null, controller: null, dirty: false};
         states.set(root, state);
         // Capture prevents the old theme dropdown/handler bindings from running a second time.

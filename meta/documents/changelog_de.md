@@ -2,6 +2,9 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Die Größen- und Farbauswahl liest die Verkaufbarkeitsdaten mehrerer Varianten gemeinsam. Bei fehlenden oder mehrdeutigen Datensätzen verwendet sie die IO-Einzelprüfung.
+- Login und Newsletter-Anmeldung laden das Facettenmodul, sobald ein Filterwidget vorhanden ist. Der frühere Fußball-Berater wurde aus dem Theme entfernt.
+
 - Idealo überträgt Sonderzeichen in Positionsdaten korrekt und fragt identische Varianten je Bestellung einmal ab. Treffen derselbe Adtraction-Partner im Bestell- und URL-Referrer zusammen, lädt sein Skript einmal. Salenti erhält die bisherigen Adressfelder auch bei Anführungszeichen und Zeilenumbrüchen korrekt.
 
 - Startseite und Warenkorb verwenden ihre responsiven Spaltenbreiten bereits vor dem Laden des Hauptstylesheets.

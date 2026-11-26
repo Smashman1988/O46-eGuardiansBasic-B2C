@@ -385,15 +385,7 @@
                 {% set linkedSelectionComplete = false %}
                 {% if variationsWithAttributes[0].attributes  | length > 0 %}
                  {% if itemData.item.flagTwo!=3 %}   
-                    {% set variationsWithAttributesWithFilter = [] %}
-                    {% for variationWithAttribute in variationsWithAttributes %}
-                        {% set isSalable = true %}
-                        {% if services.item.getVariationIsSalable(variationWithAttribute.variationId) %}
-                            {% set isSalable = false %}
-                        {% endif %}
-                        {% set withFilterSalable = variationWithAttribute|merge({'isSalable':  isSalable}) %}
-                        {% set variationsWithAttributesWithFilter = variationsWithAttributesWithFilter|merge([withFilterSalable]) %}
-                    {% endfor %}
+                    {% set salableByVariation = getVariationSalabilityMap(variationsWithAttributes|map(v => v.variationId)) %}
                 {% endif %}
                               {% for property in item.documents[0].data.properties %}
                                 {% if property.property.id in [110, 73] %}
@@ -406,8 +398,8 @@
                               {% endfor %}
                 {# IO's explicit itemId_variationId route already renders the chosen variation. #}
                 {% if request.get('quickViewItem') is empty and (request.getRequestUri()|split('?')|first|trim('/')|split('/')|last) == (itemData.item.id ~ '_' ~ itemData.variation.id) %}
-                    {% for candidate in (itemData.item.flagTwo == 3 ? variationsWithAttributes : variationsWithAttributesWithFilter) %}
-                        {% if candidate.variationId == itemData.variation.id and (itemData.item.flagTwo == 3 or candidate.isSalable) %}
+                    {% for candidate in variationsWithAttributes %}
+                        {% if candidate.variationId == itemData.variation.id and (itemData.item.flagTwo == 3 or salableByVariation[candidate.variationId]) %}
                             {% set linkedAttributes = candidate.attributes %}
                         {% endif %}
                     {% endfor %}
@@ -446,10 +438,10 @@
                                 {% set mergedAttrArray = [] %}
                                 {% set mergedAttrArray = mergedAttrArray|merge([mergedAttr]) %}
                                 {% set attrIsSalable = false %}
-                                {% for varitionData in variationsWithAttributesWithFilter %}
+                                {% for varitionData in variationsWithAttributes %}
                                         {% for varAttr in varitionData.attributes %}
                                             {% if varAttr.attributeId == itemAttribute.attributeId and varAttr.attributeValueId == itemAttributeValue.attributeValueId %}
-                                              {% if varitionData.isSalable %}
+                                              {% if salableByVariation[varitionData.variationId] %}
                                                 {% set attrIsSalable = true %}
                                               {% endif %}
                                             {% endif %}

@@ -2,6 +2,9 @@
 
 ## Unreleased · B2C develop
 
+- Size and colour selectors fetch saleability data for multiple variations together. Missing or ambiguous records use the original IO check.
+- Login and newsletter sign-up pages load the facet module when a filter widget is present. The former football selector has been removed from the theme.
+
 - Idealo preserves special characters in order lines and looks up each variation once per order render. When the order and URL refer to the same Adtraction partner, its script loads once. Salenti receives the existing address fields intact, including quotes and line breaks.
 
 - The home page and basket use their responsive column widths before the main stylesheet loads.

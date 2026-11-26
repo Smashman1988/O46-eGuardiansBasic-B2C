@@ -11,7 +11,6 @@ use Plenty\Modules\Feedback\Contracts\FeedbackRepositoryContract;
 use Plenty\Modules\Feedback\Contracts\FeedbackAverageRepositoryContract;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\CategoryItems;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\Facets;
-use Plenty\Modules\Webshop\ItemSearch\SearchPresets\SearchItems;
 use Plenty\Modules\Webshop\ItemSearch\Services\ItemSearchService;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\CrossSellingItems;
 use IO\Helper\RouteConfig;
@@ -25,6 +24,18 @@ use Ceres\Helper\SearchOptions;
 use Plenty\Plugin\Templates\Twig;
 use Plenty\Modules\Webshop\ItemSearch\SearchPresets\VariationAttributeMap;
 use GuardiansBasic\Helper\SeoPage;
+use IO\Builder\Item\Fields\VariationBaseFields;
+use IO\Builder\Item\Fields\VariationRetailPriceFields;
+use IO\Builder\Item\Fields\VariationStockFields;
+use IO\Builder\Item\ItemColumnBuilder;
+use IO\Builder\Item\ItemFilterBuilder;
+use IO\Builder\Item\ItemParamsBuilder;
+use IO\Builder\Item\Params\ItemColumnsParams;
+use IO\Helper\Utils;
+use IO\Services\ItemService;
+use Plenty\Modules\Item\DataLayer\Contracts\ItemDataLayerRepositoryContract;
+use Plenty\Modules\Webshop\Contracts\ContactRepositoryContract;
+use Plenty\Plugin\Application;
 
 class Base_Extension extends Twig_Extension
 {
@@ -62,7 +73,6 @@ class Base_Extension extends Twig_Extension
             $this->factory->createSimpleFunction('getImageAttributeList', [$this, 'getImageAttributeList']),
             $this->factory->createSimpleFunction('getFeedbackItemList', [$this, 'getFeedbackItemList']),
             $this->factory->createSimpleFunction('getListFeedbackAverages', [$this, 'getListFeedbackAverages']),
-            $this->factory->createSimpleFunction('getFacetsFromCat', [$this, 'getFacetsFromCat']),
             $this->factory->createSimpleFunction('getFacetView', [$this, 'getFacetView']),
             $this->factory->createSimpleFunction('sortCatByKey', [$this, 'sortCatByKey']),
             $this->factory->createSimpleFunction('getCrossSeller', [$this, 'getCrossSeller']),
@@ -78,6 +88,7 @@ class Base_Extension extends Twig_Extension
             $this->factory->createSimpleFunction('getCardLinks', [$this, 'getCardLinks']),
             $this->factory->createSimpleFunction('getCardAttributeMaps', [$this, 'getCardAttributeMaps']),
             $this->factory->createSimpleFunction('getItemPropertiesById', [$this, 'getItemPropertiesById']),
+            $this->factory->createSimpleFunction('getVariationSalabilityMap', [$this, 'getVariationSalabilityMap']),
         ];
     }
 
@@ -244,6 +255,51 @@ class Base_Extension extends Twig_Extension
         return VariationAttributeMap::getSearchFactory(['itemId' => $itemId, 'afterKey' => null]);
     }
 
+    /** Use the same virtual rows, retail-price filter and customer context as IO's single-ID check. */
+    public function getVariationSalabilityMap(array $ids): array
+    {
+        $ids = array_values(array_unique($ids));
+        $salable = [];
+        if (count($ids) > 1) {
+            $columns = pluginApp(ItemColumnBuilder::class)
+                ->withVariationStock([VariationStockFields::STOCK_PHYSICAL])
+                ->withVariationBase([VariationBaseFields::ID, VariationBaseFields::LIMIT_ORDER_BY_STOCK_SELECT])
+                ->withVariationRetailPrice([VariationRetailPriceFields::BASE_PRICE])
+                ->build();
+            $filter = pluginApp(ItemFilterBuilder::class)->variationHasId($ids)->variationHasRetailPrice()->build();
+            $params = pluginApp(ItemParamsBuilder::class)
+                ->withParam(ItemColumnsParams::TYPE, 'virtual')
+                ->withParam(ItemColumnsParams::LANGUAGE, Utils::getLang())
+                ->withParam(ItemColumnsParams::PLENTY_ID, pluginApp(Application::class)->getPlentyId())
+                ->withParam(ItemColumnsParams::CUSTOMER_CLASS, pluginApp(ContactRepositoryContract::class)->getContactClassId())
+                ->build();
+            $records = pluginApp(ItemDataLayerRepositoryContract::class)->search($columns, $filter, $params);
+            $seen = [];
+            foreach ($records as $record) {
+                $id = $record['variationBase']['id'] ?? null;
+                if ($id === null) {
+                    continue;
+                }
+                // IO reads current() for a single ID. Delegate ambiguous or incomplete rows to it.
+                if (isset($seen[$id]) || !isset($record['variationBase']['limitOrderByStockSelect'], $record['variationStock']['stockPhysical'])) {
+                    unset($salable[$id]);
+                } else {
+                    $salable[$id] = !($record['variationBase']['limitOrderByStockSelect'] == 1 && $record['variationStock']['stockPhysical'] <= 0);
+                }
+                $seen[$id] = true;
+            }
+        }
+        $itemService = null;
+        foreach ($ids as $id) {
+            if (!isset($salable[$id])) {
+                // IO returns true for a blocked variation. Preserve the historical Twig inversion.
+                $itemService = $itemService ?? pluginApp(ItemService::class);
+                $salable[$id] = !$itemService->getVariationIsSalable($id);
+            }
+        }
+        return $salable;
+    }
+
     public function getCardAttributeMaps(array $itemIds): array
     {
         $mapsByItem = [];
@@ -404,27 +460,6 @@ class Base_Extension extends Twig_Extension
         }
         
         return $feedbacksReturn;
-    }
-    public function getFacetsFromCat($categoryId)
-    {
-        $itemListOptions = [
-            'page'          => 1,
-            'itemsPerPage'  => 0,
-            'sorting'       => '',
-            'facets'        => '',
-            'categoryId'    => 18,
-            'priceMin'      => '0',
-            'priceMax'      => '1000'
-        ];
-        $searchParams = [
-            'facets'   => Facets::getSearchFactory( $itemListOptions ),
-            'itemList' => $categoryId > 0 ? CategoryItems::getSearchFactory( $itemListOptions ) : SearchItems::getSearchFactory( $itemListOptions )
-        ];
-        /** @var ItemSearchService $itemSearchService */
-        $itemSearchService = pluginApp( ItemSearchService::class );
-        $response = $itemSearchService->getResults($searchParams);
-        
-        return $response;
     }
 
     /** Kept for stored Twig callers. Its result is always the current basket. */

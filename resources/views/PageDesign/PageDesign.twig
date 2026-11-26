@@ -527,7 +527,35 @@
 </div>    
             {# The brands directory explicitly renders no product grid or facets. #}
             {% if (category.id or isSearch) and not isItem and not isBasketPage and (rendersItemGrid is not defined or rendersItemGrid) %}
-                <script src="{{ plugin_path('GuardiansBasic') }}/js/facets.min.js?v=1" defer></script>
+                {% if currentTemplate == 'tpl.login' or (currentTemplate == 'tpl.category.content' and (currentPath in newsletterPaths
+                    or (bodyClasses is defined ? 'category-login' in bodyClasses : category.id == config('IO.routing.category_login')))) %}
+                <script data-facets-src="{{ plugin_path('GuardiansBasic') }}/js/facets.min.js?v=2">
+                    (function (src) {
+                        var loading = false;
+                        var marker = '[data-eg-compact-facets] [data-eg-facet-data]';
+                        function init() {
+                            if (window.egFacets) return window.egFacets.init();
+                            if (loading) return;
+                            loading = true;
+                            var script = document.createElement('script');
+                            script.src = src;
+                            script.onerror = function () { loading = false; };
+                            document.head.appendChild(script);
+                        }
+                        new MutationObserver(function (changes) {
+                            for (var change of changes) {
+                                if (change.target.matches && change.target.matches(marker)) return init();
+                                for (var node of change.addedNodes) {
+                                    if (node.nodeType === 1 && (node.matches(marker) || node.querySelector(marker))) return init();
+                                }
+                            }
+                        }).observe(document.body, {childList: true, subtree: true});
+                        if (document.querySelector(marker)) init();
+                    })(document.currentScript.dataset.facetsSrc);
+                </script>
+                {% else %}
+                <script src="{{ plugin_path('GuardiansBasic') }}/js/facets.min.js?v=2" defer></script>
+                {% endif %}
             {% endif %}
             {# Keep the existing page selection and Ceres-owned jQuery exception. #}
             {# Asset URLs are generated from asset-versions.json by npm run build. #}
