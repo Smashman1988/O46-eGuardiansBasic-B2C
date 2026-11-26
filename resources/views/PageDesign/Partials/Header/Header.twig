@@ -14,8 +14,8 @@
   {% import "GuardiansBasic::Category.Macros.CategoryTree.twig" as Tree %}
 {% endif %}
 {% set headerIsCacheable = services.template.shouldBeCached() %}
-{% set headerBasket = pdpBasketForHeader is defined ? pdpBasketForHeader
-    : (headerIsCacheable ? {'itemQuantity': services.basket.getBasketQuantity()} : services.basket.getBasketForTemplate()) %}
+{% set headerBasket = headerIsCacheable ? {'itemQuantity': 0}
+    : (pdpBasketForHeader is defined ? pdpBasketForHeader : services.basket.getBasketForTemplate()) %}
 {% set headerCurrency = services.checkout.getCurrencyData() %}
 {% set currencycheck = headerCurrency.name %}
 {% set currencyParam = currencycheck != "EUR" ? '?currency=' ~ currencycheck : '' %}
@@ -131,7 +131,7 @@
                             </button>
                         </div>                        
                         <ul class="top-menu" data-eg-event="click" data-eg-target="[data-eg-back-ddown]">
-                          {{ Tree.get_nav_bar(categories, "") }}
+                          {{ Tree.get_nav_bar(categories, "", currencycheck) }}
                         </ul>
                     </div>
                 </div>

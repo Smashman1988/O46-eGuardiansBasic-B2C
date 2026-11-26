@@ -3,9 +3,9 @@
     {{- url -}}{% if currency != "EUR" %}?currency={{ currency }}{% endif %}
 {% endmacro %}
 
-{% macro get_nav_bar(categories, currentScopeUrl) -%}
+{% macro get_nav_bar(categories, currentScopeUrl, currency = null) -%}
     {%- import "GuardiansBasic::Category.Macros.CategoryNavigation.twig" as Navigation -%}
-    {%- set currency = services.checkout.getCurrencyData.name -%}
+    {%- set currency = currency ?? services.checkout.getCurrencyData.name -%}
     {%- set labels = {back: 'Back', backAria: 'Back menu', showAllTitle: 'Show all'} -%}
     {%- set menu = [
         {id: 5618, url: '/en/All-Articles/', label: 'All articles', title: 'View all articles', separator: 'cat-name-i'},

@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- Cacheable headers use a neutral basket badge until the session updates it. Navigation, empty basket previews, recommendations and Italian/Spanish search suggestions avoid repeated data access.
+
 - The header reads the basket quantity from IO on cacheable pages. The brand directory reads each tile's details once and sends less HTML.
 
 - Variant selection reuses an index per product data set. Infinite scroll registers images on newly appended cards. Late variant responses can no longer overwrite the current selection or its buy button.

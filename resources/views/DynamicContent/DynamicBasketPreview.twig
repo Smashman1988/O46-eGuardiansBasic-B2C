@@ -1,15 +1,11 @@
 {% set basketItems = services.basket.getBasketItemsForTemplate() %}
+{% if basketItems | length > 0 %}
 {% set basketData = services.basket.getBasketForTemplate() %}
 {% set lieferland = basketData.shippingCountryId %}
-{% set isCheckout = false %}
-{% if services.template.getCurrentTemplate() == "tpl.login" or services.template.getCurrentTemplate() == "tpl.checkout" %}
-    {% set isCheckout = true %}
-{% endif %}
 {% set previewCurrency = services.checkout.getCurrencyData() %}
-{% if basketItems | length > 0 %}
     <div class="basket-prev-wrap">
         <div class="basket-preview-itemlist" data-eg-event="click" data-eg-target="[data-eg-deletefrombasket]">
-            {% set rabattSum = 0 %}
+            {% set insteadLabel = trans("GuardiansBasic::Template.statt") %}
             {% for basketItem in basketItems %}
                 <div class="basket-prev-item">
                     {% set basketItemData = basketItem.variation.data %}
@@ -30,7 +26,7 @@
                             {% endif %}
                             <div class="dsp-flex-f-14">
                             <div class="col-6 nopadding cat-rrp-price">
-                                <strong>{{ trans("GuardiansBasic::Template.statt") }} <span class="line-trough">{{ basketItem.variation.data.prices.rrp.unitPrice.formatted }}*</span></strong>
+                                <strong>{{ insteadLabel }} <span class="line-trough">{{ basketItem.variation.data.prices.rrp.unitPrice.formatted }}*</span></strong>
                             </div>
                             <div class="col-6 nopadding outlet-green font-18 font-w600">                                 
                                    <strong>{{ basketItem.price|number_format(2, ',','.') }} {{ previewCurrency.symbol }}</strong>
@@ -46,7 +42,6 @@
                 </div>
             {% endfor %}
         </div>
-        {% set stattsum = (rabattSum + basketData.itemSum ) %}
         <div class="basket-prev-bottom">
             <div class="basket-prev-results">
                 <div class="row bold m-t-1">

@@ -30,7 +30,7 @@ class SearchAutocompleteResource extends ItemSearchAutocompleteResource
 
         // pluginApp resolves compiled plugin classes in the active plugin set.
         $service = pluginApp(SearchAutocompleteService::class);
-        $result = $service->getResults($searchString, $searchTypes);
+        $result = $service->getEnglishIndexResults($searchString, $searchTypes);
         return $this->response->create($service->transformResult($result), ResponseCode::OK);
     }
 }

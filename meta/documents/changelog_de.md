@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Cachebare Header verwenden ein neutrales Warenkorbsymbol bis zur Aktualisierung in der Gast- oder Kundensitzung. Navigation, leere Warenkorbvorschau, Empfehlungen und IT-/ES-Suchvorschläge vermeiden wiederholte Datenzugriffe.
+
 - Der Header verwendet auf cachebaren Seiten die Warenkorbmenge aus IO. Die Markenübersicht liest je Kachel die Markendetails einmal und liefert weniger HTML aus.
 
 - Die Variantenauswahl verwendet einen Index je Artikeldatensatz. Infinite Scroll registriert beim Nachladen nur die Bilder der neu hinzugefügten Karten. Verspätete Variantenantworten können die aktuelle Auswahl und deren Kaufbutton nicht mehr überschreiben.

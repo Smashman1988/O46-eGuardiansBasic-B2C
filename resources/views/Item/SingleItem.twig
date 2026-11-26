@@ -555,23 +555,16 @@
             {% set allCrossSimiliar = services.itemList.getItemList("category", currentcatId, "variation.position_desc", 5).documents %}
 
             {% set crossSimiliar = [] %}
-            {% set count = 0 %}
-
             {% for cross in allCrossSimiliar %}
-                {% if cross.data.item.id is defined and cross.data.item.id != currentItemId %}
+                {% if crossSimiliar|length < 4 and cross.data.item.id is defined and cross.data.item.id != currentItemId %}
                     {% set crossSimiliar = crossSimiliar | merge([cross]) %}
-                    {% set count = count + 1 %}
-                {% endif %}
-                {% if count >= 4 %}
                 {% endif %}
             {% endfor %}
 
-            {% set crossSimiliar = crossSimiliar | slice(0, 4) %}
             {% if crossSimiliar|length > 0 %}
                 <div class="home-slider-title col-12">
-                    {% set catURL = services.url.getCategoryURL(currentcatId).toAbsoluteUrl(false) %}
-                    {% set catURLint = services.url.getCategoryURL(currentcatId).toAbsoluteUrl(true) %}
-                    <a href="{{ lang == 'de' ? catURL : catURLint }}?sorting=item.feedbackDecimal_desc">
+                    {% set catURL = services.url.getCategoryURL(currentcatId).toAbsoluteUrl(lang != 'de') %}
+                    <a href="{{ catURL }}?sorting=item.feedbackDecimal_desc">
                         <span>{{ trans("GuardiansBasic::Template.moreinterestingarticles") }}</span>
                     </a>
                 </div>

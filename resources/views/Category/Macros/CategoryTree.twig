@@ -1,11 +1,9 @@
-{% macro get_children(category, currentScopeUrl, level) %}
+{% macro get_children(category, currentScopeUrl, level, categoryBreadcrumbs = null, lang = null) %}
     {# set megaMenuLevels = not config('Ceres.header.megamenu_levels') ? 1 : config('Ceres.header.megamenu_levels') #}
-    {% set categoryBreadcrumbs = services.category.getHierarchy() %}
-    {% set megaMenuLevels = 6 %}
-    {% set maxitems = { "1": config('Ceres.header.megamenu_items_stage_1'), "2": config('Ceres.header.megamenu_items_stage_2') ,"3": config('Ceres.header.megamenu_items_stage_3')} %}
+    {% set categoryBreadcrumbs = categoryBreadcrumbs ?? services.category.getHierarchy() %}
     {% import _self as childlist %}
     {% set counter = 0 %}
-    {% set lang = services.localizationRepository.getLanguage() %}
+    {% set lang = lang ?? services.localizationRepository.getLanguage() %}
     {# if level < megaMenuLevels #}
     <ul class="{% if level == 2 %}cccount{% endif %} scrollable-nav cat-{{ category.id }}">
         {% for child in category.children %}
@@ -35,7 +33,7 @@
                                     <ul>
                             {% endif %}
 
-                                {{ childlist.get_children(child, newScope, level + 1) }}
+                                {{ childlist.get_children(child, newScope, level + 1, categoryBreadcrumbs, lang) }}
                             {% if level == 1 %}
                                     </ul>
 
@@ -57,6 +55,7 @@
     {% import _self as navbar %}
     {% set counter = 0 %}
     {% set megaMenuLevels = 6 %}
+    {% set childLanguage = null %}
     {# set catIcons = [26:"",] #}
     {% for category in categories %}
 
@@ -96,13 +95,13 @@
                                         {% endfor %}
                                         </ul>
                                     {% else %}
-                                        {{ navbar.get_children(category, currentScopeUrl, 2) }}
+                                        {% set childLanguage = childLanguage ?? services.localizationRepository.getLanguage() %}
+                                        {{ navbar.get_children(category, currentScopeUrl, 2, categoryBreadcrumbs, childLanguage) }}
                                     {% endif %}
                                 </div>
                                 {% if category.id!=41 %}
                                 <div class="{% if category.id==41 %}col-12{% else %}col-lg-4{% endif %}">
                                     <div class="nav-img">
-                                            {% set catDetails = services.category.get(category.id) %}
                                             {% if category.details[0].image2Path is not empty %}
                                                 <img data-src="/documents/{{ category.details[0].image2Path }}" class="img-fluid lozad" alt="{{ category.details[0].name }}" />
                                             {% endif %}

@@ -34,16 +34,22 @@ foreach ([0,9,9.5,10,25] as $quantity) foreach ([false,true] as $cacheable) fore
     $context = ['lang'=>$lang,'vuejs'=>[],'services'=>array_fill_keys(['basket','category','checkout','template','localizationRepository'], $fixture)];
     if ($snapshot) $context['pdpBasketForHeader'] = ['itemQuantity'=>$quantity,'shippingCountryId'=>23];
     $html = $twig->render('header',$context);
-    $expected = $snapshot ? [] : [$cacheable ? 'quantity' : 'basket'];
+    $expected = $snapshot || $cacheable ? [] : ['basket'];
     if ($fixture->calls !== $expected) throw new RuntimeException('Unexpected header basket read');
     $country = strpos($html,' data-eg-basket-country=') !== false;
     if ($country === $cacheable || ($country && strpos($html,' data-eg-basket-country="'.($snapshot ? 23 : 17).'"') === false)) {
         throw new RuntimeException('Incorrect shipping-country visibility or source');
     }
-    if (strpos($html,'data-eg-basket-quantity class="header-quant-info'.($quantity < 10 ? '' : '2').'"') === false) {
+    if (strpos($html,'data-eg-basket-quantity class="header-quant-info'.($cacheable || $quantity < 10 ? '' : '2').'"') === false) {
         throw new RuntimeException('Incorrect quantity badge');
     }
-    if (isset($argv[2]) && $html !== $twig->render('before',$context)) throw new RuntimeException('Header bytes changed');
+    if (isset($argv[2])) {
+        $old = $twig->render('before', $context);
+        if ($cacheable && $quantity >= 10) {
+            $old = str_replace('data-eg-basket-quantity class="header-quant-info2"', 'data-eg-basket-quantity class="header-quant-info"', $old);
+        }
+        if ($html !== $old) throw new RuntimeException('Unexpected header difference');
+    }
     $cases++;
 }
 echo $cases.' header basket contexts passed with Twig '.Twig\Environment::VERSION.PHP_EOL;

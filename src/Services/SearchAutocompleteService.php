@@ -13,6 +13,11 @@ class SearchAutocompleteService extends ItemSearchAutocompleteService
         if (!EnglishTextSearch::applies()) {
             return parent::getResults($searchString, $searchTypes);
         }
+        return $this->getEnglishIndexResults($searchString, $searchTypes);
+    }
+
+    public function getEnglishIndexResults($searchString, $searchTypes)
+    {
         $config = pluginApp(WebstoreConfigurationRepositoryContract::class)->getWebstoreConfiguration();
         $options = SearchOptions::validateItemListOptions([
             'query' => $searchString,
