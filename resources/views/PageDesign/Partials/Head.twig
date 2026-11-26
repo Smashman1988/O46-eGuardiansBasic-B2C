@@ -100,6 +100,12 @@
 @media(max-width:767.98px){:where(#page-body>.container-max>.row)>.col{padding-right:5px;padding-left:5px}}
 </style>
 {% endif %}
+{% if currentPath is defined and currentPath in newsletterPaths|default([]) %}
+{# The newsletter text widgets have this padding in checkout.css. Leave configured widget spacing to ShopBuilder. #}
+<style data-eg-newsletter-layout-critical>
+:where(#page-body .widget-text) > [class="widget-inner bg-appearance"] { padding: 1rem 1.5rem; }
+</style>
+{% endif %}
 {% if isBasketPage %}
 {# The basket widget's 7/5 columns are 6/6 on tablets and stacked on phones. #}
 <style data-eg-basket-layout-critical>

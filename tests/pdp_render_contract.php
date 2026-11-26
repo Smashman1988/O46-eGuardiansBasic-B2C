@@ -159,6 +159,9 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
         $ctx['item']['documents'][0]['data']['stock']['net'] = $lang === 'de' ? 2 : 7;
     }
     $html=$twig->render('SingleItem',$ctx);
+    if ($value !== null && array_intersect(['getBasketForTemplate', 'isItemInWishList', 'getCanonicalURL'], $svc->calls)) {
+        throw new RuntimeException('Quickview loaded full-page basket, wishlist or canonical data');
+    }
     assertPriceUi($html,$value===null,54,60,'');
     $dom=new DOMDocument(); $dom->loadHTML($html,LIBXML_NOERROR|LIBXML_NOWARNING); $xp=new DOMXPath($dom);
     if ($svc->singleVariation) {

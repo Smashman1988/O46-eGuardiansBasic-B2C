@@ -2,6 +2,9 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Produktlisten halten für Größenanzeigen nur die erste benötigte Attributgruppe im Speicher. Die Schnellansicht überspringt die Warenkorb-, Merklisten- und Canonical-Abfragen der vollständigen Produktseite.
+- Auf der Newsletter-Anmeldeseite erhalten die Textwidgets ihren Standard-Innenabstand bereits vor dem Laden des Hauptstylesheets.
+
 - Produktdetailseite und Schnellansicht ermitteln verfügbare Größen und Farben in einem Durchlauf über die Varianten. Die Attributbild-Vorschau lädt gemeinsam verwendete Bilder je Aufruf einmal. Der Sprachwechsel verwendet vorhandene Übersetzungsdetails der aktuellen Kategorie.
 - Die Warenkorbvorschau verwendet denselben Währungsdatensatz für alle Positionen und Summen.
 

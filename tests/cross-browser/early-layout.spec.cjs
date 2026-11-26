@@ -6,6 +6,29 @@ const path = require('node:path');
 const head = fs.readFileSync(path.join(__dirname,'../../resources/views/PageDesign/Partials/Head.twig'),'utf8');
 const branches = [...head.matchAll(/<style>([\s\S]*?)<\/style>/g)].slice(0,3).map(match=>match[1]);
 
+test('Newsletter-Textwidgets behalten ihren Innenabstand beim Laden des Stylesheets', async ({page}) => {
+    const rule = head.match(/<style data-eg-newsletter-layout-critical>([\s\S]*?)<\/style>/);
+    expect(rule).toBeTruthy();
+    const checkout = fs.readFileSync(path.join(__dirname, '../../resources/css/checkout.min.css'), 'utf8');
+    const main = fs.readFileSync(path.join(__dirname, '../../resources/css/main.min.css'), 'utf8');
+    await page.route('**/*', route => route.abort());
+    await page.setContent('<main id="page-body"><div class="widget widget-text">' +
+        '<div class="widget-inner bg-appearance">Newsletter</div>' +
+        '<div class="widget-inner bg-appearance pt-0">Individueller Abstand</div></div></main>');
+    const widgets = page.locator('.widget-inner');
+    await page.addStyleTag({content:rule[1]});
+    const padding = locator => locator.evaluate(el => getComputedStyle(el).padding);
+    const earlyPadding = await padding(widgets.first());
+    expect(earlyPadding).toBe('16px 24px');
+    expect(await padding(widgets.last())).toBe('0px');
+    await page.addStyleTag({content:checkout});
+    await page.addStyleTag({content:main});
+    // Bootstrap can change the root font size. The rem-based declaration must match the final spacing.
+    const rem = await page.locator('html').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+    expect(await padding(widgets.first())).toBe(rem + 'px ' + (rem * 1.5) + 'px');
+    expect(await widgets.last().evaluate(el => getComputedStyle(el).paddingTop)).toBe('0px');
+});
+
 test('Startseite und Warenkorb behalten ihre frühen responsiven Spaltenbreiten', async ({page}) => {
     const critical = [...head.matchAll(/<style data-eg-(?:home|basket)-layout-critical>([\s\S]*?)<\/style>/g)];
     expect(critical).toHaveLength(2);

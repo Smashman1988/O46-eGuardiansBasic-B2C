@@ -2,6 +2,8 @@
 
 ## Versionierung und Baseline
 
+Der [Optimierungstransfer zwischen B2C und B2B](docs/B2B-OPTIMIZATION-TRANSFER.md) dokumentiert je Paket die Messwerte, die getrennten Teststände und offene Übertragungen.
+
 Vorbereitet am 2026-10-30: **GuardiansBasic B2C – Baseline 1.0.7**.
 Die Plugin-Version ist `1.0.7`; für die spätere Veröffentlichung ist `v1.0.7`
 vorgesehen. Die Abnahme im PlentyONE-Test-Pluginset steht noch aus.

@@ -82,8 +82,9 @@ foreach (['CHF'=>'?ref=x%2By&currency=CHF','EUR'=>'?ref=x%2By'] as $currency=>$q
     check($links===['product'=>'/art/'.$query.'#sizes','quickview'=>'/art/'.$query.'&quickViewItem=true#sizes'],'B2C card URLs for '.$currency);
 }
 $twig->addFunction(new \Twig\TwigFunction('getCardLinks',[$ext,'getCardLinks']));
-$twig->addFunction(new \Twig\TwigFunction('getCardAttributeMaps', callback(function ($ids) use ($ext,&$batch) {
-    return $batch ? $ext->getCardAttributeMaps($ids) : [];
+$twig->addFunction(new \Twig\TwigFunction('getCardAttributeMaps', callback(function ($ids, $firstBoxOnly = false) use ($ext,&$batch) {
+    check($firstBoxOnly, 'Theme list must request the card projection');
+    return $batch ? $ext->getCardAttributeMaps($ids, $firstBoxOnly) : [];
 })));
 $twig->addFilter(new \Twig\TwigFilter('itemURL', callback(function ($data) { return '/product/'.($data['variation']['itemId'] ?? ''); })));
 $twig->addFilter(new \Twig\TwigFilter('itemName', callback(function ($data) { return 'Product '.($data['variation']['itemId'] ?? ''); })));
@@ -93,7 +94,7 @@ $twig->addFilter(new \Twig\TwigFilter('orderByKey', callback(function ($rows,$ke
 $report = [];
 foreach (['category','content','simple'] as $template) {
     foreach ([1,2] as $page) {
-        foreach ([0,1,12,24,48,50,100,'duplicates'] as $n) {
+        foreach ([0,1,6,12,24,48,50,60,66,100,'duplicates'] as $n) {
             $ids = $n === 'duplicates' ? [100,101,102,100] : ($n ? range(100,99+$n) : []);
             $items = [];
             foreach ($ids as $id) {
@@ -249,6 +250,24 @@ foreach (['Homepage/Homepage'=>['12',15], 'StaticPages/Topseller'=>['8',50],
 $service->omit = true;
 try { $ext->getCardAttributeMaps([100]); throw new \RuntimeException('Missing map silently accepted'); }
 catch (\UnexpectedValueException $expected) { check(strpos($expected->getMessage(),'100') !== false,'Wrong missing key'); }
+$service = new class {
+    public $attributes;
+    public function getResults($factories) { return ['item100'=>['attributes'=>$this->attributes]]; }
+};
+$emptyBox = ['type'=>'box', 'values'=>[]];
+$otherBox = ['type'=>'box', 'values'=>[['position'=>2, 'name'=>'L']]];
+$image = ['type'=>'image', 'values'=>[['position'=>1, 'name'=>'blue']]];
+$object = (object)$otherBox;
+foreach ([
+    [[$image,$emptyBox,$otherBox], [$emptyBox]],
+    [[$image,$otherBox,$emptyBox], [$otherBox]],
+    [[$image], []],
+    [[$object,$otherBox], [$object,$otherBox]],
+] as [$full,$expected]) {
+    $service->attributes = $full;
+    check($ext->getCardAttributeMaps([100])[100]['attributes'] === $full, 'Full map contract changed');
+    check($ext->getCardAttributeMaps([100], true)[100]['attributes'] === $expected, 'Wrong first box or fallback');
+}
 file_put_contents($argv[2],json_encode(['renders'=>$report,'recommendations'=>$recommendations,'tagLists'=>$tagLists,'contextIsolation'=>true,'missingResult'=>true],JSON_PRETTY_PRINT));
 echo count($report)." list, ".count($recommendations)." recommendation and ".count($tagLists)." tag-list matching renders, language isolation and missing-result check passed.\n";
 }

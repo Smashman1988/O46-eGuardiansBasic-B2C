@@ -326,7 +326,7 @@ class Base_Extension extends Twig_Extension
         return $values;
     }
 
-    public function getCardAttributeMaps(array $itemIds): array
+    public function getCardAttributeMaps(array $itemIds, bool $firstBoxOnly = false): array
     {
         $mapsByItem = [];
         // Attribute maps can include documents and images. Keep only the attributes
@@ -342,11 +342,29 @@ class Base_Extension extends Twig_Extension
                 if (!isset($results[$key])) {
                     throw pluginApp(\UnexpectedValueException::class, ['message' => 'Missing card attribute result for ' . $id]);
                 }
-                $mapsByItem[$id] = ['attributes' => $results[$key]['attributes'] ?? []];
+                $attributes = $results[$key]['attributes'] ?? [];
+                if ($firstBoxOnly && is_array($attributes)) {
+                    $attributes = $this->firstCardBox($attributes);
+                }
+                $mapsByItem[$id] = ['attributes' => $attributes];
             }
             unset($results);
         }
         return $mapsByItem;
+    }
+
+    private function firstCardBox(array $attributes): array
+    {
+        foreach ($attributes as $attribute) {
+            // Let the template resolve object-backed platform values as before.
+            if (!is_array($attribute) || (isset($attribute['type']) && !is_string($attribute['type']))) {
+                return $attributes;
+            }
+            if (($attribute['type'] ?? null) === 'box') {
+                return [$attribute];
+            }
+        }
+        return [];
     }
     public function getBrandGroups($children): array
     {

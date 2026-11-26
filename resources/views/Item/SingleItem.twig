@@ -64,21 +64,23 @@
 {% set galleryCount = sortedItemImages|length %}
 
 {# === Services & Daten === #}
-{% set detailurl = services.url.getCanonicalURL() %}
 {% set variationsWithAttributes = services.item.getVariationAttributeMap(itemId) %}
+{% set lang = services.localizationRepository.getLanguage() %}
+{% if not pdpQuickview %}
+{% set detailurl = services.url.getCanonicalURL() %}
 {% set basketItems = services.basket.getBasketForTemplate() %}
 {% set pdpBasketForHeader = basketItems %}
-{% if request.get('quickViewItem') is empty %}{% set crossSellingList = services.item.getItemCrossSellingList(itemId) %}{% endif %}
+{% set crossSellingList = services.item.getItemCrossSellingList(itemId) %}
 {% set enabledRoutes = config("IO.routing.enabled_routes") | split(', ') %}
-{% set lang = services.localizationRepository.getLanguage() %}
-{% if request.get('quickViewItem') is empty %}{% set itemAttributes = services.item.getAttributeNameMap(itemId) %}{% endif %}
+{% set itemAttributes = services.item.getAttributeNameMap(itemId) %}
 {# IO includes this customer's variation IDs in the basket prepared above. #}
 {% set isInWishList = variationId matches '/^[1-9][0-9]*$/D' and basketItems.itemWishListIds is defined and basketItems.itemWishListIds is iterable
     ? variationId in basketItems.itemWishListIds
     : services.wishList.isItemInWishList(variationId) %}
 {% set savedWishIds = basketItems.itemWishListIds is iterable ? basketItems.itemWishListIds : (isInWishList ? [variationId] : []) %}
-{% if not pdpQuickview and not isInWishList and savedWishIds %}
+{% if not isInWishList and savedWishIds %}
     {% set isInWishList = variationsWithAttributes|filter(v => v.variationId in savedWishIds)|length > 0 %}
+{% endif %}
 {% endif %}
 {% set itemPrices = itemData.prices %}
 {% set unitPriceValue = itemPrices.default.unitPrice.value ?? itemPrices.default.data.unitPrice ?? '' %}
@@ -575,7 +577,7 @@
                 </div>
                 <div class="col-12">
                     <div class="category-product-list row disp-flexi">
-                        {% set crossAttributeMapsByItem = getCardAttributeMaps(crossSimiliar|map(item => item.data.variation.itemId)) %}
+                        {% set crossAttributeMapsByItem = getCardAttributeMaps(crossSimiliar|map(item => item.data.variation.itemId), true) %}
                         {% for itemCross in crossSimiliar %}
                             <div class="col-6 col-sm-6 col-md-6 col-lg-6 col-xl-6 col-xlg-3 col-xxlg-3">
                                 {% include "GuardiansBasic::Category.Item.Partials.CategoryListItem" with {

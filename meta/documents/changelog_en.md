@@ -2,6 +2,9 @@
 
 ## Unreleased · B2C develop
 
+- Product lists retain only the first size attribute group needed by the card. Quickview skips basket, wishlist and canonical lookups used by the full product page.
+- Newsletter signup text widgets receive their default padding before the main stylesheet loads.
+
 - Product pages and quickview determine available sizes and colours in one pass over the variations. Each attribute image preview loads shared images once. Language switching reuses translation details already loaded for the current category.
 - The basket preview uses the same currency data for all line items and totals.
 
