@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Der Seitenkopf löst den Pluginpfad für Schriften, Icons und Stylesheets einmal auf. Der Build entfernt doppelte Deklarationen aus dem Critical CSS jeder Seitenart. Historische Asset-Kopien und ungenutzte Theme-Dateien wurden entfernt.
+
 - Die Größen- und Farbauswahl liest die Verkaufbarkeitsdaten mehrerer Varianten gemeinsam. Bei fehlenden oder mehrdeutigen Datensätzen verwendet sie die IO-Einzelprüfung.
 - Login und Newsletter-Anmeldung laden das Facettenmodul, sobald ein Filterwidget vorhanden ist. Der frühere Fußball-Berater wurde aus dem Theme entfernt.
 

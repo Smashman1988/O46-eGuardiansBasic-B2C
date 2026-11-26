@@ -65,7 +65,7 @@ function prepare({root = path.resolve(__dirname, '..'), outputs = []} = {}) {
     }
     for (const file of templates) {
         let source = lf(read(file));
-        source = source.replace(/(\{\{\s*plugin_path\('GuardiansBasic'\)\s*\}\}\/)((?:js|css)\/[\w./-]+)(?:\?[^"\r\n]*)?(?=")/g,
+        source = source.replace(/(\{\{\s*(?:plugin_path\('GuardiansBasic'\)|headThemePath)\s*\}\}\/)((?:js|css)\/[\w./-]+)(?:\?[^"\r\n]*)?(?=")/g,
             (_, base, asset) => base + version(asset));
         // Reuse the existing branch assignments instead of adding a runtime
         // map, include, macro, service or filesystem lookup for the dynamic bundle.

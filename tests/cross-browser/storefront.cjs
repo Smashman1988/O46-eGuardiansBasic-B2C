@@ -22,7 +22,7 @@ function storefront(f,url) {
     const sorting = url.searchParams.get('sorting')==='name_desc'?'name_desc':'relevance';
     const bundle = pdp ? 'item' : home ? 'main' : 'cat';
     const critical = [styles[pdp?0:2],...styles.filter(m=>m[1] && (pdp || !/pdp/.test(m[1])))].map(m=>m[0]).join('')
-        .replaceAll("{{ plugin_path('GuardiansBasic') }}",'/plugin/GuardiansBasic');
+        .replaceAll('{{ headThemePath }}','/plugin/GuardiansBasic');
     const filterKey = facetKey(f,url);
     const pageNumber=Number(url.searchParams.get('page') || 1);
     const list=f.filteredLists[filterKey]?.html || (sorting==='name_desc'?f.listDesc:f.list);

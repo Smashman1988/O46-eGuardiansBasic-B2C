@@ -62,7 +62,7 @@ bleiben erhalten. Auf bereits geänderten Zeilen wurden abschließende Leerzeich
 
 - Vollständige Nachsuche nach numerischen, allgemeinen, maskierten und URL-kodierten
   Pluginpfaden: keine festen Pluginset-Pfade verblieben. Die CDN-URLs in
-  `resources/css/checkout.css` und `resources/css/checkout-140525.min.css` zeigen
+  `resources/css/checkout.css` und der daraus erzeugten `resources/css/checkout.min.css` zeigen
   auf Zahlungs-/Versandbilder unter `frontend/Payments/` und sind keine Plugin-Ressourcen.
 - Alle 15 JSON-Dateien sind parsebar; das Manifest enthält keine Twig-Syntax.
 - Alle 57 unterschiedlichen konkret referenzierten eigenen Ressourcendateien und

@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- The page head resolves the theme asset path once for fonts, icons and stylesheets. The build removes duplicate critical CSS declarations for each page type. Historical asset copies and unused theme files have been removed.
+
 - Size and colour selectors fetch saleability data for multiple variations together. Missing or ambiguous records use the original IO check.
 - Login and newsletter sign-up pages load the facet module when a filter widget is present. The former football selector has been removed from the theme.
 

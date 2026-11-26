@@ -102,7 +102,7 @@
 {# spaceless #}
 {% endif %}
 {# Render-scoped SEO data; preparation runs after widget/component registration. #}
-{% set seoPage = createSeoPage(services.template.getCurrentTemplate(), pageMax is defined ? pageMax : null, currentPage is defined ? currentPage : null, itemCountTotal is defined ? itemCountTotal : null) %}
+{% set seoPage = createSeoPage(currentTemplate is defined ? currentTemplate : services.template.getCurrentTemplate(), pageMax is defined ? pageMax : null, currentPage is defined ? currentPage : null, itemCountTotal is defined ? itemCountTotal : null) %}
 {% block PrepareSeoContent %}{% endblock %}
 <!DOCTYPE html>
 <html lang="{{ lang }}" prefix="og: http://ogp.me/ns#"{% if isQuickView and not publicLogoutPage %} data-eg-logout-home="{{ urls.home|default('/') }}"{% if services.customer.getContactId() > 0 %} data-eg-private-member{% endif %}{% endif %}>

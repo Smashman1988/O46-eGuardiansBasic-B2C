@@ -7,6 +7,7 @@ const postcss = require('postcss');
 const CleanCSS = require('clean-css');
 const {deriveCriticalCss} = require('./build-assets.cjs');
 const {syncHead} = require('./build-card-css.cjs');
+const {optimizeHead} = require('./optimize-critical-css.cjs');
 const versions = require('./asset-versioning.cjs');
 const files = versions.cssFiles;
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -34,7 +35,7 @@ function prepare({root = path.resolve(__dirname, '..')} = {}) {
     const head = fs.readFileSync(path.join(root, headFile), 'utf8');
     const footer = fs.readFileSync(path.join(root, 'resources/views/PageDesign/Partials/Footer.twig'), 'utf8');
     const critical = deriveCriticalCss(sources['main.css'], head, outputs[0].content, footer);
-    const updatedHead = syncHead(critical.head, sources['main.css']);
+    const updatedHead = optimizeHead(syncHead(critical.head, sources['main.css'])).head;
     outputs.push({file: headFile, content: updatedHead});
     const manifest = {format: 'Complete sources; clean-css level 1 all + level 2 all; rebase false; existing source-derived critical CSS',
         cleanCss: '5.3.3', postcss: require('postcss/package.json').version, files: assets};
