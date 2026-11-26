@@ -5,6 +5,7 @@ namespace GuardiansBasic\Contexts;
 use Ceres\Contexts\CategoryContext;
 use Ceres\Contexts\ItemListContext;
 use Ceres\Helper\SearchOptions;
+use GuardiansBasic\Extensions\Base_Extension;
 use GuardiansBasic\Services\EnglishTextSearch;
 use Plenty\Modules\ContentCache\CacheBlocks\Contracts\CacheTagRepositoryContract;
 
@@ -25,7 +26,7 @@ class EnglishTextSearchContext extends CategoryContext
             'facets' => $this->getParam('facets', ''),
             'sorting' => $this->getParam('sorting', ''),
             'page' => $this->getParam('page', 1),
-            'itemsPerPage' => $this->getParam('itemsPerPage', ''),
+            'itemsPerPage' => Base_Extension::SHOPBUILDER_ITEMS_PER_PAGE,
             'priceMin' => $this->request->get('priceMin', 0),
             'priceMax' => $this->request->get('priceMax', 0),
             'searchOperator' => $this->webstoreConfig->itemSearchOperator

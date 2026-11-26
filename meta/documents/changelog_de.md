@@ -2,6 +2,10 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Die italienische und spanische Hauptsuche verwendet auch bei direkter Initialisierung zwölf Artikel je Seite.
+
+- Menge und Summe im Header erscheinen erst mit dem bestätigten Warenkorbstand. Bei langsamer Sitzung entfällt die zwischenzeitliche Nullanzeige.
+
 - Cachebare Header verwenden ein neutrales Warenkorbsymbol bis zur Aktualisierung in der Gast- oder Kundensitzung. Navigation, leere Warenkorbvorschau, Empfehlungen und IT-/ES-Suchvorschläge vermeiden wiederholte Datenzugriffe.
 
 - Der Header verwendet auf cachebaren Seiten die Warenkorbmenge aus IO. Die Markenübersicht liest je Kachel die Markendetails einmal und liefert weniger HTML aus.

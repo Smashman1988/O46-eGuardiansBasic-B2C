@@ -181,6 +181,28 @@ namespace {
         $id=is_array($category)?$category['id']:$category->id;
         check(($container->context === \Ceres\Contexts\CategoryContext::class) === ((int)$id === 60),'plain Ceres context only for brand directory');
     }
+    // Direct IO context initialization can omit or override the page size supplied by the listener.
+    foreach (['it', 'es'] as $language) {
+        $locale->lang = $language;
+        foreach ([null, 12, 24, 48] as $suppliedSize) {
+            $seen = [];
+            foreach ([1, 2, 3] as $page) {
+                $params = ['query'=>'adidas', 'page'=>$page, 'sorting'=>'sorting.price.avg_asc'];
+                if ($suppliedSize !== null) $params['itemsPerPage'] = $suppliedSize;
+                $req->data = $params;
+                $documents = array_slice(range(1,32), ($page-1)*12, 12);
+                $engine->calls = [];
+                $engine->next = [['itemList'=>['documents'=>$documents,'total'=>32], 'facets'=>[]]];
+                $context = new EnglishTextSearchContext();
+                $context->init($params);
+                check(count($engine->calls) === 1 && $engine->calls[0]['itemList']->options['itemsPerPage'] === 12 &&
+                    $engine->calls[0]['itemList']->options['page'] === $page && $context->itemsPerPage === 12 &&
+                    (int)$context->pageMax === 3 && $context->itemCountPage === count($documents), 'IT/ES effective query and pagination');
+                $seen = array_merge($seen, $context->itemList);
+            }
+            check($seen === range(1,32), 'All 32 search results across three pages');
+        }
+    }
     $browserFixture=[];
     foreach ($langs as $lang) {
         $locale->lang=$lang; $english=in_array($lang,['it','es'],true);

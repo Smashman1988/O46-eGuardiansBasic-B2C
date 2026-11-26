@@ -2,6 +2,10 @@
 
 ## Unreleased · B2C develop
 
+- The Italian and Spanish search results use twelve items per page when IO initializes the search context directly.
+
+- The header shows quantity and subtotal after basket hydration, including on slow connections.
+
 - Cacheable headers use a neutral basket badge until the session updates it. Navigation, empty basket previews, recommendations and Italian/Spanish search suggestions avoid repeated data access.
 
 - The header reads the basket quantity from IO on cacheable pages. The brand directory reads each tile's details once and sends less HTML.

@@ -43,8 +43,14 @@ foreach ([0,9,9.5,10,25] as $quantity) foreach ([false,true] as $cacheable) fore
     if (strpos($html,'data-eg-basket-quantity class="header-quant-info'.($cacheable || $quantity < 10 ? '' : '2').'"') === false) {
         throw new RuntimeException('Incorrect quantity badge');
     }
+    if (!preg_match('~data-eg-basket-quantity class="header-quant-info2?"></span>~', $html)
+        || !preg_match('~data-basket-sum=""[^>]*></span>~', $html)) {
+        throw new RuntimeException('Unconfirmed basket quantity or sum in SSR');
+    }
     if (isset($argv[2])) {
         $old = $twig->render('before', $context);
+        $old = preg_replace('~(data-eg-basket-quantity class="header-quant-info2?">)0</span>~', '$1</span>', $old);
+        $old = preg_replace('~(data-basket-sum=""[^>]*>)0,00</span>~', '$1</span>', $old);
         if ($cacheable && $quantity >= 10) {
             $old = str_replace('data-eg-basket-quantity class="header-quant-info2"', 'data-eg-basket-quantity class="header-quant-info"', $old);
         }
