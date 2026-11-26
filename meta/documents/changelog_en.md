@@ -2,12 +2,10 @@
 
 ## Unreleased · B2C develop
 
-- The basket amount and currency symbol are centred together below the icon. Desktop navigation stays in place while the session loads.
-- Narrow headers reserve space for longer totals and currency codes. The product-page wishlist fallback also handles a missing ID list under strict Twig.
+- Restored the original basket icon placement and spacing beside the account and wishlist. The mobile logo retains its width, and long currency labels can wrap beneath the amount.
+- The product-page wishlist fallback also handles a missing ID list under strict Twig.
 
-- The basket subtotal keeps its reserved width after Twig rendering. Canonical and language links render in the HTML head again. Six historical CSS and JS files retain their original paths for cached pages.
-
-- The desktop header reserves space for the basket subtotal so adjacent controls stay in place when the confirmed amount arrives.
+- Canonical and language links render in the HTML head again. Six historical CSS and JS files retain their original paths for cached pages.
 
 - The Italian and Spanish search results use twelve items per page when IO initializes the search context directly.
 

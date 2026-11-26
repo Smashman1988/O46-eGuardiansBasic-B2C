@@ -133,17 +133,33 @@ test('Infinite Scroll lädt Folgeartikel einmal und verankert den Verlauf',async
         addEventListener('pagehide',()=>sessionStorage.setItem('departure:'+location.pathname,String(scrollY)));
     });
     await shop.open('/');
-    const setHomePosition=()=>page.evaluate(async()=>{
+    // Firefox can finish a newly exposed font or image after the load event.
+    // Wait for the actual viewport resources before recording or leaving a history entry.
+    const settleViewport = () => page.evaluate(async () => {
+        const frame = () => new Promise(requestAnimationFrame);
+        await frame();
+        const visible = [...document.images].filter(img => {
+            const rect = img.getBoundingClientRect();
+            return img.currentSrc && rect.top < innerHeight && rect.bottom > 0;
+        });
+        await Promise.all(visible.map(img => img.decode()));
         await document.fonts.ready;
-        scrollTo({top:180,behavior:'instant'});
-        return scrollY;
+        await frame();
     });
+    const setHomePosition = async () => {
+        await settleViewport();
+        await page.evaluate(() => scrollTo({top:180,behavior:'instant'}));
+        await settleViewport();
+        return page.evaluate(() => scrollY);
+    };
     const homePosition=await setHomePosition();
     expect(homePosition).toBeGreaterThan(0);
     // Control navigation through the same rendered home. Native scroll anchoring may
     // adjust the stored coordinate when a document is reconstructed (e.g. Galaxy S9+).
     await shop.open('/category/');
+    await settleViewport();
     await page.goBack();
+    await settleViewport();
     const reference=await page.evaluate(async()=>{await document.fonts.ready;return scrollY;});
     expect(reference).toBeGreaterThan(0);
     expect(await setHomePosition()).toBe(homePosition);
@@ -172,6 +188,7 @@ test('Infinite Scroll lädt Folgeartikel einmal und verankert den Verlauf',async
     expect(position).toBeGreaterThan(0);
     expect(shop.requests.filter(r=>r[2]==='/scroll/')).toHaveLength(3);
     await page.goBack();await expect(page).toHaveURL('https://storefront.test/');
+    await settleViewport();
     const departure=await page.evaluate(()=>Number(sessionStorage.getItem('departure:/')));
     expect(departure).toBe(homePosition);
     await info.attach('home-history',{body:JSON.stringify({requested:homePosition,reference,departure,returned:await page.evaluate(()=>scrollY)}),contentType:'application/json'});
@@ -194,11 +211,26 @@ test('Quickview schließt per X und Escape, wechselt Produkt und gibt Fokus zur�
     for(const [index,mode] of [[0,'schnell'],[1,'escape'],[0,'x']]){
         const trigger=buttons.nth(index);
         if(mode==='schnell') {
-            // Hold the entrance phase long enough to send the trusted pointer event on a busy worker.
-            const transition=await page.addStyleTag({content:'.modal-cross.fade .modal-dialog{transition-duration:1s!important}'});
+            // Drive Bootstrap's transition boundary explicitly. The pointer is still a real
+            // mouse/touch event and the theme handles it while its modal is opening.
+            await page.evaluate(()=>{
+                const dialog=document.querySelector('.modal-cross .modal-dialog');
+                const original=$.fn.emulateTransitionEnd;
+                const hold=event=>{if(event.target===dialog)event.stopImmediatePropagation();};
+                dialog.addEventListener('transitionend',hold,true);
+                $.fn.emulateTransitionEnd=function(duration){
+                    if(this[0]!==dialog || O46Core.quickview.phase!=='opening')return original.call(this,duration);
+                    $.fn.emulateTransitionEnd=original;
+                    window.finishQuickviewEntrance=()=>{
+                        dialog.removeEventListener('transitionend',hold,true);
+                        $(dialog).trigger('transitionend');
+                    };
+                    return this;
+                };
+            });
             await pressCloseDuringEntrance(page,hasTouch,()=>act(trigger,hasTouch));
             expect(await page.evaluate(()=>window.closePhase)).toEqual({phase:'opening',trusted:true});
-            await transition.evaluate(style=>style.remove());
+            await page.evaluate(()=>window.finishQuickviewEntrance());
         } else {
             await act(trigger,hasTouch);
             await expect(modal.locator('h1')).toHaveText('Artikel /product-'+(10001+index)+'/');
@@ -295,6 +327,12 @@ test('Markenfilter einzeln anwenden und nach Reload lesen',async({page,shop})=>{
     const apply=page.locator('.btnfilter-mobile-bottom');
     await expect(apply).toBeEnabled();await apply.click();
     await expect(page).toHaveURL(new RegExp('facets='+brand.values[0].id+'(?:&|$)'));
+    await expect(page.locator('[data-eg-remove-facet]')).toBeVisible();
+    await page.evaluate(async () => {
+        await new Promise(requestAnimationFrame);
+        document.body.getBoundingClientRect();
+        await document.fonts.ready;
+    });
     await page.reload();
     await expect(page.locator('[data-eg-remove-facet]')).toHaveCount(1);
     await expect(page.locator('.cat-item')).toHaveCount(2);

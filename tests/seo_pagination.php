@@ -396,7 +396,9 @@ namespace {
         $styles = $xpath->query('//head/style[@data-eg-basket-summary-critical]');
         check($styles->length === 1, 'Missing basket summary CSS');
         $css = $styles->item(0)->textContent;
-        check(preg_match('~#page-header\s+\.header-sum-info\s*\{\s*min-inline-size:\s*calc\(9ch \+ 3em\)~', $css) === 1, 'Desktop basket reservation lost during Twig rendering');
+        check(strpos($css, '[data-basket-sum]:empty + [data-currency-symbol]') !== false, 'Private basket placeholder lost during Twig rendering');
+        check(strpos($css, 'visibility: hidden') !== false && strpos($css, '[data-eg-basket-quantity]') !== false, 'Badge and amount must follow the confirmed session');
+        check(strpos($css, '9ch') === false && strpos($css, '84px') === false, 'Artificial basket width changes the production header');
         check(strpos($css, '<') === false, 'Basket style swallowed subsequent head markup');
         check($xpath->query('//head/link[@rel="canonical"]')->length === 1, 'Canonical missing from parsed document head');
         return 'Basket reservation and canonical present in rendered HTML';

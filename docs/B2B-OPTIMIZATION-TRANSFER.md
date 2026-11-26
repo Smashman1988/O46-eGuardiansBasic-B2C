@@ -249,7 +249,7 @@ Die 54 IDs bleiben erhalten. Paket 13 aktualisiert die Abnahmen auf Basis von B2
 
 [Abnahmebericht Paket 13 für B2C](../.cache/b2c-audit/Optimierungspaket-13.html)
 
-## Warenkorbheader und Merkliste im visuellen Vergleich · 26. November 2026
+## Frühere Warenkorbheader-Prüfung vor dem erneuten Vergleich mit 425 · 26. November 2026
 
 | ID | Problematik und Änderung | B2C-Nachweis | B2B-Nachweis und Transferstatus |
 |---|---|---|---|
@@ -259,3 +259,13 @@ Die 54 IDs bleiben erhalten. Paket 13 aktualisiert die Abnahmen auf Basis von B2
 Die gemeinsame Schlussprüfung umfasst 509 Betragsmessungen an 125 Breiten je Theme sowie geprüfte Windows-Chrome-Referenzbilder für Desktop und Mobil. Bei identischen Inhalten unterscheidet sich der historische Header in B2C um 3.594 bzw. 5.938 Pixel, in B2B um 3.594 bzw. 5.808 Pixel. Der korrigierte Stand stimmt in allen vier Vergleichen auf das Pixel überein.
 
 [B2C-Prüfbericht und Bilder](../.cache/b2c-audit/qualitaet-428/B2C-Qualitaetsbericht.html) · [Lokaler B2B-Prüfbericht und Bilder](../.cache/b2c-audit/qualitaet-428/B2B-Qualitaetsbericht.html)
+
+## Warenkorbheader, Galeriezoom und visuelle Regressionen
+
+| ID | B2C und ursprünglicher Befund | Lokaler Nachweis | B2B-Umsetzung und Status |
+|---|---|---|---|
+| T36 / T38 | Die reservierte Breite in e3319ad verschob die Desktopnavigation. Auf 320 px schrumpfte die Logospalte. Die ursprüngliche Spaltenaufteilung, das Zahlenpadding und die Schriftgrößen sind wieder wirksam. Die private Session bestimmt weiterhin Betrag und Menge. | 509 Betragsprüfungen je Theme, direkter Bildvergleich 425, ausgeliefertes 428 und lokaler Entwurf bei fünf Breiten. Dreizehn Währungen auf dem ausgelieferten 428 geprüft. Die aktuelle Korrektur ist lokal. | Eigenes B2B-Logo und eigener Header auf develop angepasst. **B2B lokal getestet**. Native B2B-Prüfung zurückgestellt. |
+| QA-01 | Screenshots sichern Produktkarte, Menü, Filter, Sprache, Währung, Galerie, Quickview und Newsletter ab. Das B2C-Währungsformular stammt aus Testset 428. | Windows Chrome vergleicht geprüfte Pixelbilder. Die übrigen Profile bedienen die Komponenten. Produktfotos aus Testdaten sind Platzhalter. | B2B nutzt seine eigenen ShopBuilder-Fixtures und prüft zusätzlich seine Größenmatrix. **B2B lokal getestet**. |
+| QA-02 | Die B2B-Kontaktfläche überdeckte bei 820 px den Galeriezoom. | B2C besitzt diesen B2B-Kontaktstarter nicht. | Die bestehende Schnittmengenprüfung beobachtet zusätzlich den Galeriezoom. Klickziel vor dem automatischen Scrollen geprüft. **B2B lokal getestet**. |
+
+Für diese Qualitätskorrekturen wurde kein Performance-Gewinn gemessen. [B2C-Bilder und Messungen](../.cache/b2c-audit/qualitaet-nachtrag/B2C-Qualitaetsbericht.html) · [B2B-Bilder und Einzelnachweise](../.cache/b2c-audit/qualitaet-nachtrag/B2B-Qualitaetsbericht.html)

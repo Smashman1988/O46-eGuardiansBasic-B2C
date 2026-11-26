@@ -6,7 +6,7 @@ const path = require('node:path');
 const head = fs.readFileSync(path.join(__dirname,'../../resources/views/PageDesign/Partials/Head.twig'),'utf8');
 const branches = [...head.matchAll(/<style>([\s\S]*?)<\/style>/g)].slice(0,3).map(match=>match[1]);
 
-test('Die bestätigte Warenkorbsumme verschiebt die Desktop-Navigation nicht', async ({page}) => {
+test('Die neutrale Kopfzeile entspricht dem bestätigten leeren Warenkorb und wächst nur mit dem Betrag', async ({page}) => {
     const rule = head.match(/<style data-eg-basket-summary-critical>([\s\S]*?)<\/style>/);
     const header = fs.readFileSync(path.join(__dirname, '../../resources/views/PageDesign/Partials/Header/Header.twig'), 'utf8');
     const summary = header.match(/<span class="[^"]*header-sum-info[^"]*">.*?<\/span><\/span>/);
@@ -24,7 +24,13 @@ test('Die bestätigte Warenkorbsumme verschiebt die Desktop-Navigation nicht', a
     for (const value of ['0,00', '14,99', '224,85', '999999,99']) {
         await link.locator('[data-basket-sum]').evaluate((el, sum) => { el.textContent = sum; }, value);
         await expect(currency).toBeVisible();
-        expect(await link.evaluate(el => el.getBoundingClientRect().left)).toBe(left);
+        const current = await link.boundingBox();
+        const textGrowth = await link.locator('[data-basket-sum]').evaluate(el => {
+            const width = text => { const probe = el.cloneNode(false); probe.textContent = text; el.after(probe);
+                const rect = probe.getBoundingClientRect(); probe.remove(); return rect.width; };
+            return width(el.textContent) - width('0,00');
+        });
+        expect(Math.abs(current.x + textGrowth - left)).toBeLessThan(.1);
     }
 });
 

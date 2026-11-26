@@ -21,20 +21,20 @@
 <style data-eg-basket-summary-critical>
 #page-header [data-eg-basket-quantity]:empty,
 #page-header [data-basket-sum]:empty + [data-currency-symbol] { visibility: hidden; }
-#page-header .header-sum-info { text-align: center; white-space: nowrap; }
-#page-header .header-sum-info [data-currency-symbol] { margin-inline-start: .2em; }
-@media (min-width: 992px) {
-    #page-header .header-sum-info { min-inline-size: calc(9ch + 3em); }
+/* Keep the normal empty-basket footprint while the private session loads. */
+#page-header [data-basket-sum]:empty::before { content: "0,00"; visibility: hidden; }
+/* The basket interior is slightly right of the 35px icon's centre. */
+#page-header [data-eg-basket-quantity] { width: 35px; padding-inline: 5px 0; text-align: center; }
+@media (min-width: 768px) {
+    #page-header .header-sum-info [data-currency-symbol] { margin-inline-start: .1em; }
 }
 @media (max-width: 767.98px) {
-    #page-header .header-wrap .row:has(.header-sum-info) > .col-5 { flex: 1 1 0; min-width: 0; }
-    #page-header .header-wrap .row:has(.header-sum-info) > .col-7 {
-        flex-basis: max(58.333333%, 238px);
-        max-width: max(58.333333%, 238px);
-    }
-    #page-header .d-flex:has(.header-sum-info) > .btn-mobile-nav { flex: 1 1 0; min-width: 0; }
-    #page-header .d-flex > .btn-mobile-nav:has(.header-sum-info) { flex: 0 0 84px; }
-    #page-header .btn-mobile-nav > a:has(.header-sum-info) { display: block; width: 100%; }
+    /* Only an amount wider than the original slot uses the adjacent gutter. */
+    #page-header .d-flex:has(.header-sum-info) { justify-content: flex-end !important; }
+    #page-header .d-flex:has(.header-sum-info) > .btn-mobile-nav { flex-shrink: 0; }
+    #page-header .btn-mobile-nav:has(.header-sum-info) { min-width: min-content; }
+    #page-header .header-sum-info { display: flex !important; flex-wrap: wrap; justify-content: center; align-content: center; height: 10px; line-height: 9px; column-gap: 1px; }
+    #page-header .header-sum-info [data-basket-sum] { flex: none; padding-inline: 0; }
 }
 </style>
 <link rel="apple-touch-icon" sizes="180x180" href="{{ headThemePath }}/images/icon/apple-icon-180x180.png">

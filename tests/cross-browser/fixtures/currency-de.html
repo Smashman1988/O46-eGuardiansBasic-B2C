@@ -1,0 +1,48 @@
+<form class="eg-currency-form" method="get" action="">
+
+    <p class="eg-currency-hint">
+        Wähle deine bevorzugte Währung.
+    </p>
+
+    <dl class="eg-currency-current">
+
+        <dt>
+            Aktuelle Währung
+        </dt>
+
+        <dd>
+            EUR
+                            (€)
+                    </dd>
+
+    </dl>
+
+    <div class="eg-currency-field">
+
+        <label for="currency-select">
+            Währungsauswahl
+        </label>
+
+        <select id="currency-select" name="currency" required="" data-eg-current-currency="EUR">
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="DKK">DKK (kr)</option>
+            <option value="PLN">PLN (zł)</option>
+            <option value="CHF">CHF (CHF)</option>
+            <option value="JPY">JPY (¥)</option>
+            <option value="AUD">AUD (AU$)</option>
+            <option value="CAD">CAD (CA$)</option>
+            <option value="SEK">SEK (kr)</option>
+            <option value="NOK">NOK (kr)</option>
+            <option value="CNY">CNY (¥)</option>
+            <option value="AED">AED (د.إ)</option>
+        </select>
+
+    </div>
+
+    <button type="submit" class="eg-currency-submit">
+        Währung übernehmen
+    </button>
+
+</form>

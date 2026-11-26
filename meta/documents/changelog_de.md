@@ -2,12 +2,10 @@
 
 ## Unveröffentlicht · B2C develop
 
-- Warenkorbbetrag und Währungszeichen stehen gemeinsam mittig unter dem Symbol. Beim Laden der Sitzung bleibt die Desktop-Navigation stabil.
-- Schmale Header reservieren Platz für längere Beträge und Währungskürzel. Auf der Produktseite funktioniert der Merkliste-Fallback auch bei fehlender ID-Liste unter striktem Twig.
+- Warenkorbsymbol, Mengenanzeige und Abstände zu Konto und Merkliste orientieren sich wieder am ursprünglichen Header. Bei schmalen Displays bleibt die Logobreite erhalten. Lange Währungskürzel können unter dem Betrag stehen.
+- Auf der Produktseite funktioniert der Merkliste-Fallback auch bei fehlender ID-Liste unter striktem Twig.
 
-- Die Warenkorbsumme behält ihre reservierte Breite auch nach dem Twig-Rendering. Canonical und Sprachverweise stehen wieder im HTML-Head. Sechs historische CSS- und JS-Dateien sind für bereits gecachte Seiten unter den ursprünglichen Pfaden verfügbar.
-
-- Auf dem Desktop reserviert der Header Platz für die Warenkorbsumme. Beim Laden des bestätigten Betrags bleiben die benachbarten Bedienelemente an ihrer Position.
+- Canonical und Sprachverweise stehen wieder im HTML-Head. Sechs historische CSS- und JS-Dateien sind für bereits gecachte Seiten unter den ursprünglichen Pfaden verfügbar.
 
 - Die italienische und spanische Hauptsuche verwendet auch bei direkter Initialisierung zwölf Artikel je Seite.
 

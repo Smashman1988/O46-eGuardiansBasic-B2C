@@ -1,62 +1,75 @@
 const {test, expect} = require('./storefront.cjs');
 
-test('Betrag und Währung stehen zusammen mittig unter dem sichtbaren Warenkorbsymbol', async ({shop, page}, info) => {
-    await page.setViewportSize({width: 1440, height: 900});
+async function basketState(page, amount, currency, quantity) {
+    return page.locator('#page-header').evaluate((header, values) => {
+        const sum = header.querySelector('[data-basket-sum]');
+        const unit = sum.nextElementSibling;
+        const link = sum.closest('a');
+        const badge = link.querySelector('[data-eg-basket-quantity]');
+        sum.textContent = values.amount;
+        unit.textContent = values.currency;
+        badge.textContent = String(values.quantity);
+        badge.className = values.quantity < 10 ? 'header-quant-info' : 'header-quant-info2';
+        function bounds(el, text = false) {
+            const target = text ? document.createRange() : el;
+            if (text) target.selectNodeContents(el);
+            return target.getBoundingClientRect().toJSON();
+        }
+        return {sum: bounds(sum, true), unit: bounds(unit, true), badge: bounds(badge, true),
+            icon: bounds(link.querySelector('.icon-online-shopping-cart')), logo: bounds(header.querySelector('.o-logo')),
+            height: header.clientHeight, account: bounds(header.querySelector('.btn-login-open .mobile-btn-txt'), true)};
+    }, {amount, currency, quantity});
+}
+
+test('Warenkorbsymbol, Menge und Betrag folgen dem ursprünglichen Desktop-Layout', async ({shop, page}, info) => {
+    await page.setViewportSize({width:1440, height:900});
     await shop.open('/alle-artikel/');
-    const header = page.locator('#page-header');
-    const number = header.locator('[data-basket-sum]');
-    const unit = header.locator('[data-currency-symbol]').last();
-    const icon = number.locator('xpath=ancestor::a').locator('.icon-online-shopping-cart');
     await page.evaluate(() => document.fonts.ready);
-    for (const [amount, symbol] of [['0,00', '€'], ['11,98', '€'], ['224,85', 'CHF'], ['999999,99', 'HK$']]) {
-        await number.evaluate((el, text) => { el.textContent = text; }, amount);
-        await unit.evaluate((el, text) => { el.textContent = text; }, symbol);
-        const ink = locator => locator.evaluate(el => {
-            const range = document.createRange();
-            range.selectNodeContents(el);
-            const {left, right, top} = range.getBoundingClientRect();
-            return {left, right, top};
-        });
-        const [value, currency, cart] = await Promise.all([ink(number), ink(unit), icon.boundingBox()]);
-        expect(cart).toBeTruthy();
-        expect(Math.abs((value.left + currency.right) / 2 - (cart.x + cart.width / 2)), amount + ' ' + symbol).toBeLessThanOrEqual(1.5);
-        expect(currency.left - value.right).toBeGreaterThanOrEqual(1);
-        expect(currency.left - value.right).toBeLessThanOrEqual(5);
-        expect(Math.abs(currency.top - value.top)).toBeLessThanOrEqual(1);
-        expect(currency.right).toBeLessThanOrEqual(1440);
+    for (const [amount, unit, quantity] of [['0,00','€',0], ['11,98','€',2], ['224,85','CHF',15], ['999999,99','HK$',105]]) {
+        const r = await basketState(page, amount, unit, quantity);
+        // The original label has 10 px leading padding and follows its actual text width.
+        const center = r.icon.x + r.icon.width / 2;
+        expect(r.icon.width).toBe(35);
+        expect(Math.abs((r.sum.left + r.unit.right) / 2 - center - 5)).toBeLessThan(1);
+        expect(Math.abs((r.badge.left + r.badge.right) / 2 - center - 2.5)).toBeLessThan(1);
+        expect(r.badge.top).toBeGreaterThan(r.icon.top);
+        expect(r.badge.bottom).toBeLessThan(r.icon.bottom);
+        expect(Math.abs(r.sum.top - r.unit.top)).toBeLessThan(1);
+        expect(r.unit.left - r.sum.right).toBeGreaterThanOrEqual(1);
+        expect(r.unit.left - r.sum.right).toBeLessThanOrEqual(2);
+        expect(r.unit.right).toBeLessThanOrEqual(1440);
     }
-    // Reference images were visually checked with the Windows Chrome profile.
+    const header = page.locator('#page-header');
     if (process.platform === 'win32' && info.project.name === 'chrome') {
-        await expect(header).toHaveScreenshot('warenkorb-desktop.png', {maxDiffPixels: 0});
+        await expect(header).toHaveScreenshot('warenkorb-desktop.png', {maxDiffPixels:0});
     }
-    await info.attach('Warenkorbheader', {body: await header.screenshot(), contentType: 'image/png'});
+    await info.attach('Warenkorbheader', {body:await header.screenshot(), contentType:'image/png'});
 });
 
-test('Langer Betrag bleibt auf schmalen Smartphones vollständig im sichtbaren Header', async ({shop, page}, info) => {
+test('Schmale Kopfzeile erhält das Logo und zeigt vollständige Beträge und Währungen', async ({shop, page}, info) => {
     await shop.open('/alle-artikel/');
-    const header = page.locator('#page-header');
-    const amount = header.locator('[data-basket-sum]');
-    const unit = amount.locator('xpath=following-sibling::*[1]');
     await page.evaluate(() => document.fonts.ready);
-    await amount.evaluate(el => { el.textContent = '999999,99'; });
-    await unit.evaluate(el => { el.textContent = 'AED'; });
-    for (const width of [320, 360, 375, 390, 414, 430, 575, 576, 767, 768, 992]) {
-        await page.setViewportSize({width, height: 844});
-        const result = await amount.evaluate(el => {
-            const range = document.createRange();
-            range.setStartBefore(el.firstChild);
-            range.setEndAfter(el.nextElementSibling.lastChild);
-            const box = range.getBoundingClientRect();
-            const icon = el.closest('a').querySelector('.icon-online-shopping-cart').getBoundingClientRect();
-            return {right: box.right, offset: (box.left + box.right - icon.left - icon.right) / 2};
-        });
-        expect(result.right, 'Währung bei ' + width + ' px').toBeLessThanOrEqual(width);
-        expect(Math.abs(result.offset), 'Zentrierung bei ' + width + ' px').toBeLessThanOrEqual(1.5);
+    for (const width of [320,360,375,390,414,430,575,576,767,768,992]) {
+        await page.setViewportSize({width,height:844});
+        const initial = await basketState(page, '0,00', '€', 0);
+        const r = await basketState(page, '999999,99', 'AED', 105);
+        expect(r.height).toBe(initial.height);
+        expect(r.logo.width).toBe(initial.logo.width);
+        expect(r.logo.height).toBe(initial.logo.height);
+        expect(r.logo.left).toBe(initial.logo.left);
+        expect(r.sum.right).toBeLessThanOrEqual(width + .05);
+        expect(r.unit.right).toBeLessThanOrEqual(width + .05);
+        expect(r.sum.left).toBeGreaterThanOrEqual(r.account.right - .05);
+        expect(r.unit.left).toBeGreaterThanOrEqual(r.account.right - .05);
+        expect(r.unit.bottom).toBeGreaterThanOrEqual(r.sum.bottom - 1);
+        expect(r.badge.left).toBeGreaterThan(r.icon.left);
+        expect(r.badge.right).toBeLessThan(r.icon.right);
         if (width === 320) {
+            const header = page.locator('#page-header');
             if (process.platform === 'win32' && info.project.name === 'chrome') {
-                await expect(header).toHaveScreenshot('warenkorb-mobil-aed.png', {maxDiffPixels: 0});
+                await expect(header).toHaveScreenshot('warenkorb-mobil-aed.png', {maxDiffPixels:0});
             }
-            await info.attach('Warenkorbheader-AED-320', {body: await header.screenshot(), contentType: 'image/png'});
+            await info.attach('Warenkorbheader-AED-320',{body:await header.screenshot(),contentType:'image/png'});
         }
     }
 });

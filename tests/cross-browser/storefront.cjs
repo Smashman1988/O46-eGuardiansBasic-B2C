@@ -31,7 +31,7 @@ function storefront(f,url) {
     const pager = paging ? f.pager[pageNumber] : '';
     const listing = '<section class="categoriegrid page-content container"><h1>'+title+'</h1><div class="row"><div class="col-12"><div class="leftsidecat">'+(home?'':parts.controls+(lang==='de'?f.filters[filterKey]:parts.filter).replaceAll('https://store.example.test/damen-bekleidung/',origin+url.pathname))+'</div></div><div class="col-12'+(paging?' category-paging-host':'')+'">'+(paging?'<div class="eg-pagination d-none d-lg-block" data-category-paging-anchor>'+pager+'</div>':'')+(url.pathname==='/search/'?f.sorting[sorting]:'')+(url.searchParams.get('query')==='Nulltreffer'?'<p>Keine Treffer</p>':cards)+pagination+(paging?'<nav class="category-pager-footer" data-category-pager="44" aria-label="Seite">'+pager+'</nav>':'')+ '</div></div></section>';
     return '<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="o46-language-route" lang="en" content="/en/category/"><link rel="alternate" hreflang="en" href="/en/category/">'+critical+'<link rel="stylesheet" href="/assets/main.min.css"></head><body>'+parts.header+
-        '<main id="page-body" class="'+(home?'isHome':'')+'">'+(pdp?article(f,url.pathname,false,url.searchParams.has('single')):home?f.slider+listing+f.strip:listing)+(url.searchParams.has('long-page')?'<div aria-hidden="true" style="height:2400px"></div>':'')+'</main>'+f.footer+f['modal-cross']+parts.languageOptions+f.dynamicModal+f.backdrop+
+        '<main id="page-body" class="'+(home?'isHome':'')+'">'+(pdp?article(f,url.pathname,false,url.searchParams.has('single')):home?f.slider+listing+f.strip:listing)+(url.searchParams.has('long-page')?'<div aria-hidden="true" style="height:2400px"></div>':'')+'</main>'+f.footer+f['modal-cross']+(url.searchParams.has('newsletter') ? parts.newsletter : '')+parts.languageOptions+f.dynamicModal+f.backdrop+
         '<button id="totop">Nach oben</button><script type="application/json" id="app-data-custom">{"templateType":"'+(home?'home':pdp?'item':'category')+'"}</script>'+
         '<script>window.activeLang='+JSON.stringify(lang)+';window.messageServiceTranslations={searchexample:"Beispiele"};window.addEventListener("load",function(){eGuardians.initialize();document.body.dataset.ready="1"})</script>'+
         '<script src="/assets/jquery-3.7.1.min.js"></script><script defer src="/assets/core.min.js" data-eg-magiczoom-src="/assets/magiczoom.min.js"></script>'+
@@ -52,6 +52,11 @@ const test = base.extend({
             const json=data=>route.fulfill({json:{data}});
             const pic=color=>route.fulfill({contentType:'image/svg+xml',body:svg(color)});
             if (req.method()==='GET') {
+                // Test rasters from Ceres resources/images/flags/4x3 at the dialog's 2x density.
+                const flag = /\/flags\/4x3\/(de|gb|fr|it|es)\.svg$/.exec(p);
+                if (flag && req.resourceType() === 'image' && (u.origin === origin || u.hostname === 'cdn02.outlet46.de')) {
+                    return route.fulfill({path:path.join(__dirname, 'fixtures/flags', flag[1]+'.png'), contentType:'image/png'});
+                }
                 if(u.hostname==='images.example.test' && req.resourceType()==='image') return pic('steelblue');
                 if(u.origin===origin) {
                     if(/^\/assets\/[a-z0-9.-]+\.(css|js)$/.test(p)) return route.fulfill({path:path.join(root,'resources',p.endsWith('.js')?'js':'css',path.basename(p))});
@@ -66,6 +71,9 @@ const test = base.extend({
                     if(p==='/rest/io/facet/') return json({itemList:{total:f.filteredLists[facetKey(f,u)]?.total || 12},facets:f.groups});
                     if(p.includes('/search/autocomplete/')) return json({item:[],suggestion:[{label:'Laufschuh'}]});
                     if(p==='/loginPreview/') return json({description1:'<h2>Anmelden</h2>'});
+                    if (p === '/getShopBuilderContent/' && u.searchParams.get('categoryId') === '5638') {
+                        return json({description1:read('tests/cross-browser/fixtures/currency-de.html').toString()});
+                    }
                     if(p==='/getShopBuilderContent/') return json({description1:'<a href="/en/">English</a>'});
 
                     if (/^\/rest\/io\/variations\/(101|102)\/?$/.test(p)) return json({documents:[{data:{stock:{net:8},prices:{graduatedPrices:[]},variation:{number:'123',availability:{id:1,names:{name:'Lieferbar'}}},images:{all:[],variation:[]}}}]});
