@@ -386,6 +386,21 @@ namespace {
         'buildHash'=>'fixture', 'forceNoIndex'=>false, 'currencyData'=>['name'=>'EUR'], 'notifications'=>[]];
     // Plenty globals are supplied to nested renders too, as in the shop.
     foreach ($base as $key=>$value) { $twig->addGlobal($key,$value); }
+
+    test('head/rendered-basket-style-and-canonical', function () use ($twig, $base) {
+        $html = $twig->render('head', ['isQuickView'=>true, 'currentTemplate'=>'tpl.category.item'] + $base);
+        $document = new \DOMDocument();
+        $document->loadHTML('<!doctype html><html><head>'.$html.'</head><body></body></html>',
+            LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new \DOMXPath($document);
+        $styles = $xpath->query('//head/style[@data-eg-basket-summary-critical]');
+        check($styles->length === 1, 'Missing basket summary CSS');
+        $css = $styles->item(0)->textContent;
+        check(strpos($css, 'min-inline-size:calc(9ch + 10px)') !== false, 'Desktop basket reservation lost during Twig rendering');
+        check(strpos($css, '<') === false, 'Basket style swallowed subsequent head markup');
+        check($xpath->query('//head/link[@rel="canonical"]')->length === 1, 'Canonical missing from parsed document head');
+        return 'Basket reservation and canonical present in rendered HTML';
+    });
     foreach (['basket','checkout','login','register','my-account','wish-list','confirmation'] as $route) {
         foreach (['template','body-class','configured-category'] as $mode) {
             test("robots/system/$route/$mode", function () use ($route,$mode,$twig,$base,$request,$templateService) {

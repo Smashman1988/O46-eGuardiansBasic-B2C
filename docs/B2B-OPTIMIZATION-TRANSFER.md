@@ -2,7 +2,7 @@
 
 B2C führt die laufende Tiefenoptimierung. Diese Datei gehört zum B2C-Repository. Bei jedem Paket die betroffenen IDs aktualisieren, neue IDs anhängen und die getesteten Git-Stände nennen. Eine ID bleibt auch bei abgelehnten Versuchen oder abweichenden B2B-Pfaden erhalten.
 
-**Stand 26.11.2026, Paket 11.** Bei B2C stimmen die Auslieferungssignaturen von Set 428 mit `792b9bc` überein. Die zusätzliche Platzreservierung für die Warenkorbsumme ist lokal geprüft. B2B liegt lokal auf `5d8756b`. Der Remote-Branch steht auf `1f154b9`, das ungebundene Testset 427 auf Theme 1.0.6. Die native B2B-Abnahme des Kandidaten steht aus.
+**Stand 26.11.2026, Paket 12.** B2C führt, die native Prüfung erfolgt auf 428. Die korrigierte T38-Regel und die sechs temporären Originalassets liegen lokal auf Basis von `1f6dd04`. Die B2B-Entwicklung und Transferprüfung erfolgen derzeit ausschließlich lokal auf Basis von `5d8756b`. Der Betreiber veröffentlicht beide Themes. Die B2B-Abnahme ist bewusst zurückgestellt. Die Freigabeentscheidungen sind unabhängig.
 
 Pfade gelten jeweils innerhalb des genannten Themes. `Views` steht für `resources/views`, `Head` für `Views/PageDesign/Partials/Head.twig`, `PageDesign` für `Views/PageDesign/PageDesign.twig`, `PDP` für `Views/Item/SingleItem.twig`, `Extension` für `src/Extensions/Base_Extension.php`. Außer den ausdrücklich angegebenen B2B-Testergebnissen wurde für die jeweilige ID kein B2B-Vorher-/Nachher-Test durchgeführt. Die Paketberichte sind lokale Zusatzbelege. Git-Stände, Messwerte und Entscheidungen stehen auch hier im versionierbaren Dokument.
 
@@ -223,3 +223,16 @@ Die 53 bisherigen Einzelentscheidungen aus Paket 10 gelten mit den folgenden Akt
 | B03 | Eigenständige Händlermatrix. | Lokale Matrix-, Batch- und Korbregression erneut ausgeführt. Händlerklassen, Nettostaffeln, Mindestwert, Bestandsgrenzen und große Bestellungen müssen auf dem richtigen Testset gemeinsam geprüft werden. | B2B lokal getestet |
 
 [Paket-11-Abnahme B2C mit Einzelentscheidungen und Cache-Übergang](../.cache/b2c-audit/Optimierungspaket-11.html)
+
+## Paket 12 · Header, Suchpaginierung und Cache-Übergang
+
+Die 54 bestehenden IDs bleiben erhalten. Die folgenden Einträge aktualisieren den Nachweis für die betroffenen Funktionen.
+
+| ID | B2C | B2B | Transferstatus |
+|---|---|---|---|
+| T38 | Auf 428 verschluckt Twig ab dem CSS-Fragment `{#page-header` das Ende des Style-Tags. Auf der Kategorie stehen Canonical und Sprachverweise dadurch im CSS. Beim Eintreffen des bestätigten Betrags wandert der Warenkorblink auf Desktop um 29,77 bis 47,84 px. In `Head.twig` hält `:is(#page-header)` die Selektorspezifität und vermeidet den Twig-Kommentar. `tests/seo_pagination.php` prüft die gerenderte Regel und den Canonical im HTML-DOM. Lokal 0 px Bewegung in fünf Breiten und drei Währungen. Erneute native Abnahme nach Bereitstellung offen. | Im gerenderten Händlerheader ohne Platzreservierung bis zu 85,09 px Bewegung. Eigene Desktopregel und eigener DOM-Test lokal umgesetzt. 15 Kombinationen aus Breite und Währung, jeweils fünf Beträge bis 999999,99. Nachher 0 px und keine Überschneidung. 666 SEO-Fälle je Twig-Version bestanden. | B2B lokal getestet |
+| T15a | Sechs historische Ressourcen für frühere HTML-Dokumente temporär als Git-Dateien wiederhergestellt. SHA-256 und Git-Blobs stimmen mit Produktion 425 überein. Zwei Builds lassen die Dateien unverändert. Die aktiven Templates und Manifeste referenzieren sie nicht. `tests/cache_compatibility.cjs` schützt Bytes und Referenzen. Entfernung erst nach dokumentiertem Ablauf alter HTML-/CDN-Caches und des Rollbackfensters sowie bestätigtem Ende alter Assetabrufe. | Die sechs Pfade und Hashes gehören zum B2C-Auslieferungswechsel. Für einen späteren B2B-Wechsel ist die eigene Assethistorie maßgeblich. | B2B nicht relevant |
+| T36 | Sieben verzögerte Antworten auf 428, korrekte Mengen und Beträge, je eine Warenkorbanfrage. Der öffentliche ShopBooster-Test mit zwei Gästen bleibt für den kontrollierten Wechsel offen. | Eigener synchronisierter Header mit produktivem Core lokal geprüft. | B2B lokal getestet |
+| T37 | Such-Smoke in DE, EN, FR, IT und ES auf 428. Alle zehn geprüften Seiten enthielten zwölf Karten. Die vollständige Bestands- und Scrollprüfung steht in Paket 11. | Der eigene Händler-Suchkontext bleibt als gesonderte Transferentscheidung geführt. | B2B-Prüfung ausstehend |
+
+[Abnahmebericht Paket 12 für B2C](../.cache/b2c-audit/Optimierungspaket-12.html)

@@ -10,7 +10,7 @@
     "check:css": "node scripts/build-css.cjs --check",
     "build:js": "node scripts/build-js.cjs",
     "check:js": "node scripts/build-js.cjs --check",
-    "test": "npm run check:identity && npm run check:assets && node tests/variation_prices.cjs && node tests/api_transport.cjs && node tests/api_transport.cjs --min && node tests/auth_responses.cjs && node tests/auth_responses.cjs --min"
+    "test": "npm run check:identity && npm run check:assets && node tests/cache_compatibility.cjs && node tests/variation_prices.cjs && node tests/api_transport.cjs && node tests/api_transport.cjs --min && node tests/auth_responses.cjs && node tests/auth_responses.cjs --min"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

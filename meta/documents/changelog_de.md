@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Die Warenkorbsumme behält ihre reservierte Breite auch nach dem Twig-Rendering. Canonical und Sprachverweise stehen wieder im HTML-Head. Sechs historische CSS- und JS-Dateien sind für bereits gecachte Seiten unter den ursprünglichen Pfaden verfügbar.
+
 - Auf dem Desktop reserviert der Header Platz für die Warenkorbsumme. Beim Laden des bestätigten Betrags bleiben die benachbarten Bedienelemente an ihrer Position.
 
 - Die italienische und spanische Hauptsuche verwendet auch bei direkter Initialisierung zwölf Artikel je Seite.

@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- The basket subtotal keeps its reserved width after Twig rendering. Canonical and language links render in the HTML head again. Six historical CSS and JS files retain their original paths for cached pages.
+
 - The desktop header reserves space for the basket subtotal so adjacent controls stay in place when the confirmed amount arrives.
 
 - The Italian and Spanish search results use twelve items per page when IO initializes the search context directly.
