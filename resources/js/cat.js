@@ -32,13 +32,25 @@ eGuardians.initialize = function () {
 };
 
   eGuardians.events = new function() {
-        this.observeLazyImages = function () {
-            if (this.lazyObserver && this.lazyObserver.observer) {
-                this.lazyObserver.observer.disconnect();
+        this.observeLazyImages = function (items) {
+            if (!items || !this.lazyObserver) {
+                if (this.lazyObserver?.observer) this.lazyObserver.observer.disconnect();
+                this.lazyObserver = lozad();
+                this.lazyObserver.observe();
+                return;
             }
-            // Recreate to apply placeholders to new nodes; release the previous targets.
-            this.lazyObserver = lozad();
-            this.lazyObserver.observe();
+            const lazy = this.lazyObserver;
+            function observe(element) {
+                const placeholder = element.getAttribute('data-placeholder-background');
+                if (placeholder) element.style.background = placeholder;
+                if (element.getAttribute('data-loaded') === 'true') return;
+                if (lazy.observer) lazy.observer.observe(element);
+                else lazy.triggerLoad(element);
+            }
+            for (const item of items) {
+                if (item.matches('.lozad')) observe(item);
+                item.querySelectorAll('.lozad').forEach(observe);
+            }
         };
         this.bindEvents = function(bindWrapper){
            
@@ -564,8 +576,8 @@ $(document).on('click', '.linkabso', function () {
             button: '.view-more-button',
             scrollThreshold: 1200,
             status: '.scroller-status'
-        }).on('append.infiniteScroll', function () {
-            eGuardians.events.observeLazyImages();
+        }).on('append.infiniteScroll', function (event, response, path, items) {
+            eGuardians.events.observeLazyImages(items);
         });
     }
 

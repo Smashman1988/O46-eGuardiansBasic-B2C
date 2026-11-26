@@ -1,6 +1,67 @@
 /* Shared storefront modules. Page entry points retain their initialization order. */
 var O46Core = window.O46Core || { installed: Object.create(null) };
 
+// Lookup for one immutable variant payload. A replacement array gets its own index.
+O46Core.variationLookup = (() => {
+    const indexes = new WeakMap();
+
+    function indexFor(rows) {
+        if (!indexes.has(rows)) {
+            const byAttribute = new Map();
+            rows.forEach((row, position) => {
+                const occurrences = new Map();
+                for (const attribute of row.attributes || []) {
+                    // Keep the original JSON comparison, including value types and key order.
+                    const key = JSON.stringify(attribute);
+                    occurrences.set(key, (occurrences.get(key) || 0) + 1);
+                }
+                for (const [key, count] of occurrences) {
+                    if (!byAttribute.has(key)) byAttribute.set(key, []);
+                    byAttribute.get(key).push({ position, count });
+                }
+            });
+            indexes.set(rows, byAttribute);
+        }
+        return indexes.get(rows);
+    }
+
+    return {
+        containing(rows, attribute) {
+            if (!rows?.length) return [];
+            const matches = indexFor(rows).get(JSON.stringify(attribute)) || [];
+            return matches.map(match => rows[match.position]);
+        },
+        selected(rows, attributes) {
+            if (!rows?.length) return null;
+            if (!attributes.length) return rows[rows.length - 1];
+            const byAttribute = indexFor(rows);
+            const totals = new Map();
+            for (const attribute of attributes) {
+                const matches = byAttribute.get(JSON.stringify(attribute)) || [];
+                for (const { position, count } of matches) {
+                    totals.set(position, (totals.get(position) || 0) + count);
+                }
+            }
+            // The original selector returns the last row with exactly this many pair matches.
+            let last = -1;
+            for (const [position, count] of totals) {
+                if (count === attributes.length && position > last) last = position;
+            }
+            return last < 0 ? null : rows[last];
+        }
+    };
+})();
+
+// Only the latest read may update this product, including after a quickview closes.
+O46Core.forCurrentVariation = function ($item, apply) {
+    const article = $item[0];
+    const selection = {};
+    article.o46VariationRead = selection;
+    return function (response) {
+        if (article.isConnected && article.o46VariationRead === selection) apply(response, $item);
+    };
+};
+
 // IO's prepared unitPrice already reflects the customer's net/gross setting.
 O46Core.updateVariationPrices = function ($item, prices) {
     const amount = entry => {

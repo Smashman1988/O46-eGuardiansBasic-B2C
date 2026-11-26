@@ -374,3 +374,38 @@ test('Kompakter Kategoriepager bleibt beim Scrollen und nach Höhenwechsel errei
     await expect(page.locator('[data-category-paging-anchor]')).toBeVisible();
     await expect(pager).toBeHidden();
 });
+
+test('Nachgeladene Lazy-Bilder behalten Platzhalter und Fallback ohne neuen Dokumentdurchlauf', async ({page, shop}) => {
+    await shop.open('/scroll/');
+    const result = await page.evaluate(() => {
+        const events = eGuardians.events;
+        const nativeObserver = window.IntersectionObserver;
+        const query = document.querySelectorAll;
+        const root = document.createElement('div');
+        document.body.append(root);
+        let documentScans = 0;
+        try {
+            window.IntersectionObserver = undefined;
+            events.observeLazyImages();
+            document.querySelectorAll = function (selector) {
+                if (selector === '.lozad') documentScans++;
+                return query.call(this, selector);
+            };
+            root.innerHTML = '<div class="lozad" data-placeholder-background="red" data-toggle-class="ready">'
+                + '<span class="lozad" data-toggle-class="ready"></span></div>';
+            const card = root.firstElementChild;
+            events.observeLazyImages([card]);
+            events.observeLazyImages([card]);
+            return {
+                documentScans, placeholder: card.style.background,
+                loaded: [card, card.firstElementChild].every(node => node.dataset.loaded === 'true' && node.classList.contains('ready'))
+            };
+        } finally {
+            document.querySelectorAll = query;
+            window.IntersectionObserver = nativeObserver;
+            root.remove();
+            events.observeLazyImages();
+        }
+    });
+    expect(result).toEqual({documentScans: 0, placeholder: 'red', loaded: true});
+});

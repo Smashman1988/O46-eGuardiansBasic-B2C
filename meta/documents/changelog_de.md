@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Die Variantenauswahl verwendet einen Index je Artikeldatensatz. Infinite Scroll registriert beim Nachladen nur die Bilder der neu hinzugefügten Karten. Verspätete Variantenantworten können die aktuelle Auswahl und deren Kaufbutton nicht mehr überschreiben.
+
 - Produktlisten halten für Größenanzeigen nur die erste benötigte Attributgruppe im Speicher. Die Schnellansicht überspringt die Warenkorb-, Merklisten- und Canonical-Abfragen der vollständigen Produktseite.
 - Auf der Newsletter-Anmeldeseite erhalten die Textwidgets ihren Standard-Innenabstand bereits vor dem Laden des Hauptstylesheets.
 

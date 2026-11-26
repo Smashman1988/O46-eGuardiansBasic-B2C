@@ -30,7 +30,8 @@ for (const entry of entries) {
         n.type==='AssignmentExpression' && n.left.object?.name==='O46Core' && n.left.property?.name==='updateVariationPrices' && n.right);
     const callback = findSource(entry, (n,s) => n.type==='CallExpression' && n.callee.property?.name==='get' &&
         n.arguments[0]?.type==='BinaryExpression' && s.slice(n.arguments[0].start,n.arguments[0].end).includes('/rest/io/variations/') &&
-        n.arguments[2]?.type==='FunctionExpression' && s.slice(n.arguments[2].start,n.arguments[2].end).includes('data-eg-item-nr') && n.arguments[2]);
+        n.arguments[2]?.callee?.property?.name==='forCurrentVariation' &&
+        s.slice(n.arguments[2].start,n.arguments[2].end).includes('data-eg-item-nr') && n.arguments[2].arguments[1]);
     const state=new Map();
     function node(key) {
         if (!state.has(key)) state.set(key,{value:'',hidden:false,set(v){this.value=String(v);return this;},html(v){return this.set(v);},text(v){return this.set(v);},
@@ -45,7 +46,7 @@ for (const entry of entries) {
     const apply=vm.runInContext('('+callback+')',ctx);
     for (const [price,rrp,p,r,s,pct] of cases) {
         apply({data:{documents:[{data:{stock:{net:8},images:{variation:[]},variation:{number:'test',availability:{id:1,names:{name:'ok'}}},
-            prices:{default:amounts(price,999),rrp:amounts(rrp,1000),graduatedPrices:[]}}}]}});
+            prices:{default:amounts(price,999),rrp:amounts(rrp,1000),graduatedPrices:[]}}}]}},ctx.$itemElement);
         for (const [attr,value] of [['price',p],['rrp',r],['rrp-spar',s],['rrp-percent',pct]]) assert.equal(node('[data-eg-item-'+attr+']').value,value,entry+'/'+String(rrp));
         assert.equal(node('[data-eg-item-discount]').hidden,!r);
         assert.equal(node('[data-eg-item-special]').hidden,!!r);
@@ -58,3 +59,49 @@ for (const entry of entries) {
     assert.equal(dispatched,cases.length);
 }
 console.log(entries.length+' source/bundle callbacks × '+cases.length+' sequential IO variation responses PASS');
+
+for (const core of ['core.js', 'core.min.js']) {
+    function moduleValue(name) {
+        const expression = findSource(core, node =>
+            node.type === 'AssignmentExpression' && node.left.object?.name === 'O46Core' &&
+            node.left.property?.name === name && node.right);
+        return vm.runInNewContext('(' + expression + ')');
+    }
+    const lookup = moduleValue('variationLookup');
+    const attribute = (attributeId, attributeValueId) => ({attributeId, attributeValueId});
+    for (const count of [1, 12, 24, 50, 100]) {
+        const rows = Array.from({length: count}, (_, i) => ({
+            variationId: i + 1, attributes: [attribute(1, i % 4), attribute(2, i)]
+        }));
+        for (const row of rows) {
+            assert.equal(lookup.selected(rows, row.attributes), row);
+            const group = row.attributes[0];
+            const expected = rows.filter(entry => entry.attributes[0].attributeValueId === group.attributeValueId);
+            assert.deepEqual(Array.from(lookup.containing(rows, group)), expected);
+        }
+        assert.equal(lookup.selected(rows, []), rows[count - 1]);
+    }
+    const pair = attribute(1, 2);
+    const rows = [{attributes: [pair, pair]}, {attributes: [pair]}];
+    assert.equal(lookup.selected(rows, [pair]), rows[1]);
+    assert.equal(lookup.selected(rows, [pair, pair]), rows[1]);
+    assert.equal(lookup.selected(rows, [attribute(1, '2')]), null);
+    assert.equal(lookup.selected(rows, [{attributeValueId: 2, attributeId: 1}]), null);
+
+    const guard = moduleValue('forCurrentVariation');
+    const first = [{isConnected: true}], second = [{isConnected: true}], accepted = [];
+    const save = (value, item) => accepted.push([value, item]);
+    const obsolete = guard(first, save);
+    const latest = guard(first, save);
+    const independent = guard(second, save);
+    latest('latest');
+    obsolete('late');
+    independent('other');
+    const partial = guard(first, save);
+    delete first[0].o46VariationRead;
+    partial('incomplete selection');
+    second[0].isConnected = false;
+    independent('detached article');
+    assert.deepEqual(accepted, [['latest', first], ['other', second]]);
+}
+console.log('Variant lookup and isolated, ordered updates PASS for source and production core.');

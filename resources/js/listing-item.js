@@ -65,71 +65,17 @@ O46Core.item = O46Core.item || function () {
              * @param {type} searchIndex
              * @returns {unresolved}
              */
-            this.findVariation = function(attributes, searchIndex,_this){
-                var foundedVariation = null;
-                var selectedVariation = [];
-                var itemVariations = $(_this).data('eg-variations');
-                $(itemVariations).each(function(key, valVariation){
-                        foundedVariation = valVariation.attributes.filter(function (el) { 
-                            if(JSON.stringify(attributes) === JSON.stringify(el)){
-                                return valVariation;
-                            } 
-                        }); 
-                        /*if(foundedVariation!=null&&foundedVariation.length>0){
-                            selectedVariation.push(valVariation);
-                        }
-                        var reverseAttr = valVariation.attributes.reverse();
-                        foundedVariation = reverseAttr.filter(function (el) { 
-
-                            if(JSON.stringify(attributes) === JSON.stringify(el)){
-                                return valVariation;
-                            } 
-                        }); */
-                        
-                        if(foundedVariation!=null&&foundedVariation.length>0){
-                            selectedVariation.push(valVariation);
-                            //return false; 
-                        }
-                    //})
-                });
-                return selectedVariation;
+            this.findVariation = function(attributes, searchIndex, container) {
+                return O46Core.variationLookup.containing($(container).data('eg-variations'), attributes);
             };
-            this.getVariation = function(attributes,_this){
-           
-                /*var selectedVariation = itemVariations.filter(function (el) { return JSON.stringify(attributes) === JSON.stringify(el.attributes) }); 
-                 Wenn keine Variante gefunden wurde dann drehe array und prüfe erneut 
-                if(selectedVariation.length==0){
-                    attributes = attributes.reverse();
-                    selectedVariation = itemVariations.filter(function (el) { return JSON.stringify(attributes) === JSON.stringify(el.attributes) }); 
-                }*/
-                var selectedVariation = null;
-                var foundLength = 0;
-                var hasLength = attributes.length;
-                var itemVariations = $(_this).closest('[data-item-variation]').data('eg-variations');
-                console.log(_this)
-                $(itemVariations).each(function(key, variationVal){
-                    foundLength = 0;
-                    $(variationVal.attributes).each(function(key, attrVal){
-                        $(attributes).each(function(key, selectAttrVal){
-                            if(JSON.stringify(selectAttrVal) === JSON.stringify(attrVal)){
-                                foundLength++;
-                            }
-                        })
-                        
-                    });
-                    if(foundLength==hasLength){
-                        selectedVariation = variationVal;
-                        return true;
-                    }
-                    
-                });
-   
-                return selectedVariation;
+            this.getVariation = function(attributes, element) {
+                const rows = $(element).closest('[data-item-variation]').data('eg-variations');
+                return O46Core.variationLookup.selected(rows, attributes);
             };
             this.setVarition = function(_this){
                 var attributesFormat = [];
                 var activeAttributeBox = null;
-                $itemElement = $(_this).parents('[data-item]');
+                const $itemElement = $(_this).parents('[data-item]');
                 attributeList = $itemElement.find('[data-eg-attributes]');
                 
                
@@ -175,14 +121,14 @@ O46Core.item = O46Core.item || function () {
                     var searchParams = {
                         template: encodeURI('Ceres::Item.SingleItem')
                     }
-                    $('[data-eg-loading-attr]').addClass('isLoading');
-                    eGuardians.apiservice.get('/rest/io/variations/' + activeVariation.variationId, searchParams, function(response){    
+                    $itemElement.find('[data-eg-loading-attr]').addClass('isLoading');
+                    eGuardians.apiservice.get('/rest/io/variations/' + activeVariation.variationId, searchParams, O46Core.forCurrentVariation($itemElement, function(response, $itemElement){
                       
                         var variationData = response.data.documents[0].data;
                         if(variationData.stock.net<7 && variationData.stock.net>0){
-                            $('.data-stock-warn').html(messageServiceTranslations["stockWarn1"]+' '+variationData.stock.net+' '+messageServiceTranslations["stockWarn2"])
+                            $itemElement.find('.data-stock-warn').html(messageServiceTranslations["stockWarn1"]+' '+variationData.stock.net+' '+messageServiceTranslations["stockWarn2"])
                         }else{
-                            $('.data-stock-warn').html(messageServiceTranslations["stockWarn3"])
+                            $itemElement.find('.data-stock-warn').html(messageServiceTranslations["stockWarn3"])
                         }                        
                         O46Core.updateVariationPrices($itemElement, variationData.prices);
                         
@@ -203,24 +149,26 @@ O46Core.item = O46Core.item || function () {
                         event.initEvent("submit", false, true); 
                         document.dispatchEvent(event,response);
                         //document.dispatchEvent(new CustomEvent("variationChanged",response));
-                        $('[data-eg-loading-attr]').removeClass('isLoading');
+                        $itemElement.find('[data-eg-loading-attr]').removeClass('isLoading');
                         
                         if(variationData.prices.graduatedPrices.length>0){
-                            $('.table-gruaded-head').html('');
-                            $('.table-gruaded-content').html('');
+                            $itemElement.find('.table-gruaded-head').html('');
+                            $itemElement.find('.table-gruaded-content').html('');
                             $(variationData.prices.graduatedPrices.reverse()).each(function(i,gruadedData){
                                 
                                 if(gruadedData.minimumOrderQuantity>1){
-                                    $('.table-gruaded-head').append('<div class="table-cell table-head">ab <span>'+gruadedData.minimumOrderQuantity+'</span></div>');
-                                    $('.table-gruaded-content').append('<div class="table-cell table-content"> <span class="bold">'+gruadedData.price.formatted+'</span></div>');
+                                    $itemElement.find('.table-gruaded-head').append('<div class="table-cell table-head">ab <span>'+gruadedData.minimumOrderQuantity+'</span></div>');
+                                    $itemElement.find('.table-gruaded-content').append('<div class="table-cell table-content"> <span class="bold">'+gruadedData.price.formatted+'</span></div>');
                                     /*$('.table-head[data-gruadetquantity="'+gruadedData.minimumOrderQuantity+'"] > span').html(gruadedData.minimumOrderQuantity);
                                     $('.table-content[data-gruadetquantity="'+gruadedData.minimumOrderQuantity+'"] > span').html(gruadedData.price.formatted);*/
                                 }
                             })
                         }
                         
-                    });
+                    }));
                 }else{
+                    delete $itemElement[0].o46VariationRead;
+                    $itemElement.find('[data-eg-loading-attr]').removeClass('isLoading');
                     $itemElement.find('[data-item-tobasket]').addClass('inBasketBtnDisabled');
                     $itemElement.find('[data-item-tobasket]').attr('title','Diese Variante ist leider nicht mehr verfügbar.');
                     //$('[data-item-tobasket]').attr('data-toggle','tooltip');
@@ -232,7 +180,7 @@ O46Core.item = O46Core.item || function () {
                  * Wählt man ein Attribute finde andere Attribute die nicht zu dem Attribut gehören 
                  * pressedActiveParent ist das Element was gerade angeklickt wurde
                  */
-                $itemElement = $(activeElement).parents('[data-item]');
+                const $itemElement = $(activeElement).parents('[data-item]');
                 $itemElement.find('[data-eg-value]').removeClass('disabled');
                 var selectedAttributeData = $("[data-selected]", pressedActiveParent).data();
                 $itemElement.find('[data-eg-value]').each(function(){
