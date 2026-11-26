@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Auf dem Desktop reserviert der Header Platz für die Warenkorbsumme. Beim Laden des bestätigten Betrags bleiben die benachbarten Bedienelemente an ihrer Position.
+
 - Die italienische und spanische Hauptsuche verwendet auch bei direkter Initialisierung zwölf Artikel je Seite.
 
 - Menge und Summe im Header erscheinen erst mit dem bestätigten Warenkorbstand. Bei langsamer Sitzung entfällt die zwischenzeitliche Nullanzeige.

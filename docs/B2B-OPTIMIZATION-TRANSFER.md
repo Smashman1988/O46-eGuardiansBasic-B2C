@@ -2,7 +2,7 @@
 
 B2C führt die laufende Tiefenoptimierung. Diese Datei gehört zum B2C-Repository. Bei jedem Paket die betroffenen IDs aktualisieren, neue IDs anhängen und die getesteten Git-Stände nennen. Eine ID bleibt auch bei abgelehnten Versuchen oder abweichenden B2B-Pfaden erhalten.
 
-**Stand 26.11.2026.** B2C develop ec0d549, Paket 7 auf Set 428 verifiziert, Paket 8 lokal. B2B develop 1f154b9 mit den bisherigen lokalen Transfers und den unten geprüften Erweiterungen. Die native Prüfung des neuen B2B-Arbeitsstands steht aus.
+**Stand 26.11.2026, Paket 11.** Bei B2C stimmen die Auslieferungssignaturen von Set 428 mit `792b9bc` überein. Die zusätzliche Platzreservierung für die Warenkorbsumme ist lokal geprüft. B2B liegt lokal auf `5d8756b`. Der Remote-Branch steht auf `1f154b9`, das ungebundene Testset 427 auf Theme 1.0.6. Die native B2B-Abnahme des Kandidaten steht aus.
 
 Pfade gelten jeweils innerhalb des genannten Themes. `Views` steht für `resources/views`, `Head` für `Views/PageDesign/Partials/Head.twig`, `PageDesign` für `Views/PageDesign/PageDesign.twig`, `PDP` für `Views/Item/SingleItem.twig`, `Extension` für `src/Extensions/Base_Extension.php`. Außer den ausdrücklich angegebenen B2B-Testergebnissen wurde für die jeweilige ID kein B2B-Vorher-/Nachher-Test durchgeführt. Die Paketberichte sind lokale Zusatzbelege. Git-Stände, Messwerte und Entscheidungen stehen auch hier im versionierbaren Dokument.
 
@@ -210,3 +210,16 @@ Stand 26. November 2026. B2C develop basiert auf 4dab006, B2B develop auf 1f154b
 Die neuen Einträge T36, T37 und B03 sind oben in der Einzelentscheidung erfasst. Die lokale Markennachbildung erklärt sämtliche Positionsabweichungen. Der Release wartet auf die Wiederabnahme von T36/T37 und separat auf das B2B-Testset.
 
 [Paket-10-Bericht](../.cache/b2c-audit/Optimierungspaket-10.html) · [SHA-256 der sechs historischen Dateien](../.cache/b2c-audit/paket10/kompatibilitaet/manifest.json)
+
+## Paket 11 · Native Gesamtabnahme
+
+Die 53 bisherigen Einzelentscheidungen aus Paket 10 gelten mit den folgenden Aktualisierungen. T38 erfasst die im nativen Test nachgewiesene Layoutverschiebung. Die Paketberichte führen alle 54 IDs mit dem jeweiligen Nachweis auf.
+
+| ID | B2C-Nachweis | B2B-Relevanz und nächster Nachweis | Transferstatus |
+|---|---|---|---|
+| T36 | 428, 17 Headerprüfungen mit zwei unabhängigen Gastkörben, 0/1/9/10/11/15 Artikeln, zweitem Tab und Währungswechsel. Beim Zurückhalten und beim Ausfall der Warenkorbantwort blieben Menge und Währungssymbol verborgen. Nach dem erneuten Abruf erschienen 15 Artikel und 224,85 €. Die Vorschau ist privat. Der Nachweis am öffentlichen Kandidaten steht aus. | Den dort lokal getesteten Header auf dem künftigen B2B-Testset mit Nettosummen und getrennten Händlerkonten erneut prüfen. | B2B lokal getestet |
+| T37 | 428, 32 eindeutige Suchtreffer in IT und ES, jeweils 12/12/8, leere Seite 4. Klassischer Seitenlink und Infinite Scroll geprüft. DE/EN/FR als Kontrollen. | Seitengröße des eigenen Händler-Suchkontexts im bereitgestellten B2B-Kandidaten messen. 427 enthält den alten Stand. | B2B-Prüfung ausstehend |
+| T38 | `Head.twig`, `tests/cross-browser/early-layout.spec.cjs`. Der leere Betrag hatte keine eigene Mindestbreite. Bei 15 Artikeln rückte der Warenkorblink nativ um 30,42 px. Die Desktopregel reserviert Platz in der Einheit der Ziffernbreite. Im lokalen A/B mit dem gerenderten 428-Dokument betrug die Verschiebung nach der Korrektur bei 1.024, 1.440 und 1.920 px jeweils 0 px, auch mit sechsstelligen Summen. Mobile Kontrollbreiten 390 und 768 px. Keine zusätzlichen Anfragen. Die native Wiederabnahme nach Bereitstellung steht aus. | Eigenen Händlerheader mit Nettobeträgen, Währung und langen Summen nativ vermessen. Eine technische Gleichwertigkeit ist offen. | B2B-Prüfung ausstehend |
+| B03 | Eigenständige Händlermatrix. | Lokale Matrix-, Batch- und Korbregression erneut ausgeführt. Händlerklassen, Nettostaffeln, Mindestwert, Bestandsgrenzen und große Bestellungen müssen auf dem richtigen Testset gemeinsam geprüft werden. | B2B lokal getestet |
+
+[Paket-11-Abnahme B2C mit Einzelentscheidungen und Cache-Übergang](../.cache/b2c-audit/Optimierungspaket-11.html)

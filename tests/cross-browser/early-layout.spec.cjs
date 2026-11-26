@@ -6,6 +6,28 @@ const path = require('node:path');
 const head = fs.readFileSync(path.join(__dirname,'../../resources/views/PageDesign/Partials/Head.twig'),'utf8');
 const branches = [...head.matchAll(/<style>([\s\S]*?)<\/style>/g)].slice(0,3).map(match=>match[1]);
 
+test('Die bestätigte Warenkorbsumme verschiebt die Desktop-Navigation nicht', async ({page}) => {
+    const rule = head.match(/<style data-eg-basket-summary-critical>([\s\S]*?)<\/style>/);
+    const header = fs.readFileSync(path.join(__dirname, '../../resources/views/PageDesign/Partials/Header/Header.twig'), 'utf8');
+    const summary = header.match(/<span class="[^"]*header-sum-info[^"]*">.*?<\/span><\/span>/);
+    expect(rule).toBeTruthy();
+    expect(summary).toBeTruthy();
+    await page.setViewportSize({width: 1440, height: 900});
+    await page.setContent('<header id="page-header" style="display:flex;justify-content:flex-end"><button>Konto</button><a>' +
+        summary[0].replace(/{{[^}]+}}/, '€') + '</a></header>');
+    await page.addStyleTag({path: path.join(__dirname, '../../resources/css/main.min.css')});
+    await page.addStyleTag({content: rule[1]});
+    const link = page.locator('#page-header a');
+    const left = await link.evaluate(el => el.getBoundingClientRect().left);
+    const currency = link.locator('[data-currency-symbol]');
+    await expect(currency).toBeHidden();
+    for (const value of ['0,00', '14,99', '224,85', '999999,99']) {
+        await link.locator('[data-basket-sum]').evaluate((el, sum) => { el.textContent = sum; }, value);
+        await expect(currency).toBeVisible();
+        expect(await link.evaluate(el => el.getBoundingClientRect().left)).toBe(left);
+    }
+});
+
 test('Newsletter-Textwidgets behalten ihren Innenabstand beim Laden des Stylesheets', async ({page}) => {
     const rule = head.match(/<style data-eg-newsletter-layout-critical>([\s\S]*?)<\/style>/);
     expect(rule).toBeTruthy();
