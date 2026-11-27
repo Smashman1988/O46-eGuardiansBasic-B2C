@@ -154,11 +154,26 @@ test('Infinite Scroll lädt Folgeartikel einmal und verankert den Verlauf',async
     };
     const homePosition=await setHomePosition();
     expect(homePosition).toBeGreaterThan(0);
+    // On Android the fallback font can paint before or after Chromium restores the
+    // home entry. Compare both navigations with the same ordering: restore and
+    // paint the fallback first, then let the real local webfonts load normally.
+    async function returnHome() {
+        if (info.project.name !== 'android-large') return page.goBack();
+        const releaseFonts = shop.holdFonts();
+        try {
+            await page.goBack({waitUntil:'commit'});
+            await page.waitForFunction(() => location.pathname === '/' && scrollY > 0);
+            await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+        } finally {
+            releaseFonts();
+        }
+        await page.waitForLoadState('load');
+    }
     // Control navigation through the same rendered home. Native scroll anchoring may
     // adjust the stored coordinate when a document is reconstructed (e.g. Galaxy S9+).
     await shop.open('/category/');
     await settleViewport();
-    await page.goBack();
+    await returnHome();
     await settleViewport();
     const reference=await page.evaluate(async()=>{await document.fonts.ready;return scrollY;});
     expect(reference).toBeGreaterThan(0);
@@ -187,7 +202,7 @@ test('Infinite Scroll lädt Folgeartikel einmal und verankert den Verlauf',async
     const position=await page.evaluate(()=>scrollY);
     expect(position).toBeGreaterThan(0);
     expect(shop.requests.filter(r=>r[2]==='/scroll/')).toHaveLength(3);
-    await page.goBack();await expect(page).toHaveURL('https://storefront.test/');
+    await returnHome();await expect(page).toHaveURL('https://storefront.test/');
     await settleViewport();
     const departure=await page.evaluate(()=>Number(sessionStorage.getItem('departure:/')));
     expect(departure).toBe(homePosition);

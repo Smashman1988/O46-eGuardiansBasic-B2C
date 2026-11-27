@@ -41,6 +41,12 @@ const test = base.extend({
     shop: async ({context,page},use,info) => {
         const f = JSON.parse(read('.cache/cross-browser/fragments.json'));
         const requests=[], errors=[], failures=[];
+        let fontResponse;
+        function holdFonts() {
+            let release;
+            fontResponse = new Promise(resolve => { release = resolve; });
+            return () => { fontResponse = undefined; release(); };
+        }
         page.on('pageerror',e=>errors.push(e.stack||e.message));
         page.on('response',r=>{if(r.status()>=400) failures.push({url:r.url(),message:'HTTP '+r.status()});});
         page.on('console',m=>{ if(m.type()==='error') errors.push(m.text()); });
@@ -60,7 +66,10 @@ const test = base.extend({
                 if(u.hostname==='images.example.test' && req.resourceType()==='image') return pic('steelblue');
                 if(u.origin===origin) {
                     if(/^\/assets\/[a-z0-9.-]+\.(css|js)$/.test(p)) return route.fulfill({path:path.join(root,'resources',p.endsWith('.js')?'js':'css',path.basename(p))});
-                    if(p.includes('/documents/fonts/') && /^[\w.-]+\.woff2?$/.test(path.basename(p))) return route.fulfill({path:path.join(root,'resources/documents/fonts',path.basename(p))});
+                    if(p.includes('/documents/fonts/') && /^[\w.-]+\.woff2?$/.test(path.basename(p))) {
+                        if (fontResponse) await fontResponse;
+                        return route.fulfill({path:path.join(root,'resources/documents/fonts',path.basename(p))});
+                    }
                     if (p === '/plugin/GuardiansBasic/images/logo-outlet-new.svg') {
                         return route.fulfill({path: path.join(root, 'resources/images/logo-outlet-new.svg'), contentType: 'image/svg+xml'});
                     }
@@ -88,7 +97,7 @@ const test = base.extend({
             return route.abort('blockedbyclient');
         });
         const open=async (pathname='/alle-artikel/')=>{await page.goto(origin+pathname);await expect(page.locator('body')).toHaveAttribute('data-ready','1');};
-        try { await use({open,requests,groups:f.groups}); }
+        try { await use({open,requests,groups:f.groups,holdFonts}); }
         finally {
             const layout=page.isClosed()?null:await page.evaluate(()=>({inner:innerWidth,client:document.documentElement.clientWidth,
                 visual:visualViewport?.width,screen:screen.width,dpr:devicePixelRatio,touch:navigator.maxTouchPoints,

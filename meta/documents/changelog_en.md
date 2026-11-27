@@ -2,6 +2,7 @@
 
 ## Unreleased · B2C develop
 
+- On narrow screens, amounts such as 179,88 € fit on one line. Longer amounts can still wrap before the currency.
 - Restored the original basket icon placement and spacing beside the account and wishlist. The mobile logo retains its width, and long currency labels can wrap beneath the amount.
 - The product-page wishlist fallback also handles a missing ID list under strict Twig.
 

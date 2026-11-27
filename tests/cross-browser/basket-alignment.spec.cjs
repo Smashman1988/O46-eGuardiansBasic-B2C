@@ -52,6 +52,14 @@ test('Schmale Kopfzeile erhält das Logo und zeigt vollständige Beträge und W�
     for (const width of [320,360,375,390,414,430,575,576,767,768,992]) {
         await page.setViewportSize({width,height:844});
         const initial = await basketState(page, '0,00', '€', 0);
+        for (const amount of ['11,98', '179,88', '1573,95']) {
+            const current = await basketState(page, amount, '€', 12);
+            if (amount !== '1573,95') expect(current.unit.top).toBe(current.sum.top);
+            expect(current.sum.left).toBeGreaterThanOrEqual(current.account.right);
+            expect(current.unit.right).toBeLessThanOrEqual(width);
+            expect(current.logo).toEqual(initial.logo);
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
         const r = await basketState(page, '999999,99', 'AED', 105);
         expect(r.height).toBe(initial.height);
         expect(r.logo.width).toBe(initial.logo.width);

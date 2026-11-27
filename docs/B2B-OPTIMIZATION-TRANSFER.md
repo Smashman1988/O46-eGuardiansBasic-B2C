@@ -269,3 +269,24 @@ Die gemeinsame Schlussprüfung umfasst 509 Betragsmessungen an 125 Breiten je Th
 | QA-02 | Die B2B-Kontaktfläche überdeckte bei 820 px den Galeriezoom. | B2C besitzt diesen B2B-Kontaktstarter nicht. | Die bestehende Schnittmengenprüfung beobachtet zusätzlich den Galeriezoom. Klickziel vor dem automatischen Scrollen geprüft. **B2B lokal getestet**. |
 
 Für diese Qualitätskorrekturen wurde kein Performance-Gewinn gemessen. [B2C-Bilder und Messungen](../.cache/b2c-audit/qualitaet-nachtrag/B2C-Qualitaetsbericht.html) · [B2B-Bilder und Einzelnachweise](../.cache/b2c-audit/qualitaet-nachtrag/B2B-Qualitaetsbericht.html)
+
+### Native Nachprüfung des wiederhergestellten B2C-Headers am 27. November 2026
+
+| ID | B2C | B2B |
+| --- | --- | --- |
+| T36 / T38 | **B2C nativ abgenommen** für den wiederhergestellten Warenkorbheader. Auf 428 entspricht das ausgelieferte kritische CSS dem Stand `e56deb7`. Auf 320 px liegt das Korbsymbol wie auf 425 bei x = 279,81 px. Vergleich bei 117 Breiten und acht Browserzoomstufen. Bei 1, 12 und 105 Stück sowie allen 13 Währungen stimmten Betrag und Einheit in 30 direkt vergleichbaren Bildpaaren überein. Lange Beträge bleiben auf 428 auch bei 320 px lesbar. | **B2B lokal getestet**. Alle 509 Header-Geometriefälle bestanden. Die native B2B-Prüfung bleibt zurückgestellt. |
+| QA-01 / QA-02 | Die 480 Windows-Browserfälle ergaben 470 bestandene, neun ausgelassene und einen fehlgeschlagenen Fall. Die Scrollrückkehr auf Android wich einmal um 2 px ab. Acht unveränderte Einzelwiederholungen bestanden. | **B2B lokal getestet**. Alle 15 früher fehlgeschlagenen Einzelprogramme bestanden. Galeriezoom und Kontaktbutton waren bei 27 Breiten von 320 bis 3840 px an ihren vorgesehenen Positionen bedienbar. |
+
+[Native B2C-Vergleichsbilder und Befunde](../.cache/b2c-audit/native-header-20261127/B2C-Native-Qualitaetspruefung.html) · [Lokale B2B-Prüfergebnisse](../.cache/b2c-audit/native-header-20261127/B2B-Lokale-Testpruefung.html)
+
+### Währungsumbruch und Android-Verlauf · 27. November 2026
+
+| ID | Befund und betroffener Pfad | B2C | B2B |
+| --- | --- | --- | --- |
+| T38, Folgekorrektur | Im mobilen `PageDesign/Partials/Head.twig` fehlten bei 320 px rund 2,6 px für 179,88 €. Nur die zentrierte Textfläche nutzt jetzt je 2 px des vorhandenen Zwischenraums. Lange Beträge können weiterhin umbrechen. | **B2C lokal umgesetzt**. 509 bestehende Geometriefälle und 832 direkte Vorher-/Nachher-Vergleiche bestanden. Der Ausgangsfehler ist nativ auf 428 belegt. Die native Prüfung der Korrektur steht aus. | **B2B lokal getestet**. Gleicher Layoutbefund und identische Gegenprüfungen mit dem eigenen B2B-Logo. Die native Prüfung ist zurückgestellt. |
+| QA-02, Folgekorrektur | Das Android-Testprofil verglich gelegentlich zwei unterschiedliche Zeitpunkte der Schriftumschaltung beim nativen Scroll-Anchoring. `tests/cross-browser/storefront.cjs` und `storefront.spec.cjs` koordinieren nun die Schriftantwort beim Rücksprung. | **B2C lokal umgesetzt**. Neun Wiederholungen bestanden. Eine gezielt falsche Rückkehr um 2 px wurde erkannt. | **B2B lokal getestet**. Dieselbe Fixture und neun erfolgreiche Wiederholungen im Pixel-7-Pro-Profil. |
+| QA-03 | Eine verspätete erste Initialisierung der B2B-Variantenmatrix konnte im Test mit der simulierten 503-Antwort zusammentreffen. | B2C verwendet die normale Variantenwahl. | **B2B lokal getestet**. `tests/matrix_availability.cjs` wartet auf die beiden initialen Anfragen von Produktseite und Quickview. Die gezielt hergestellte Fehlreihenfolge reproduzierte den Befund. Zehn Wiederholungen der korrigierten Prüfung bestanden. |
+
+Für diese Qualitätskorrekturen wurde kein Performancegewinn erhoben. Das externe GTM-Plugin und die vier B2C-Mandanteninhalte begründen keinen Theme-Transfer.
+
+[Bildvergleich und Testinventar](../.cache/b2c-audit/qualitaet-rest-20261127/Qualitaetsbericht.html) · [GTM-Befund](../.cache/b2c-audit/qualitaet-rest-20261127/GTM-Fehlerbericht.html) · [Herkunft der Rechtstexte](../.cache/b2c-audit/qualitaet-rest-20261127/Rechtsseiten.html)

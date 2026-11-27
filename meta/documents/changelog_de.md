@@ -2,6 +2,7 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Auf schmalen Displays bleibt z. B. 179,88 € in einer Zeile. Bei längeren Beträgen kann die Währung weiterhin unter dem Betrag stehen.
 - Warenkorbsymbol, Mengenanzeige und Abstände zu Konto und Merkliste orientieren sich wieder am ursprünglichen Header. Bei schmalen Displays bleibt die Logobreite erhalten. Lange Währungskürzel können unter dem Betrag stehen.
 - Auf der Produktseite funktioniert der Merkliste-Fallback auch bei fehlender ID-Liste unter striktem Twig.
 
