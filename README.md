@@ -99,6 +99,8 @@ Die Referenz für die übernommenen Storefront-Funktionen ist B2B `1f154b9`. B2C
 
 Mit den Dev-Abhängigkeiten aus `package-lock.json` baut `npm run build` die CSS- und JavaScript-Dateien. `npm test` prüft die Pluginidentität, die erzeugten Dateien, Preisformate und die API- und Kontodialoge. Bei Änderungen an ausgelieferten Bytes die betroffenen Einträge in `resources/asset-versions.json` erhöhen. Der Build überprüft die SHA-256-Werte im Manifest.
 
+`npm test` führt auch `npm run test:plentyone` aus. Der Test parst produktive PHP-Dateien, löst Namespaces und Importe auf und meldet Fundstellen mit Datei und Zeile. Der versionierte Stand in `tests/fixtures/plentyone-stable7.json` ermöglicht die Offline-Prüfung. Bei Änderungen der Plattformfreigaben die beiden Namenslisten mit der [offiziellen Stable7-Referenz](https://developers.plentymarkets.com/en-gb/interface/stable7/NativePHPFunctionsAndClasses.html) abgleichen.
+
 Die PHP-/Twig- und Browsertests verwenden lokale Testdaten. `tests/ceres-list-query.php` erwartet den Pfad zu Ceres `src`. `tests/seo_pagination.php` und `tests/pdp_render_contract.php` erwarten den Twig-Autoloader und den Pfad zur JSON-Ergebnisdatei. Der lokale Vergleichsbericht liegt unter `.cache/b2c-parity/Auftrag-04-Produktkarten-Grids.html`.
 
 ### Lokale Browserprüfung

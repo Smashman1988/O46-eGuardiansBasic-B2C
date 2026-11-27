@@ -2,6 +2,7 @@
   "name": "outlet46-b2c-theme-assets",
   "private": true,
   "scripts": {
+    "test:plentyone": "node tests/plentyone_php.cjs",
     "test:cross": "playwright test --config=playwright.config.cjs",
     "build": "node scripts/build-assets.cjs",
     "check:assets": "node scripts/build-assets.cjs --check",
@@ -10,12 +11,13 @@
     "check:css": "node scripts/build-css.cjs --check",
     "build:js": "node scripts/build-js.cjs",
     "check:js": "node scripts/build-js.cjs --check",
-    "test": "npm run check:identity && npm run check:assets && node tests/cache_compatibility.cjs && node tests/variation_prices.cjs && node tests/api_transport.cjs && node tests/api_transport.cjs --min && node tests/auth_responses.cjs && node tests/auth_responses.cjs --min"
+    "test": "npm run test:plentyone && npm run check:identity && npm run check:assets && node tests/cache_compatibility.cjs && node tests/variation_prices.cjs && node tests/api_transport.cjs && node tests/api_transport.cjs --min && node tests/auth_responses.cjs && node tests/auth_responses.cjs --min"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
     "acorn": "8.15.0",
     "clean-css": "5.3.3",
+    "php-parser": "3.7.0",
     "postcss": "8.5.6",
     "terser": "5.44.0"
   }

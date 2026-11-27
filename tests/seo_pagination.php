@@ -531,7 +531,7 @@ namespace {
     foreach ([null,'1','2','69','999','0','-1','abc','',[], '2abc','1.5'] as $raw) {
         test('category/page-' . json_encode($raw), function () use ($raw) {
             $query = $raw === null ? [] : ['page'=>$raw];
-            $page = new SeoPage($query,'tpl.category.item',69, is_string($raw) && ctype_digit($raw) ? max(1,(int)$raw) : 1,1654);
+            $page = new SeoPage($query,'tpl.category.item',69, is_string($raw) && preg_match('/\A[0-9]+\z/', $raw) === 1 ? max(1,(int)$raw) : 1,1654);
             $p = $page->getPagination();
             $valid = in_array($raw,[null,'1','2','69'],true);
             check($p['valid'] === $valid,'Wrong valid range');

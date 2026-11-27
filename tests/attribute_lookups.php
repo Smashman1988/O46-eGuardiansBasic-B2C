@@ -9,6 +9,32 @@ namespace {
     function check($condition, $message) { if (!$condition) throw new RuntimeException($message); }
 
     $lookup = (new ReflectionClass(Base_Extension::class))->newInstanceWithoutConstructor();
+    // Preserve the string conversion, positive integer guard and original PHP array key.
+    foreach ([
+        [1,1], ['001','001'], [true,1], [12.0,12], [str_repeat('9',40),str_repeat('9',40)],
+        [0,null], ['00',null], [false,null], [null,null], ['',null], [-1,null], ['-1',null],
+        ['+1',null], [' 1',null], ["1\n",null], ["1\0",null], ['1e2',null], ['1.0',null],
+        ['１２',null], ['١',null], [1.5,null]
+    ] as [$id,$expectedKey]) {
+        $rows = $lookup->getWishChoices([['variationId'=>$id]], [])['rows'];
+        check(array_keys($rows) === ($expectedKey === null ? [] : [$expectedKey]), 'Changed ID handling for '.var_export($id,true));
+    }
+    // A model can expose both properties and offsets with different values.
+    $hybrid = new class(['attributeId'=>5,'attributeValueId'=>6]) extends ArrayObject {
+        public $attributeId = 100;
+        public $attributeValueId = 200;
+    };
+    $dto = new class { public $attributeId = 7; public $attributeValueId = 8; };
+    $mixed = [['variationId'=>1,'attributes'=>[$hybrid,$dto,(object)['attributeId'=>9,'attributeValueId'=>10]]]];
+    check($lookup->getWishChoices($mixed,[])['rows'][1][1] === [5=>6,7=>8,9=>10], 'Picker attribute representation or precedence changed');
+    check($lookup->getSalableAttributeValues($mixed,[1=>true]) === [5=>[6=>true],7=>[8=>true],9=>[10=>true]], 'Salability attribute precedence changed');
+    $broken = new class extends ArrayObject {
+        public function offsetGet(mixed $key): mixed { throw new Error('Invalid model offset'); }
+    };
+    try {
+        $lookup->getWishChoices([['variationId'=>1,'attributes'=>[$broken]]],[]);
+        throw new RuntimeException('Model error swallowed');
+    } catch (Error $e) { check($e->getMessage() === 'Invalid model offset','Changed model error'); }
     $pair = ['attributeId'=>'03', 'attributeValueId'=>'007'];
     $variations = [
         ['variationId'=>11, 'attributes'=>[$pair, (object)['attributeId'=>4,'attributeValueId'=>7]]],

@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Die Prüfung der Varianten-IDs und der Attributwerte für die Merkliste verwendet die von PlentyONE freigegebene PHP-Funktionalität.
+
 - Produktkarten, Artikeldetailseite und Schnellansicht teilen ein Merklistenherz. Die gespeicherte Variante lässt sich direkt entfernen. Bei mehreren möglichen Varianten zeigt die Größenauswahl die konkreten Optionen. Gäste und Kunden sehen bestätigte Änderungen auch auf der Merklistenseite und in anderen Tabs.
 
 - Auf schmalen Displays bleibt z. B. 179,88 € in einer Zeile. Bei längeren Beträgen kann die Währung weiterhin unter dem Betrag stehen.

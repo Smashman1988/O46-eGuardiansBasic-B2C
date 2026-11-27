@@ -317,13 +317,7 @@ class Base_Extension extends Twig_Extension
                 continue;
             }
             foreach ($variation['attributes'] ?? [] as $attribute) {
-                if (is_array($attribute) || $attribute instanceof \ArrayAccess) {
-                    $attributeId = $attribute['attributeId'] ?? null;
-                    $valueId = $attribute['attributeValueId'] ?? null;
-                } else {
-                    $attributeId = $attribute->attributeId ?? null;
-                    $valueId = $attribute->attributeValueId ?? null;
-                }
+                [$attributeId, $valueId] = $this->attributeIds($attribute, false);
                 if ($attributeId !== null && $valueId !== null) {
                     $values[(int)$attributeId][(int)$valueId] = true;
                 }
@@ -441,16 +435,13 @@ class Base_Extension extends Twig_Extension
         $rows = [];
         foreach ($variations as $variation) {
             $id = $variation['variationId'] ?? null;
-            if (!ctype_digit((string)$id) || (int)$id < 1) {
+            if (preg_match('/\A[0-9]+\z/', (string)$id) !== 1 || (int)$id < 1) {
                 continue;
             }
             $attributes = [];
             foreach ($variation['attributes'] ?? [] as $pair) {
-                if (is_object($pair) && !($pair instanceof \ArrayAccess)) {
-                    $attributes[$pair->attributeId] = $pair->attributeValueId;
-                } else {
-                    $attributes[$pair['attributeId']] = $pair['attributeValueId'];
-                }
+                [$attributeId, $valueId] = $this->attributeIds($pair, true);
+                $attributes[$attributeId] = $valueId;
             }
             $salable = $salability[$id] ?? $variation['isSalable'] ??
                 (($itemData['item']['flagTwo'] ?? null) == 3 ||
@@ -465,6 +456,27 @@ class Base_Extension extends Twig_Extension
             }
         }
         return ['rows' => $rows, 'names' => $names];
+    }
+
+    /** IO supplies offsets or public properties. When a model exposes both, offsets win. */
+    private function attributeIds($pair, bool $required): array
+    {
+        if (!is_object($pair) || get_class($pair) !== 'stdClass') {
+            try {
+                return $required
+                    ? [$pair['attributeId'], $pair['attributeValueId']]
+                    : [$pair['attributeId'] ?? null, $pair['attributeValueId'] ?? null];
+            } catch (\Error $error) {
+                // Only a property-only object falls back. Propagate errors from the model's own getter.
+                if (!is_object($pair) || $error->getFile() !== __FILE__ ||
+                    $error->getMessage() !== 'Cannot use object of type ' . explode("\0", get_class($pair), 2)[0] . ' as array') {
+                    throw $error;
+                }
+            }
+        }
+        return $required
+            ? [$pair->attributeId, $pair->attributeValueId]
+            : [$pair->attributeId ?? null, $pair->attributeValueId ?? null];
     }
 
     private function firstCardBox(array $attributes): array
