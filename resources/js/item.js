@@ -10,13 +10,7 @@ var eGuardians = (function(eGuardians) {
 eGuardians.initialize = function () {
     // 🔁 Event-Bindings aktivieren
     this.events.bindEvents();
-    const heart = document.querySelector('article.single button[data-eg-handler="watchListTrigger"][disabled]');
-    if (heart) {
-        heart.querySelector('.icon-spinner9')?.classList.replace('icon-spinner9', 'icon-heart-o');
-        heart.removeAttribute('aria-busy');
-        heart.removeAttribute('title');
-        heart.disabled = false;
-    }
+
 };
 
   eGuardians.events = new function() {
@@ -188,7 +182,7 @@ this.initShopData = function () { return O46Core.basketHeader.start(); };
             $(_this).parents('.eg-dropdown').toggleClass('isOpen');
         }
        
-        this.watchListTrigger = function(heart) { O46Core.wishPicker.open(heart); };
+
         this.initLiveSearch = O46Core.initLiveSearch
   };
   
@@ -456,22 +450,7 @@ O46Core.apiservice.call(window);
                 return images.variation.length>0 ? images.variation : images.all;
             }
         };
-        this.watchList = {
-            add: function(variationId, callback){
-                 var searchParams = {
-                    variationId: variationId,
-                    templateEvent: "tpl.item"
-                }
-                eGuardians.apiservice.post('/rest/io/itemWishList/', searchParams, callback);
-            },
-            remove: function(variationId, callback){
-                 var searchParams = {
-                    variationId: variationId,
-                    templateEvent: "tpl.item"
-                }
-                eGuardians.apiservice.delete('/rest/io/itemWishList/'+variationId, searchParams, callback);
-            }
-        };
+
     };
 })(eGuardians);
 /**
@@ -510,14 +489,6 @@ var loadJS = function(url, implementationCode, location){
 
     location.appendChild(scriptTag);
 };                                                                                               
-$(document).on('click', '.wish-list-remove', function(event){   
-    if((window.ceresStore.getters.wishListCount-1)<=0){
-        $('.wishlist-link').addClass('noWishListItems');
-    }else{
-       $('.wishlist-link .wishlist-count').html((window.ceresStore.getters.wishListCount-1)) 
-    }
-});
-
 $(document).on('click', '.related-search button', function(event){   
     if($(this).hasClass('directlink')){
         document.location.href = $(this).data('searchtxt');

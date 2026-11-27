@@ -1,13 +1,14 @@
 {# Ceres 5.0.86, resources/js/src/app/components/wishList/WishList.vue (AGPL-3.0).
-   Changes: empty-state condition and existing neutral status for unresolved IDs. Compare on Ceres updates. #}
+   Changes: empty-state condition, neutral status and variant IDs for the shared remove control. Compare on Ceres updates. #}
 <!-- SSR:template(wish-list) -->
 <script type="x/template" data-component="wish-list">
 {% verbatim %}
-<div>
+<div data-wish-list>
   <transition-group name="list-transition" tag="div">
     <wish-list-item
         v-for="wishListItem in wishListItems"
         :key="wishListItem.id"
+        :data-wish-entry="wishListItem.data.variation.id"
         :wish-list-item-raw="wishListItem"
         :item-details-data="itemDetailsData">
     </wish-list-item>
@@ -19,6 +20,7 @@
     <wish-list-inactive-item
         v-for="wishListInactiveItem in inactiveVariationIds"
         :key="wishListInactiveItem"
+        :data-wish-entry="wishListInactiveItem"
         :wish-list-inactive-item-raw="wishListInactiveItem"
         :item-details-data="itemDetailsData">
     </wish-list-inactive-item>

@@ -94,7 +94,6 @@ foreach (['blue','green','red'] as $color) {
     $url='/image/'.$color.'.svg';
     $images[]=array_fill_keys(['url','urlMiddle','urlSecondPreview','urlPreview'],$url);
 }
-$result['gallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>$images,'mainImg'=>$images[0],'galleryCount'=>count($images),'itemData'=>[]]);
 $variants = [['variationId'=>101,'attributes'=>[['attributeId'=>9,'attributeValueId'=>1]],'isSalable'=>true],
     ['variationId'=>102,'attributes'=>[['attributeId'=>9,'attributeValueId'=>2]],'isSalable'=>true]];
 $attributes = [['attributeId'=>9,'name'=>'Farbe','type'=>'text','values'=>[
@@ -104,10 +103,13 @@ class_alias(BrowserTwigExtensionStub::class, 'Plenty\\Plugin\\Templates\\Extensi
 require_once $root.'/src/Extensions/Base_Extension.php';
 $attributesExtension = (new ReflectionClass(\GuardiansBasic\Extensions\Base_Extension::class))->newInstanceWithoutConstructor();
 $salableByVariation = array_column($variants,'isSalable','variationId');
+$choices = $attributesExtension->getWishChoices($variants,$attributes,$salableByVariation,[],null,true);
+$result['quickWish'] = $twig->createTemplate(fragment($pdp,'<span class="eg-quick-wish"','{% endif %}'))->render(['wishChoices'=>$choices]);
+$result['gallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>$images,'mainImg'=>$images[0],'galleryCount'=>count($images),'itemData'=>[], 'wishChoices'=>$choices]);
 $result['selection'] = $twig->createTemplate(divSource($pdp,'<div data-item-variation class='))->render([
     'linkedAttributes'=>[], 'attributes'=>$attributes, 'variationsWithAttributes'=>$variants,
     'salableAttributeValues'=>$attributesExtension->getSalableAttributeValues($variants,$salableByVariation)]);
-$result['singleGallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>[$images[0]],'mainImg'=>$images[0],'galleryCount'=>1,'itemData'=>[]]);
+$result['singleGallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>[$images[0]],'mainImg'=>$images[0],'galleryCount'=>1,'itemData'=>[], 'wishChoices'=>$choices]);
 $homepage=$templates['GuardiansBasic::Homepage.Homepage'];
 $result['slider']=$twig->createTemplate(fragment($homepage,'<section class="section-slider-wrap">','<section class="section-banner-first">'))->render($context);
 $result['pager']=[];
@@ -126,6 +128,7 @@ foreach (['de','en','fr','it','es'] as $lang) {
     $context['lang']=$lang;
     $labels=parse_ini_file($root.'/resources/lang/'.$lang.'/Template.properties',false,INI_SCANNER_RAW);
     $result['languages'][$lang]=[
+        'wishDialog'=>$twig->render('GuardiansBasic::Item.Partials.WishListPicker'),
         'header'=>$twig->render('GuardiansBasic::PageDesign.Partials.Header.Header',$context),
         'languageOptions'=>$twig->createTemplate(fragment($layout, '<template id="eg-language-options"', '</template>').'</template>')->render($context),
         'newsletter'=>$newsletter->render($context+['wkbkasse'=>[5482,5484],'currentRequestUri'=>'/']),

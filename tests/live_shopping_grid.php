@@ -28,7 +28,20 @@ function pluginApp($class, $params = []) {
 }
 class AttributeFixture {
     public $singles = [], $batches = [], $omit = false;
-    function result($id) { return ['attributes' => $id % 2 ? [['type'=>'box','values'=>[['position'=>2,'name'=>'L'],['position'=>1,'name'=>'M']]]] : [], 'documents'=>[['id'=>$id,'ignored'=>'same source payload']]]; }
+    function result($id) {
+        $attributes = $id % 2 ? [['type'=>'box','values'=>[['position'=>2,'name'=>'L'],['position'=>1,'name'=>'M']]]] : [];
+        $rows = [['variationId'=>$id+100000,'isSalable'=>true,'attributes'=>[]]];
+        if ($id === 10001) {
+            $attributes[] = ['type'=>'image','attributeId'=>9,'name'=>'Farbe','values'=>[
+                ['attributeValueId'=>1,'name'=>'Grün'],['attributeValueId'=>2,'name'=>'Rot'],['attributeValueId'=>3,'name'=>'Blau']]];
+            $rows = [];
+            foreach ([101=>1,102=>2,103=>3] as $variation=>$colour) {
+                $rows[] = ['variationId'=>$variation,'isSalable'=>$variation !== 103,
+                    'attributes'=>[['attributeId'=>9,'attributeValueId'=>$colour]]];
+            }
+        }
+        return ['attributes'=>$attributes, 'variations'=>$rows, 'documents'=>[['id'=>$id]]];
+    }
     function getResult($factory) { $this->singles[]=$factory; return $this->result($factory['itemId']); }
     function getResults($factories) {
         $this->batches[]=$factories; $results=[];

@@ -140,6 +140,7 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     $twig->addFunction(new Twig\TwigFunction('getFeedbackItemList',[$svc,'feedbackList']));
     $twig->addFunction(new Twig\TwigFunction('getListFeedbackAverages',[$svc,'feedbackAverage']));
     $twig->addFunction(new Twig\TwigFunction('getItemPropertiesById',[$propertyExtension,'getItemPropertiesById']));
+    $twig->addFunction(new Twig\TwigFunction('getWishChoices',[$propertyExtension,'getWishChoices']));
     $twig->addFunction(new Twig\TwigFunction('getVariationSalabilityMap',[$svc,'salabilityMap']));
     $twig->addFunction(new Twig\TwigFunction('getSalableAttributeValues',[$propertyExtension,'getSalableAttributeValues']));
     foreach(['get_consent_scripts','get_json_data','get_filtered_tags','get_shop_builder_scripts','ssr_entry','csrf_token','prepareSeoContent'] as $name)$twig->addFunction(new Twig\TwigFunction($name,[$svc,'noop']));
@@ -147,6 +148,8 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     $twig->addFilter(new Twig\TwigFilter('orderByKey',[$svc,'sortImages']));
     foreach(['int'=>'integer','itemName'=>'itemName','itemURL'=>'itemURL'] as $name=>$method)$twig->addFilter(new Twig\TwigFilter($name,[$svc,$method]));
     $item=['item'=>['id'=>42,'manufacturer'=>['name'=>'Fixture','externalName'=>'Fixture','logo'=>'','url'=>''],'feedbackCount'=>0,'feedbackDecimal'=>0], 'variation'=>['id'=>1011,'bundleType'=>'','availability'=>['id'=>1]],'images'=>['all'=>[['url'=>'/image.jpg','urlMiddle'=>'/image-middle.jpg','urlPreview'=>'/image-preview.jpg','position'=>0]]],'prices'=>['default'=>['unitPrice'=>['value'=>4.99,'formatted'=>'4.99 EUR'],'currency'=>'EUR'],'rrp'=>['price'=>['value'=>9.99],'unitPrice'=>['value'=>9.99,'formatted'=>'9.99 EUR']]],'texts'=>['name1'=>'Fixture '.$case['lang'],'metaDescription'=>'Description','keywords'=>'Fixture','description'=>'<p>Product</p>','shortDescription'=>'Short','technicalData'=>''],'attributes'=>[],'properties'=>[],'barcodes'=>[['code'=>'123']]];
+    $item['filter']['isSalable'] = true;
+    $svc->blockedVariation = false;
     $item['variation']['id'] = $case['variation'] ?? 1011;
     for($image=1;$image<($case['images']??3);$image++)$item['images']['all'][]=['url'=>'/image-'.$image.'.jpg','urlMiddle'=>'/image-middle-'.$image.'.jpg','urlPreview'=>'/image-preview-'.$image.'.jpg','position'=>$image];
     $ctx=['request'=>$req,'item'=>['documents'=>[['data'=>$item]]],'services'=>array_fill_keys(['ItemCrossSellingService','item','url','basket','localizationRepository','wishList','template','checkout','propertyFile','order','country','webstoreConfig','category','itemList'],$svc),'isShopBuilder'=>$case['builder'],'category'=>null,'defaultCategory'=>['details'=>[['name'=>'Category']]],'buildHash'=>'fixture','webstoreConfig'=>['defaultLanguage'=>'de','domainSsl'=>'https://store.example.test','name'=>'Fixture','browserLanguage'=>[]],'ceresConfig'=>['global'=>['blockCookies'=>false],'log'=>['performanceLevel'=>'live','checkSyntax'=>false],'header'=>['companyLogo'=>'/logo.png']],'context'=>new class {function renderState(){return '';}},'urls'=>['templateType'=>'item','appendTrailingSlash'=>true,'search'=>'/search/'],'currencyData'=>['symbol'=>'EUR'],'locale'=>$case['lang'],'assetName'=>'ceres-base','showNetPrices'=>true,'notifications'=>[]];
@@ -162,6 +165,18 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     if ($value !== null && array_intersect(['getBasketForTemplate', 'isItemInWishList', 'getCanonicalURL'], $svc->calls)) {
         throw new RuntimeException('Quickview loaded full-page basket, wishlist or canonical data');
     }
+    if ($format === 'prepared') {
+        $svc->wishListSnapshot = ['itemWishListIds'=>[1012,987654321]];
+        $svc->wishListHit = true;
+        $private = $twig->render('SingleItem',$ctx);
+        if (str_contains($private,'987654321') || str_contains($private,'data-saved=') ||
+            preg_match('/class="[^"]*\bitem-in-wishlist\b[^"]*"/',$private) || in_array('isItemInWishList',$svc->calls,true)) {
+            throw new RuntimeException('Wishlist data escaped into cacheable product output');
+        }
+        preg_match('/data-wish-product="[^"]*"/',$html,$guestControl);
+        preg_match('/data-wish-product="[^"]*"/',$private,$customerControl);
+        if (!$guestControl || $customerControl !== $guestControl) throw new RuntimeException('Session-dependent heart markup');
+    }
     assertPriceUi($html,$value===null,54,60,'');
     $dom=new DOMDocument(); $dom->loadHTML($html,LIBXML_NOERROR|LIBXML_NOWARNING); $xp=new DOMXPath($dom);
     if ($svc->singleVariation) {
@@ -176,6 +191,9 @@ foreach (['de','en','fr','it','es'] as $lang) foreach ([null,'true'] as $value) 
     if ($value===null && $xp->query('//*[@data-eg-gallery-count="3"]')->length!==1) throw new RuntimeException('Gallery image count');
     if ($value===null && $xp->query('//article//div[contains(concat(" ",@class," ")," property-box ") and not(*) and normalize-space(.)=""]')->length) {
         throw new RuntimeException('Empty property section reserves space');
+    }
+    if ($value !== null && $format === 'prepared' && $lang === 'fr') {
+        file_put_contents(dirname($argv[2]).'/quickview-multi.html', $html);
     }
     if ($value===null && $format==='prepared' && in_array($lang,['de','fr'],true)) {
         file_put_contents(dirname($argv[2]).($lang==='de' ? '/pdp.html' : '/pdp-multi.html'),$html);

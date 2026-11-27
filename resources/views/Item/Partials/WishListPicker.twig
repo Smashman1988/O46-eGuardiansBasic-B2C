@@ -1,16 +1,20 @@
+<template id="eg-wish-control">
+    <button type="button" class="eg-wish-heart" aria-label="{{ trans('GuardiansBasic::Template.galleryWishlist') }}">
+        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+            <path d="M12 21 3.8 13C-2 7.1 5.8-.6 12 6.1 18.2-.6 26 7.1 20.2 13Z"/>
+        </svg>
+    </button><span data-wish-notice role="status"></span>
+</template>
 <div id="eg-wish-picker" class="modal" data-eg-dialog role="dialog" tabindex="-1" aria-hidden="true"
      aria-labelledby="eg-wish-title" aria-describedby="eg-wish-hint"
-     data-saved="{{ savedWishIds|json_encode|e('html_attr') }}"
-     data-attributes="{{ itemAttributes.attributes|default({})|json_encode|e('html_attr') }}"
-     {% if itemAttributes.units|default([])|length > 1 %}
-     data-units="{{ variationsWithAttributes|map(v => [v.variationId ~ '', itemAttributes.units[v.unitCombinationId]|default('')])|json_encode|e('html_attr') }}"
-     {% endif %}
+     data-add="{{ trans('GuardiansBasic::Template.wishAdd') }}"
+     data-remove="{{ trans('GuardiansBasic::Template.wishRemove') }}"
      data-variant="{{ trans('GuardiansBasic::Template.wishVariant') }}"
      data-saved-label="{{ trans('GuardiansBasic::Template.wishAlreadySaved') }}"
      data-unavailable="{{ trans('GuardiansBasic::Template.wishUnavailable') }}"
      data-error="{{ trans('GuardiansBasic::Template.wishWriteError') }}">
     <div class="modal-dialog" role="document">
-        <div class="modal-content">
+        <div class="modal-content eg-wish-content">
             <div class="modal-header">
                 <h2 class="modal-title" id="eg-wish-title">{{ trans('GuardiansBasic::Template.wishAdd') }}</h2>
                 <button type="button" class="close" data-dismiss="modal" aria-label="{{ trans('GuardiansBasic::Template.facetClose') }}"><span aria-hidden="true">×</span></button>

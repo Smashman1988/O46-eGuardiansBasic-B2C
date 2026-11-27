@@ -597,7 +597,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         return entry && scope && entry.scope === scope && typeof entry.change === 'string' &&
             Number.isFinite(entry.timestamp) && entry.timestamp <= Date.now() && entry.timestamp > Date.now() - ttl;
     }
-    function render(basket, updateWishList = true) {
+    function render(basket) {
         current = basket;
         window.egSessionData = { basket };
         document.querySelectorAll('[data-eg-basket-quantity]').forEach(el => {
@@ -610,7 +610,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         });
         document.querySelectorAll('[data-basket-sum]').forEach(el => { el.textContent = basket.itemSum.toFixed(2).replace('.', ','); });
         document.querySelectorAll('.wishlist-link').forEach(el => el.classList.toggle('noWishListItems', !basket.itemWishListIds.length));
-        if (updateWishList) O46Core.wishPicker?.sync(basket.itemWishListIds);
+        O46Core.wishPicker?.sync(basket.itemWishListIds);
         document.querySelectorAll('.single[data-item]').forEach(el => {
             const selected = basket.itemWishListIds.some(id => String(id) === el.dataset.egActiveVariation);
             el.querySelectorAll('.btn-watch').forEach(btn => btn.classList.toggle('item-in-wishlist', selected));
@@ -636,6 +636,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         // A digest lets another verified tab recognise the session without persisting a session or contact ID.
         const verified = await identity(basket);
         if (ticket !== generation) return true;
+        if (scope && scope !== verified) O46Core.wishPicker?.sync(null);
         scope = verified;
         render(summary);
         if (!scope) {
@@ -679,6 +680,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         if (invalidating) return request;
         invalidating = true;
         generation++;
+        O46Core.wishPicker?.sync(null);
         scope = ''; change = ''; current = null; writeVersion = 0; lastIdentity = ''; hashPromise = null;
         storage('sessionStorage', 'removeItem', scopeKey);
         storage('localStorage', 'removeItem', key);
@@ -695,8 +697,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
             writeVersion = 0;
         }
         change = entry.change;
-        // The freshly rendered PDP has newer wishlist IDs than a restored header cache.
-        render(summary, notify && modified);
+        render(summary);
         if (notify && modified) window.dispatchEvent(new Event('o46:basket-invalidated'));
         return true;
     }
@@ -728,7 +729,12 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                 return;
             }
             // A read by a different verified session/currency/country is not a notification for this tab.
-            if (entry && (entry.scope !== scope || (compact(entry.basket) && !matchesContext(entry.basket)))) return;
+            if (entry && entry.scope !== scope) return;
+            if (entry && compact(entry.basket) && !matchesContext(entry.basket)) {
+                // Wishlist IDs belong to the verified session across display currencies.
+                if (valid(entry) && entry.change !== change) O46Core.wishPicker?.sync(entry.basket.itemWishListIds);
+                return;
+            }
             const raw = storage('localStorage', 'getItem', key);
             if (rejectedRecord === raw) return;
             rejectedRecord = raw;
@@ -742,6 +748,8 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
             // Ceres already reads the session on every Vue bootstrap.
             initialCeres = !store.state.basket.isBasketInitiallyLoaded;
             store.subscribe((mutation, state) => {
+                if (mutation.type === 'removeWishListId' && !initialCeres) refreshAfterWrite();
+                if (mutation.type === 'setIsWishListLoading' && !state.wishList.isLoading) O46Core.wishPicker?.reconcileList();
                 if (mutation.type === 'setBasket' && !initialCeres) accept(state.basket.data, false);
                 if (mutation.type === 'setIsBasketInitiallyLoaded') {
                     initialCeres = false;

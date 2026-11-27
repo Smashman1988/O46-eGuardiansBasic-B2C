@@ -6,6 +6,7 @@ const D=path.resolve(process.argv[2]),root=path.resolve(__dirname,'..'),rows=[];
 const read=p=>fs.readFileSync(p,'utf8');
 // Resolve the Twig resource path before parsing CSS, so the braces cannot truncate a font rule.
 const fonts=[...read(root+'/resources/views/PageDesign/Partials/Head.twig').replaceAll("{{ plugin_path('GuardiansBasic') }}",'/theme').replaceAll('{{ headThemePath }}','/theme').matchAll(/@font-face\{[^}]+\}/g)].slice(0,3).map(x=>x[0]).join('');
+const dialog = read(path.join(D,'wish-controls.html'));
 let origin,requests=[];
 const server=http.createServer((req,res)=>{
  const u=new URL(req.url,origin);requests.push({path:u.pathname+u.search,method:req.method});
@@ -16,6 +17,7 @@ const server=http.createServer((req,res)=>{
  if(u.pathname.startsWith('/visual/')){const file=D+u.pathname.replace(/\.avif$/,'');if(fs.existsSync(file))return res.end(fs.readFileSync(file));}
  if(u.pathname.startsWith('/assets/')){res.setHeader('Content-Type','application/javascript');return res.end(read(root+'/resources/js/'+path.basename(u.pathname)));}
  if(/\.woff2?$/.test(u.pathname))return res.end(fs.readFileSync(root+'/resources/documents/fonts/'+path.basename(u.pathname)));
+ if(u.pathname==='/rest/io/basket/'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({data:{itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,itemWishListIds:[]}}));}
  if(u.pathname==='/rest/io/session/'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({data:{basket:{itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,customerId:0,itemWishListIds:[]}}}));}
  res.setHeader('Content-Type','text/html');
  if(u.searchParams.get('quickViewItem')==='true'&&!u.searchParams.has('page'))return res.end('<article class="single"><h2 data-local-quickview>Local quickview</h2></article>');
@@ -23,7 +25,7 @@ const server=http.createServer((req,res)=>{
  const next=u.searchParams.get('page')==='2';
  const cards=read(D+'/cards-de-'+(before?'before':next?'next':'after')+'.html');
  const listing='<main id="page-body"><section class="categoriegrid page-content container"><div class="row"><div class="col-12">'+cards+'</div></div></section></main>';
- res.end(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Card flow fixture</title><style>${fonts+read(before?D+'/baseline/main.min.css':root+'/resources/css/main.min.css')}</style></head><body><script type="application/json" id="app-data-custom">{"templateType":"category.item","language":"de","currency":"EUR"}</script>${listing}${next?'':'<a class="pagination__next" href="'+u.pathname+'?page=2&amp;quickViewItem=true">Next</a>'}<button id="totop" hidden>Top</button><div class="modal fade modal-cross" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><button class="close" data-dismiss="modal">Close</button></div><div class="modal-body"></div></div></div></div><script src="/assets/jquery-3.7.1.min.js"></script>${before?'<script src="/baseline/cat.min.js" defer></script>':'<script src="/assets/core.min.js" data-eg-magiczoom-src="/assets/magiczoom.min.js" defer></script><script src="/assets/cat.min.js" defer></script>'}<script>window.activeLang='de';window.messageServiceTranslations={searchexample:'Search'};addEventListener('load',()=>{eGuardians.initialize();window.fixtureReady=true})</script></body></html>`);
+ res.end(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Card flow fixture</title><style>${fonts+read(before?D+'/baseline/main.min.css':root+'/resources/css/main.min.css')}</style></head><body><script type="application/json" id="app-data-custom">{"templateType":"category.item","language":"de","currency":"EUR"}</script>${listing}${before?'':dialog}${next?'':'<a class="pagination__next" href="'+u.pathname+'?page=2&amp;quickViewItem=true">Next</a>'}<button id="totop" hidden>Top</button><div class="modal fade modal-cross" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><button class="close" data-dismiss="modal">Close</button></div><div class="modal-body"></div></div></div></div><script src="/assets/jquery-3.7.1.min.js"></script>${before?'<script src="/baseline/cat.min.js" defer></script>':'<script src="/assets/core.min.js" data-eg-magiczoom-src="/assets/magiczoom.min.js" defer></script><script src="/assets/cat.min.js" defer></script>'}<script>window.activeLang='de';window.messageServiceTranslations={searchexample:'Search'};addEventListener('load',()=>{eGuardians.initialize();window.O46Core?.basketHeader.start();window.fixtureReady=true})</script></body></html>`);
 });
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+server.address().port;
@@ -56,9 +58,38 @@ const server=http.createServer((req,res)=>{
    assert.equal(await page.locator('.cat-item').count(),12);
    const geometry=()=>page.locator('.cat-item').evaluateAll(es=>es.map(e=>[e.getBoundingClientRect().width,e.getBoundingClientRect().height,e.querySelector('.cat-item-image').getBoundingClientRect().height,e.querySelector('.linkabso').getBoundingClientRect().height]));
    const first=await geometry();
+   const withoutHearts=await page.addStyleTag({content:'.eg-card-wish{display:none}'});
+   assert.deepEqual(await geometry(),first,'Wishlist overlays must preserve every card, image and purchase button dimension');
+   await withoutHearts.evaluate(style=>style.remove());
+   const hearts=page.locator('.eg-card-wish button');
+   assert.equal(await hearts.count(),12);
+   for (const host of await page.locator('.cat-item-image').all()) {
+     const fits = await host.evaluate(image => {
+       const box=image.getBoundingClientRect(), button=image.querySelector('.eg-wish-heart').getBoundingClientRect();
+       return button.width>=44 && button.height>=44 && button.right<=box.right && button.bottom<=box.bottom &&
+         [...image.querySelectorAll('.cat-badges,.cat-logo,.item-action2')].every(el=>{
+           const r=el.getBoundingClientRect(); return r.right<=button.left || r.bottom<=button.top || r.left>=button.right;
+         });
+     });
+     assert.ok(fits,'Wishlist target overlaps an existing badge at '+width);
+   }
    if(route==='/category/' && [390,1440].includes(width)){
      await page.locator('.cat-item picture img').first().evaluate(img=>img.decode());
      await page.screenshot({path:path.join(D,'karten-'+width+'.png')});
+   }
+   if(route==='/category/' && [390,1440].includes(width)){
+     const logo=page.locator('.cat-logo').first();
+     const original=await logo.getAttribute('src');
+     for(const [w,h] of [[600,60],[24,48]]) {
+       await logo.evaluate(async (img,[w,h])=>{
+         const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><rect width="100%" height="100%" fill="#333"/></svg>';
+         img.src='data:image/svg+xml,'+encodeURIComponent(svg); await img.decode();
+       },[w,h]);
+       assert.ok(await logo.evaluate(img=>img.getBoundingClientRect().bottom <
+         img.closest('.cat-item-image').querySelector('.eg-wish-heart').getBoundingClientRect().top));
+       assert.deepEqual(await geometry(),first,'Logo aspect ratio changed the card geometry');
+     }
+     await logo.evaluate((img,src)=>{img.src=src;},original);
    }
    if(width===1440){
      const button=page.locator('.cat-item button.linkabso').first();
@@ -85,6 +116,13 @@ const server=http.createServer((req,res)=>{
    }
    await page.evaluate(()=>InfiniteScroll.data(document.querySelector('.category-product-list')).loadNextPage());
    await page.waitForFunction(()=>document.querySelectorAll('.cat-item').length===24);
+   assert.equal(await hearts.count(),24);
+   if(route==='/category/' && width===390) {
+     const appended=page.locator('.cat-item').nth(12);
+     await appended.scrollIntoViewIfNeeded();
+     await appended.locator('picture img').evaluate(img=>img.decode());
+     await page.screenshot({path:path.join(D,'nachgeladen-390.png')});
+   }
    for(const n of [12,13,18,23]){const photo=page.locator('.cat-item picture img').nth(n);await photo.scrollIntoViewIfNeeded();await photo.evaluate(i=>new Promise((resolve,reject)=>{if(i.complete&&i.naturalWidth)return resolve();i.onload=resolve;i.onerror=()=>reject(Error('Appended image failed'));}));}
    const ids=await page.locator('[data-eg-item]').evaluateAll(cards=>cards.map(card=>card.dataset.egItem));
    assert.equal(new Set(ids).size,24,'No duplicate items after append');

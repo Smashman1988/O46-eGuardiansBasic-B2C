@@ -86,6 +86,7 @@ class Base_Extension extends Twig_Extension
             $this->factory->createSimpleFunction('getAttributesWithImages', [$this, 'getAttributesWithImages']),
             $this->factory->createSimpleFunction('getBrandGroups', [$this, 'getBrandGroups']),
             $this->factory->createSimpleFunction('getCardLinks', [$this, 'getCardLinks']),
+            $this->factory->createSimpleFunction('getWishChoices', [$this, 'getWishChoices']),
             $this->factory->createSimpleFunction('getCardAttributeMaps', [$this, 'getCardAttributeMaps']),
             $this->factory->createSimpleFunction('getItemPropertiesById', [$this, 'getItemPropertiesById']),
             $this->factory->createSimpleFunction('getVariationSalabilityMap', [$this, 'getVariationSalabilityMap']),
@@ -231,7 +232,12 @@ class Base_Extension extends Twig_Extension
     }
 
     public function getAttributesWithImages($itemId){
-        return pluginApp(ItemSearchService::class)->getResult($this->cardAttributeFactory($itemId));
+        $result = pluginApp(ItemSearchService::class)->getResult($this->cardAttributeFactory($itemId));
+        $result['wishChoices'] = $this->cardWishChoices($result);
+        $maps = [$itemId => ['wishChoices' => $result['wishChoices']]];
+        $this->completeWishChoices($maps);
+        $result['wishChoices'] = $maps[$itemId]['wishChoices'];
+        return $result;
     }
 
     /** Index the existing item result once; the first property for an ID wins. */
@@ -346,11 +352,119 @@ class Base_Extension extends Twig_Extension
                 if ($firstBoxOnly && is_array($attributes)) {
                     $attributes = $this->firstCardBox($attributes);
                 }
-                $mapsByItem[$id] = ['attributes' => $attributes];
+                $mapsByItem[$id] = ['attributes' => $attributes, 'wishChoices' => $this->cardWishChoices($results[$key])];
             }
             unset($results);
         }
+        $this->completeWishChoices($mapsByItem);
         return $mapsByItem;
+    }
+
+    /** IO paginates very large attribute maps. Batch only their outstanding pages. */
+    private function completeWishChoices(array &$maps): void
+    {
+        $pending = [];
+        foreach ($maps as $id => $map) {
+            if (isset($map['wishChoices']['afterKey'])) {
+                $pending[$id] = $map['wishChoices']['afterKey'];
+            }
+        }
+        $seen = [];
+        while ($pending) {
+            $next = [];
+            foreach (array_chunk($pending, 24, true) as $group) {
+                $factories = [];
+                foreach ($group as $id => $cursor) {
+                    $key = json_encode($cursor);
+                    if (isset($seen[$id][$key])) {
+                        throw pluginApp(\UnexpectedValueException::class, ['message' => 'Repeated variation map cursor for ' . $id]);
+                    }
+                    $seen[$id][$key] = true;
+                    $factories['item' . $id] = VariationAttributeMap::getSearchFactory(['itemId' => $id, 'afterKey' => $cursor]);
+                }
+                $results = pluginApp(ItemSearchService::class)->getResults($factories);
+                foreach ($group as $id => $cursor) {
+                    if (!isset($results['item' . $id]['variations'])) {
+                        throw pluginApp(\UnexpectedValueException::class, ['message' => 'Missing variation map page for ' . $id]);
+                    }
+                    $page = $this->cardWishChoices($results['item' . $id]);
+                    $choices = &$maps[$id]['wishChoices'];
+                    $choices['rows'] += $page['rows'];
+                    foreach ($page['names'] as $attributeId => $field) {
+                        if (isset($choices['names'][$attributeId])) {
+                            $choices['names'][$attributeId]['values'] += $field['values'];
+                        } else {
+                            $choices['names'][$attributeId] = $field;
+                        }
+                    }
+                    unset($choices['afterKey'], $choices);
+                    if (isset($page['afterKey'])) {
+                        $next[$id] = $page['afterKey'];
+                    }
+                }
+            }
+            $pending = $next;
+        }
+    }
+
+    /** Send only the IDs, sale flags and labels used by the shared picker. */
+    private function cardWishChoices(array $result): array
+    {
+        $names = [];
+        foreach ($result['attributes'] ?? [] as $field) {
+            if (!is_array($field) || !isset($field['attributeId'], $field['name'])) {
+                continue;
+            }
+            $values = [];
+            foreach ($field['values'] ?? [] as $value) {
+                $values[$value['attributeValueId']] = $value['name'];
+            }
+            $names[$field['attributeId']] = ['name' => $field['name'], 'values' => $values];
+        }
+        $choices = $this->getWishChoices($result['variations'] ?? [], $names);
+        if (!empty($result['afterKey'])) {
+            $choices['afterKey'] = $result['afterKey'];
+        }
+        return $choices;
+    }
+
+    public function getWishChoices(iterable $variations, array $names, array $salability = [], array $units = [], $itemData = null, bool $selectorLabels = false): array
+    {
+        if ($selectorLabels) {
+            $labels = [];
+            foreach ($names as $field) {
+                $labels[$field['attributeId']] = ['name' => $field['name'],
+                    'values' => array_column($field['values'], 'name', 'attributeValueId')];
+            }
+            $names = $labels;
+        }
+        $rows = [];
+        foreach ($variations as $variation) {
+            $id = $variation['variationId'] ?? null;
+            if (!ctype_digit((string)$id) || (int)$id < 1) {
+                continue;
+            }
+            $attributes = [];
+            foreach ($variation['attributes'] ?? [] as $pair) {
+                if (is_object($pair) && !($pair instanceof \ArrayAccess)) {
+                    $attributes[$pair->attributeId] = $pair->attributeValueId;
+                } else {
+                    $attributes[$pair['attributeId']] = $pair['attributeValueId'];
+                }
+            }
+            $salable = $salability[$id] ?? $variation['isSalable'] ??
+                (($itemData['item']['flagTwo'] ?? null) == 3 ||
+                ($id == ($itemData['variation']['id'] ?? null) && ($itemData['filter']['isSalable'] ?? false)));
+            if ($id == ($itemData['variation']['id'] ?? null) && isset($itemData['filter']['isSalable']) && !$itemData['filter']['isSalable']) {
+                $salable = false;
+            }
+            $rows[$id] = [$salable === true || $salable === 1, $attributes];
+            $unit = $variation['unitName'] ?? $units[$variation['unitCombinationId'] ?? ''] ?? '';
+            if ($unit !== '') {
+                $rows[$id][] = $unit;
+            }
+        }
+        return ['rows' => $rows, 'names' => $names];
     }
 
     private function firstCardBox(array $attributes): array

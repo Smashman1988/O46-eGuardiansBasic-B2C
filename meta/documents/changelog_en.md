@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- Product cards, product details and quick view share a wishlist heart. Customers and guests can remove a saved variation directly or choose a specific variation when several match. Confirmed changes also appear on the wishlist page and in other tabs.
+
 - On narrow screens, amounts such as 179,88 € fit on one line. Longer amounts can still wrap before the currency.
 - Restored the original basket icon placement and spacing beside the account and wishlist. The mobile logo retains its width, and long currency labels can wrap beneath the amount.
 - The product-page wishlist fallback also handles a missing ID list under strict Twig.

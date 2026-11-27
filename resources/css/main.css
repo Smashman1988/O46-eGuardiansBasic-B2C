@@ -12029,6 +12029,33 @@ opacity: 0.7;
  .isHome{--home-widget-margin:-10px;}
  .categoriegrid .col-12 > .category-product-list,.isHome .col-12 > .home-slider-items,.isHome .widget-code > .widget-inner > .category-product-list,.isHome .row:has(> .col-6 > .widget-code > .widget-inner > .cat-item.has-variations){margin-inline:-10px;}
 }
+.eg-card-wish { position: absolute; right: 3px; bottom: 3px; z-index: 2; }
+.eg-quick-wish { position: relative; float: right; margin-left: 8px; }
+.eg-wish-heart {
+    display: inline-grid;
+    place-items: center;
+    vertical-align: middle;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 1px 5px #0002;
+    color: #609b00;
+    fill: none;
+    cursor: pointer;
+}
+.eg-card-wish .eg-wish-heart svg { width: clamp(20px, 12cqi, 24px); }
+.eg-wish-heart[aria-pressed="true"] { color: #de443a; fill: currentColor; }
+@media (hover: hover) {
+    .eg-wish-heart.eg-wish-hover[aria-pressed="false"] { color: #de443a; fill: currentColor; }
+    .eg-wish-heart.eg-wish-hover[aria-pressed="true"] { color: #609b00; fill: none; }
+}
+.eg-wish-heart:focus-visible { outline: 2px solid #355d13; outline-offset: -3px; }
+.eg-card-wish [data-wish-notice]:not(:empty) { top: auto; bottom: 100%; max-width: calc(100cqi - 8px); }
+.modal-cross .modal-content[hidden], [data-wish-entry] [data-testing="remove-wlist-item"][hidden] { display: none; }
+[data-wish-entry] [data-wish-notice]:not(:empty) { position: static; display: block; }
 /* End B2C card separators */
 .ptpb{padding-top:0px!important;padding-bottom:0px!important;}
 .tcenter{text-align: center;}
@@ -13186,8 +13213,8 @@ body.modal-open .btnfilter-mobile { visibility: hidden; }
 .smm-header .close { float: right; margin-inline-start: 8px; }
 .smm-card .smm-grid { padding: var(--eg-dialog-padding); }
 #eg-wish-hint { margin: 0 0 16px; color: #4e5d52; }
-#eg-wish-picker fieldset { min-width: 0; border: 0; margin: 0 0 12px; padding: 0; }
-#eg-wish-picker legend { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.eg-wish-content fieldset { min-width: 0; border: 0; margin: 0 0 12px; padding: 0; }
+.eg-wish-content legend { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
 .eg-wish-option {
     display: inline-grid;
     grid-auto-flow: column;
@@ -13228,9 +13255,9 @@ body.modal-open .btnfilter-mobile { visibility: hidden; }
     font-size: 14px;
     line-height: 1.4;
 }
-.eg-gallery-frame .btn-watch-h.item-in-wishlist .icon-heart-o::before { content: "\e924"; }
+
 @media (max-width: 480px) {
-    #eg-wish-picker .modal-footer { flex-direction: column-reverse; align-items: stretch; }
+    .eg-wish-content .modal-footer { flex-direction: column-reverse; align-items: stretch; }
 }
 @media (prefers-reduced-motion: no-preference) {
     /* Bootstrap observes the dialog's transition before it emits shown.bs.modal. */

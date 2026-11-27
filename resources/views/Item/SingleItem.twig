@@ -73,15 +73,19 @@
 {% set crossSellingList = services.item.getItemCrossSellingList(itemId) %}
 {% set enabledRoutes = config("IO.routing.enabled_routes") | split(', ') %}
 {% set itemAttributes = services.item.getAttributeNameMap(itemId) %}
-{# IO includes this customer's variation IDs in the basket prepared above. #}
-{% set isInWishList = variationId matches '/^[1-9][0-9]*$/D' and basketItems.itemWishListIds is defined and basketItems.itemWishListIds is iterable
-    ? variationId in basketItems.itemWishListIds
-    : services.wishList.isItemInWishList(variationId) %}
-{% set savedWishIds = basketItems.itemWishListIds is defined and basketItems.itemWishListIds is iterable ? basketItems.itemWishListIds : (isInWishList ? [variationId] : []) %}
-{% if not isInWishList and savedWishIds %}
-    {% set isInWishList = variationsWithAttributes|filter(v => v.variationId in savedWishIds)|length > 0 %}
 {% endif %}
+{# The picker uses the same concrete rows and sale decisions as this article's selector. #}
+{% set wishRows = variationsWithAttributes|default([]) %}
+{% if wishRows is empty and attributes|default([]) is empty and not itemData.filter.hasActiveChildren|default(false) %}
+    {% set wishRows = [{'variationId': variationId}] %}
 {% endif %}
+{% set salableByVariation = {} %}
+{% if wishRows and itemData.item.flagTwo|default(0) != 3 and
+    (wishRows|length > 1 or variationsWithAttributes[0].attributes|default([]) or itemData.filter.isSalable is not defined) %}
+    {% set salableByVariation = getVariationSalabilityMap(wishRows|map(v => v.variationId)) %}
+{% endif %}
+{% set wishChoices = getWishChoices(wishRows, pdpQuickview ? attributes|default([]) : itemAttributes.attributes|default({}),
+    salableByVariation, itemAttributes.units|default({}), itemData, pdpQuickview) %}
 {% set itemPrices = itemData.prices %}
 {% set unitPriceValue = itemPrices.default.unitPrice.value ?? itemPrices.default.data.unitPrice ?? '' %}
 {% set rrpUnitValue = itemPrices.rrp.unitPrice.value ?? itemPrices.rrp.data.unitPrice ?? '' %}
@@ -240,9 +244,7 @@
                                                         <span class="item-action i-action-nachhaltig-item">{{ trans("GuardiansBasic::Template.sustainability") }}</span>
                                                         {% endif %}
                                                         {% endfor %}
-                                                        <span class="wishlist-info1">
-				<button type="button" disabled aria-busy="true" title="{{ trans('GuardiansBasic::Template.dialogLoading') }}" aria-label="{{ trans('GuardiansBasic::Template.galleryWishlist') }}" aria-pressed="{{ isInWishList ? 'true' : 'false' }}" data-eg-event="click" data-eg-handler="watchListTrigger" {% if variationsWithAttributes|length > 1 %}aria-haspopup="dialog" aria-controls="eg-wish-picker"{% endif %} class="btn btn-watch-h align-items-center justify-content-center btn-secondary wishlist-count1{% if isInWishList %} item-in-wishlist{% endif %}"><span class="icon-spinner9" aria-hidden="true"></span></button><span data-wish-notice role="status"></span>
-                            </span>
+                            <span class="wishlist-info1" data-wish-product="{{ wishChoices|json_encode }}"></span>
                             <a {% if galleryCount %}href="{{ mainImg.url }}"{% endif %} aria-label="{{ itemData | itemName }}" title="{{ itemData | itemName }}" id="ItemImgZoom" class="eg-pdp-photo {% if galleryCount %}MagicZoomPlus{% endif %}" data-options="zoomMode: off; transitionEffect: false; lazyZoom: true; cssClass: white-bg; textBtnClose: {{ trans('GuardiansBasic::Template.facetClose') }}; textBtnNext: {{ trans('GuardiansBasic::Template.galleryNext') }}; textBtnPrev: {{ trans('GuardiansBasic::Template.galleryPrevious') }}; textHoverZoomHint: ; textClickZoomHint: ; textExpandHint:    " data-mobile-options="zoomMode: off; textTouchZoomHint: ; textClickZoomHint: ; textExpandHint: ">
                                 <img fetchpriority="high" {% if galleryCount %}src="{{ mainImg.urlMiddle }}"{% endif %} alt="{{ itemData | itemName }}" title="{{ itemData | itemName }}"  width="560px" height="560px">
                             </a>
@@ -291,6 +293,7 @@
            {% if isQuickView %}
             <div class="col-12 col-md-6" data-eg-loading-attr>
                 {% endif %}
+                {% if pdpQuickview %}<span class="eg-quick-wish" data-wish-product="{{ wishChoices|json_encode }}"></span>{% endif %}
                 <h1 class="item-title" data-eg-item-title>{{ itemData | itemName }}</h1>
                  {% if isQuickView %}
                     {% if pdpFeedbackCount > 0 and validRating %}
@@ -387,7 +390,6 @@
                 {% set linkedSelectionComplete = false %}
                 {% if variationsWithAttributes[0].attributes  | length > 0 %}
                  {% if itemData.item.flagTwo!=3 %}   
-                    {% set salableByVariation = getVariationSalabilityMap(variationsWithAttributes|map(v => v.variationId)) %}
                     {% set salableAttributeValues = getSalableAttributeValues(variationsWithAttributes, salableByVariation) %}
                 {% endif %}
                               {% for property in item.documents[0].data.properties %}
@@ -595,7 +597,6 @@
     {% endif %} 
 </article>
 {% if isQuickView %}
-{% include 'GuardiansBasic::Item.Partials.WishListPicker' %}
 {# PageDesign's isQuickView flag is true for a full page, false for the AJAX fragment. #}
 <script>
 window.dataLayer = window.dataLayer || [];

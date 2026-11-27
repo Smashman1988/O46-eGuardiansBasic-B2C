@@ -55,8 +55,8 @@ function prepare({root = path.resolve(__dirname, '..'), outputs = []} = {}) {
             entry.sha256 === assets['js/' + name + '.min.js'].sha256 &&
             entry.sourceSha256 === hash(sources.map(file => lf(read(file))).join('\n')), message);
     }
-    requireBundle('core', ['core', 'search', 'zoom-loader'], 'Storefront requires a current complete core build; run npm run build');
-    requireBundle('item', ['wishlist-picker', 'item'], 'PDP requires a current wishlist picker and item build; run npm run build');
+    requireBundle('core', ['core', 'search', 'zoom-loader', 'wishlist-picker'], 'Storefront requires a current complete core build; run npm run build');
+    requireBundle('item', ['item'], 'PDP requires a current item build; run npm run build');
     requireBundle('main', ['listing-item', 'main'], 'Shared main/Vue delivery requires a current main build; run npm run build');
     function version(file) {
         assert.ok(assets[file], 'Unknown own delivery asset: ' + file);

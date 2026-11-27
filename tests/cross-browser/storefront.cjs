@@ -7,7 +7,7 @@ const read = file => fs.readFileSync(path.join(root,file));
 const svg = color => '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="800"><rect width="640" height="800" fill="'+color+'"/><circle cx="320" cy="400" r="100" fill="white"/></svg>';
 function article(f, id, quick, single = false) {
     const gallery=single ? f.singleGallery : f.gallery;
-    return '<article class="single container" data-item><h1>Artikel '+id+'</h1><div class="row">'+(quick?'':gallery)+'</div>'+f.selection+'</article>';
+    return '<article class="single container" data-item>'+(quick?f.quickWish:'')+'<h1>Artikel '+id+'</h1><div class="row">'+(quick?'':gallery)+'</div>'+f.selection+'</article>';
 }
 function facetKey(f,url) {
     const selected=(url.searchParams.get('facets')||'').split(',');
@@ -31,9 +31,9 @@ function storefront(f,url) {
     const pager = paging ? f.pager[pageNumber] : '';
     const listing = '<section class="categoriegrid page-content container"><h1>'+title+'</h1><div class="row"><div class="col-12"><div class="leftsidecat">'+(home?'':parts.controls+(lang==='de'?f.filters[filterKey]:parts.filter).replaceAll('https://store.example.test/damen-bekleidung/',origin+url.pathname))+'</div></div><div class="col-12'+(paging?' category-paging-host':'')+'">'+(paging?'<div class="eg-pagination d-none d-lg-block" data-category-paging-anchor>'+pager+'</div>':'')+(url.pathname==='/search/'?f.sorting[sorting]:'')+(url.searchParams.get('query')==='Nulltreffer'?'<p>Keine Treffer</p>':cards)+pagination+(paging?'<nav class="category-pager-footer" data-category-pager="44" aria-label="Seite">'+pager+'</nav>':'')+ '</div></div></section>';
     return '<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="o46-language-route" lang="en" content="/en/category/"><link rel="alternate" hreflang="en" href="/en/category/">'+critical+'<link rel="stylesheet" href="/assets/main.min.css"></head><body>'+parts.header+
-        '<main id="page-body" class="'+(home?'isHome':'')+'">'+(pdp?article(f,url.pathname,false,url.searchParams.has('single')):home?f.slider+listing+f.strip:listing)+(url.searchParams.has('long-page')?'<div aria-hidden="true" style="height:2400px"></div>':'')+'</main>'+f.footer+f['modal-cross']+(url.searchParams.has('newsletter') ? parts.newsletter : '')+parts.languageOptions+f.dynamicModal+f.backdrop+
+        '<main id="page-body" class="'+(home?'isHome':'')+'">'+(pdp?article(f,url.pathname,false,url.searchParams.has('single')):home?f.slider+listing+f.strip:listing)+(url.searchParams.has('long-page')?'<div aria-hidden="true" style="height:2400px"></div>':'')+'</main>'+f.footer+f['modal-cross']+parts.wishDialog+(url.searchParams.has('newsletter') ? parts.newsletter : '')+parts.languageOptions+f.dynamicModal+f.backdrop+
         '<button id="totop">Nach oben</button><script type="application/json" id="app-data-custom">{"templateType":"'+(home?'home':pdp?'item':'category')+'"}</script>'+
-        '<script>window.activeLang='+JSON.stringify(lang)+';window.messageServiceTranslations={searchexample:"Beispiele"};window.addEventListener("load",function(){eGuardians.initialize();document.body.dataset.ready="1"})</script>'+
+        '<script>window.activeLang='+JSON.stringify(lang)+';window.messageServiceTranslations={searchexample:"Beispiele"};window.addEventListener("load",function(){eGuardians.initialize();O46Core.basketHeader.start();document.body.dataset.ready="1"})</script>'+
         '<script src="/assets/jquery-3.7.1.min.js"></script><script defer src="/assets/core.min.js" data-eg-magiczoom-src="/assets/magiczoom.min.js"></script>'+
         '<script defer src="/assets/'+bundle+'.min.js"></script>'+(pdp?'<script defer src="/assets/magiczoom.min.js" data-eg-magiczoom></script>':'')+'<script defer src="/assets/facets.min.js"></script></body></html>';
 }
@@ -76,6 +76,7 @@ const test = base.extend({
                     if(req.resourceType()==='image') {
                         return pic(p.includes('green')?'green':p.includes('red')?'red':'steelblue');
                     }
+                    if(p==='/rest/io/basket/') return json({itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,itemWishListIds:[]});
                     if(p==='/rest/io/session/') return json({basket:{itemQuantity:0,itemWishListIds:[]}});
                     if(p==='/rest/io/facet/') return json({itemList:{total:f.filteredLists[facetKey(f,u)]?.total || 12},facets:f.groups});
                     if(p.includes('/search/autocomplete/')) return json({item:[],suggestion:[{label:'Laufschuh'}]});

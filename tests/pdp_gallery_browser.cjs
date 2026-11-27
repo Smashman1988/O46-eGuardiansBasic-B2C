@@ -95,10 +95,11 @@ async function run() {
             window.messageServiceTranslations={wishlistplus:'Added',wishlistminus:'Removed',searchexample:'Suche'};
             eGuardians.initialize();
             window.writes=[];
-            eGuardians.item.watchList.add=(id,cb)=>{writes.push(id);window.reply=cb;};
+            O46Core.wishPicker.sync([]);
+            eGuardians.apiservice.post=(url,data,cb)=>{writes.push(data.variationId);window.reply=cb;};
             O46Core.basketHeader.refreshAfterWrite=()=>{};
         });
-        const heart=page.locator('article.single button[data-eg-handler="watchListTrigger"]');
+        const heart=page.locator('article.single .eg-wish-heart');
         await heart.click();
         assert.deepEqual(await page.evaluate(()=>writes),['1011']);
         await page.evaluate(()=>reply({data:{variationId:1011}},201));
@@ -113,7 +114,8 @@ async function run() {
         await page.evaluate(()=>{
             window.activeLang='fr';window.messageServiceTranslations={wishlistplus:'Added',wishlistminus:'Removed',searchexample:'Recherche'};
             eGuardians.initialize();window.writes=[];
-            eGuardians.item.watchList.add=(id,cb)=>{writes.push(id);window.reply=cb;};
+            O46Core.wishPicker.sync([]);
+            eGuardians.apiservice.post=(url,data,cb)=>{writes.push(data.variationId);window.reply=cb;};
             O46Core.basketHeader.refreshAfterWrite=()=>{};
         });
         await heart.click();
@@ -148,6 +150,14 @@ async function run() {
         await mountItem('de');
         const selected = page.locator('article.single [data-eg-selected-attribute]');
         assert.deepEqual(await selected.allTextContents(),['M','Grau']);
+        await page.evaluate(()=>{
+            O46Core.wishPicker.sync([1012]);
+            window.linkedWrites=[];
+            eGuardians.apiservice.delete=(url,data)=>linkedWrites.push([url,data.variationId]);
+        });
+        assert.equal(await heart.getAttribute('aria-pressed'),'true');
+        await heart.click();
+        assert.deepEqual(await page.evaluate(()=>linkedWrites),[['/rest/io/itemWishList/1012','1012']]);
         await page.locator('[data-eg-language-switch]').click();
         const english = page.locator('.dynamicModal a[hreflang="en"]');
         const target = new URL(await english.getAttribute('href'));

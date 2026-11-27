@@ -511,6 +511,7 @@
        {% if not services.template.shouldBeCached() %}
             <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
         {% endif %}
+{% include "GuardiansBasic::Item.Partials.WishListPicker" only %}
 <div class="modal fade modal-cross" data-eg-dialog aria-labelledby="eg-quick-title" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
       <div class="modal-content">
@@ -570,13 +571,13 @@
             {% elseif category.id or isSearch %}
                 {% set themePageScript = 'cat.min.js?v=4' %}
             {% elseif isItem %}
-                {% set themePageScript = 'item.min.js?v=4' %}
+                {% set themePageScript = 'item.min.js?v=5' %}
 
             {% endif %}
             {% if themeNeedsJquery %}
                 <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js?v=1"></script>
             {% endif %}
-            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=11" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
+            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=12" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
             <script src="{{ plugin_path('GuardiansBasic') }}/js/{{ themePageScript }}"{% if not themeNeedsJquery %} data-eg-vue-logout{% endif %} defer></script>
             {% if isItem %}
                 {# After item.js defines mzOptions, before DOMContentLoaded initializes the gallery. #}

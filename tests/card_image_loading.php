@@ -23,7 +23,7 @@ class ImageCardFixture {
     function noop() { return ''; }
     function url($data) { $this->count('itemURL');return $this->itemUrl ?? '/'.$this->lang.'/product-'.$data['variation']['itemId'].'/'; }
     function name($data) { $this->count('itemName');return $data['texts']['name1']; }
-    function attributes($id) { $this->count('attributes');return ['attributes'=>[['type'=>'box','values'=>[['position'=>1,'name'=>'M'],['position'=>2,'name'=>'L & XL']]]]]; }
+    function attributes($id) { $this->count('attributes');return ['wishChoices'=>['rows'=>[10000+$id=>[true,[]]],'names'=>[]],'attributes'=>[['type'=>'box','values'=>[['position'=>1,'name'=>'M'],['position'=>2,'name'=>'L & XL']]]]]; }
     function batch($ids) { $this->count('batch');$maps=[];foreach($ids as $id)$maps[$id]=$this->attributes($id);return $maps; }
     function order($rows,$key) { usort($rows,function($a,$b)use($key){return $a[$key]<=>$b[$key];});return $rows; }
 }
@@ -99,6 +99,8 @@ foreach (['de','en','fr','it','es'] as $lang) {
     }
 }
 $probe = new ImageCardFixture('fr');
+$controlSource = file_get_contents($views.'/Item/Partials/WishListPicker.twig');
+file_put_contents(dirname($argv[2]).'/wish-controls.html',imageEnvironment($views,new ImageCardFixture('de'))->createTemplate($controlSource)->render([]));
 $probe->itemUrl='/fr/art/?ref=x%2By&Currency=USD&%63urrency=GBP&QuickViewItem=false#sizes';
 $twig=imageEnvironment($views,$probe);
 foreach (['CHF'=>'&currency=CHF','EUR'=>'',''=>''] as $currency=>$parameter) {

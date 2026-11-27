@@ -301,3 +301,12 @@ Für diese Qualitätskorrekturen wurde kein Performancegewinn erhoben. Das exter
 Im vollständigen lokalen Lauf bestanden B2C 85/85 und B2B 229/229 Einzelprogramme. Unter Windows bestanden 471/480 B2C- und 351/360 B2B-Fälle. Unter Ubuntu bestanden 46/48 und 34/36. Die übrigen Fälle betrafen Touchgesten im Desktopprofil oder einen vom Browser nicht bestätigten Hintergrundtab. Beide Themes bauten zweimal bytegleich. Auf acht nativ geprüften B2C-Seitentypen kamen die geladenen Theme-Skripte und Stylesheets aus Pluginset 428.
 
 Die Prüfung ergab keine Änderung am Laufzeitcode und keinen gemessenen Performancegewinn. [Native Screenshots, MagicZoom-Protokolle und lokale Regression](../.cache/b2c-audit/qualitaet-nativ-galerie-20261127/Qualitaetskontrolle.html)
+
+## Merklistenherzen auf Produktkarten · 27. November 2026
+
+| Funktion | B2C develop | B2B-Transfer |
+| --- | --- | --- |
+| Variantenbezogenes Herz auf Karte, PDP, Quickview und Merkliste | Gemeinsamer Picker und IO-Schreibpfad. Die Karten verwenden die bereits gruppiert gelesenen Varianten. Die Sitzung liefert die gespeicherten IDs. | **Vorgemerkt.** Position, Farben, Tastatursteuerung, bestätigte Schreibantworten und gemeinsame Sitzungsaktualisierung sind übertragbar. |
+| Eindeutige Auswahl und Entfernen | Eine gemerkte Variante lässt sich direkt entfernen. Bei mehreren gemerkten Varianten zeigt der Picker die einzelnen IDs mit den verfügbaren Attribut- und Einheitenbezeichnungen. | Der lokale B2B-Picker liest Größen, Farben und Bestandszustände aus der Händlermatrix. Die explizite Zeilenauswahl, Mengeneinheiten und nachgeladene Bestände müssen über diese Matrix aufgelöst und mit den vorhandenen B2B-Fixtures geprüft werden. Der B2C-Selektor passt dafür nicht unverändert. |
+
+B2B wurde für die Bewertung lokal gelesen. Umsetzung und B2B-Abnahme stehen aus. [B2C-Prüfbericht mit Browserbildern](../.cache/wishlist/Bericht.html)

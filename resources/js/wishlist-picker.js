@@ -1,183 +1,330 @@
-/* Wish-list choices use the visible variants and translated attribute names supplied by IO. */
+/* Session IDs come from the existing IO/Ceres basket lifecycle. Product markup
+ * contains only public variation choices. One dialog serves all product surfaces. */
 O46Core.wishPicker = (function () {
-    let picker;
-    function init(heart) {
-        const article = heart.closest('article[data-item]');
-        const modal = document.getElementById('eg-wish-picker');
-        const wrap = article.querySelector('[data-eg-variations]');
-        if (!modal) return;
-        const labels = modal.dataset;
-        const names = JSON.parse(labels.attributes);
-        const units = new Map(Object.values(JSON.parse(labels.units || '[]')));
-        const variations = new Map();
-        for (const row of Object.values(JSON.parse(wrap?.dataset.egVariations || '[]'))) {
-            if (/^[1-9]\d*$/.test(row.variationId)) variations.set(String(row.variationId), Object.values(row.attributes || {}));
-        }
-        const base = article.dataset.egActiveVariation;
-        if (!variations.size && /^[1-9]\d*$/.test(base)) variations.set(base, []);
-        const ids = [...variations.keys()];
-        const fields = modal.querySelector('[data-wish-choices]');
-        const status = modal.querySelector('[data-wish-status]');
-        const notice = article.querySelector('[data-wish-notice]');
-        const save = modal.querySelector('[data-wish-save]');
-        const saved = new Set();
-        let selected = '', error = '', pending = false, noticeTimer;
-        const filters = new Map();
-        const dimensions = Object.entries(names).filter(([, field]) => field && field.name && field.values).map(([id, field]) => ({
-            id, name: field.name, values: new Map(Object.entries(field.values).map(([valueId, name]) => [String(valueId), name]))
-        }));
-        function value(id, dim) {
-            const attribute = variations.get(id)?.find(a => String(a.attributeId) === dim.id);
-            return attribute && String(attribute.attributeValueId);
-        }
-        // Duplicate tuples (e.g. different packs), extra attributes and incomplete
-        // labels use concrete, labelled IDs rather than guessing a combination.
-        const tuples = ids.map(id => dimensions.map(d => value(id,d)).join('/'));
-        const simple = dimensions.length && new Set(tuples).size === ids.length && ids.every(id =>
-            variations.get(id).length === dimensions.length && dimensions.every(d => d.values.get(value(id,d))));
-        const filterGroups = simple ? dimensions.slice(0,-1) : dimensions.filter(d =>
-            ids.every(id => d.values.get(value(id,d))) && new Set(ids.map(id => value(id,d))).size > 1);
-        function variantName(id) {
-            const parts = variations.get(id).map(a => {
-                const d = dimensions.find(d => d.id === String(a.attributeId));
-                const field = names[a.attributeId];
-                const name = field?.name || d?.name;
-                const label = field?.values?.[a.attributeValueId] || d?.values.get(String(a.attributeValueId));
-                return name && label ? name + ' · ' + label : '';
-            }).filter(Boolean);
-            return [...parts, units.get(id), labels.variant + ' ' + id].filter(Boolean).join(' / ');
-        }
-        function badges(id) {
-            return saved.has(id) ? labels.savedLabel : '';
-        }
-        function updateStatus() {
-            for (const button of fields.querySelectorAll('[data-wish-id]')) {
-                button.lastElementChild.textContent = badges(button.dataset.wishId);
-            }
-            status.textContent = error || (selected ? badges(selected) : '');
-            save.disabled = pending || !selected || saved.has(selected);
-            modal.setAttribute('aria-busy', String(pending));
-        }
-        function sync(list) {
-            saved.clear();
-            for (const id of list) saved.add(String(id));
-            const marked = ids.some(id => saved.has(id));
-            heart.classList.toggle('item-in-wishlist', marked);
-            heart.setAttribute('aria-pressed', String(marked));
-            updateStatus();
-        }
-        function group(title) {
-            const field = document.createElement('fieldset');
-            const legend = document.createElement('legend');
-            legend.textContent = title;
-            field.append(legend);
-            fields.append(field);
-            return field;
-        }
-        function option(field, text, key, chosen, id, change) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'eg-wish-option';
-            button.textContent = text;
-            button.dataset.wishKey = key;
-            button.setAttribute('aria-pressed', String(chosen));
-            if (id) {
-                button.dataset.wishId = id;
-                button.append(document.createElement('small'));
-            }
-            button.addEventListener('click', () => {
-                if (pending) return;
-                error = '';
-                change();
-                render();
-                [...fields.querySelectorAll('button')].find(b => b.dataset.wishKey === key)?.focus({preventScroll:true});
-            });
-            field.append(button);
-        }
-        function render() {
-            fields.replaceChildren();
-            let choices = ids;
-            for (const [index,dim] of filterGroups.entries()) {
-                if (!choices.length) break;
-                const field = group(dim.name);
-                for (const key of new Set(choices.map(id => value(id,dim)))) {
-                    option(field, dim.values.get(key), dim.id + '-' + key, filters.get(dim) === key, null, () => {
-                        if (filters.get(dim) === key) return;
-                        selected = '';
-                        for (const later of filterGroups.slice(index + 1)) filters.delete(later);
-                        filters.set(dim,key);
-                    });
-                }
-                choices = choices.filter(id => value(id,dim) === filters.get(dim));
-            }
-            if (choices.length) {
-                const dim = dimensions[dimensions.length-1];
-                const field = group(simple ? dim.name : labels.variant);
-                for (const id of choices) {
-                    option(field, simple ? dim.values.get(value(id,dim)) : variantName(id),
-                        'id-' + id, selected === id, id, () => { selected = id; });
-                }
-            }
-            updateStatus();
-        }
-        function write(id, remove) {
-            if (pending || !variations.has(id) || (!remove && saved.has(id))) return;
-            pending = true;
-            clearTimeout(noticeTimer);
-            error = notice.textContent = '';
-            heart.setAttribute('aria-busy','true');
-            updateStatus();
-            const method = remove ? 'remove' : 'add';
-            eGuardians.item.watchList[method](id, (response, code) => {
-                pending = false;
-                heart.removeAttribute('aria-busy');
-                const ok = !response?.error && (remove ? code === 200 && response?.data === true :
-                    code === 201 && String(response?.data?.variationId) === id);
-                if (ok) {
-                    if (remove) saved.delete(id); else saved.add(id);
-                    sync([...saved]);
-                    notice.textContent = messageServiceTranslations[remove ? 'wishlistminus' : 'wishlistplus'];
-                    noticeTimer = setTimeout(() => { notice.textContent = ''; }, 4000);
-                    document.querySelectorAll('.wishlist-link').forEach(el => el.classList.toggle('noWishListItems', !saved.size));
-                    document.querySelectorAll('.wishlist-count').forEach(el => { el.textContent = String(saved.size); });
-                    O46Core.basketHeader.refreshAfterWrite();
-                    if (modal.classList.contains('show')) $(modal).modal('hide');
-                } else {
-                    error = labels.error;
-                    if (!modal.classList.contains('show')) notice.textContent = error;
-                }
-                updateStatus();
-            });
-        }
-        save.addEventListener('click', () => write(selected, false));
-        if (ids.length > 1) {
-            heart.setAttribute('aria-haspopup','dialog');
-            heart.setAttribute('aria-controls',modal.id);
-        }
-        sync(Object.values(JSON.parse(labels.saved)));
-        return {sync, open() {
-            if (pending) return;
-            notice.textContent = error = '';
-            if (!ids.length) { notice.textContent = labels.error; return; }
-            if (ids.length === 1) { write(ids[0], saved.has(ids[0])); return; }
-            const direct = location.pathname.match(/(?:\/|_)([0-9]+)_([0-9]+)\/?$/);
-            const linked = direct && direct[1] === article.dataset.mainitemid ? direct[2] : '';
-            const active = String(article.dataset.egWishSelection || $(wrap).data('activeVariationId') || linked || '');
-            selected = variations.has(active) ? active : '';
-            filters.clear();
-            if (selected) for (const dim of filterGroups) filters.set(dim,value(selected,dim));
-            render();
+    const selector = '[data-wish-product], [data-wish-entry]';
+    const products = new Map();
+    let saved = null, pending = null, dialog = null, session = 0;
+    let modal, template, labels, fields, status, save, title, content;
+    const noticeTimers = new WeakMap();
 
-            if (modal.parentElement !== document.body) document.body.append(modal);
-            $(modal).modal('show', heart);
-        }};
+    function notice(product, message) {
+        clearTimeout(noticeTimers.get(product));
+        product.notice.textContent = message;
+        if (message) noticeTimers.set(product, setTimeout(() => { product.notice.textContent = ''; }, 5000));
     }
-    return {
-        open(heart) { picker ||= init(heart); picker?.open(); },
-        sync(ids) {
-            if (!picker && document.getElementById('eg-wish-picker')?.dataset.saved === JSON.stringify(ids)) return;
-            const heart = document.querySelector('article.single [data-eg-handler="watchListTrigger"]');
-            if (heart) { picker ||= init(heart); picker?.sync(ids); }
+
+    function selectedId(product) {
+        if (!product.article) return '';
+        const selected = [...product.article.querySelectorAll('[data-eg-attributes]')].map(group =>
+            [group.dataset.egAttributes, group.querySelector('[data-selected]')?.dataset.egValue]);
+        if (!selected.length || selected.some(([, value]) => !value)) return product.linked || '';
+        const matches = product.ids.filter(id => {
+            const attributes = product.rows[id][1];
+            return Object.keys(attributes).length === selected.length &&
+                selected.every(([key, value]) => String(attributes[key]) === value);
+        });
+        return matches.length === 1 ? matches[0] : matches.includes(product.linked) ? product.linked : '';
+    }
+
+    function renderHeart(product) {
+        const {heart, ids} = product;
+        const active = selectedId(product);
+        const marked = !!saved && (active ? saved.has(active) : ids.some(id => saved.has(id)));
+        if (saved) heart.setAttribute('aria-pressed', String(marked));
+        else heart.removeAttribute('aria-pressed');
+        heart.setAttribute('aria-label', (marked ? labels.remove : labels.add) + (product.title ? ' · ' + product.title : ''));
+        const busy = !!pending && ids.includes(pending.id);
+        heart.setAttribute('aria-busy', String(busy || !saved));
+        heart.setAttribute('aria-disabled', String(!!pending));
+        const needsChoice = !active && ids.length > 1 && (!marked || ids.filter(id => saved.has(id)).length > 1);
+        if (needsChoice) {
+            heart.setAttribute('aria-haspopup', 'dialog');
+            heart.setAttribute('aria-controls', modal.id);
+        } else {
+            heart.removeAttribute('aria-haspopup');
+            heart.removeAttribute('aria-controls');
         }
-    };
+    }
+
+    // The list page owns product documents in Vuex. Remove confirmed rows locally.
+    // Only a newly added, unknown ID needs the list endpoint to supply its document.
+    let listRequest = null;
+    function reconcileList() {
+        const store = window.ceresStore;
+        const state = store?.state.wishList;
+        if (!saved || !document.querySelector('[data-wish-list]') || !state?.isWishListInitiallyLoading || state.isLoading) return;
+        const documents = state.wishListItems.filter(row => saved.has(String(row.id)));
+        const inactive = (state.inactiveVariationIds || []).filter(id => saved.has(String(id)));
+        if (documents.length !== state.wishListItems.length) store.commit('setWishListItems', documents);
+        if (inactive.length !== state.inactiveVariationIds?.length) store.commit('setInactiveVariationIds', inactive);
+        store.commit('setWishListIds', [...saved]);
+        if (documents.length + inactive.length === saved.size || listRequest) return;
+        const expected = new Set(saved);
+        const owner = session;
+        listRequest = expected;
+        eGuardians.apiservice.get('/rest/io/itemWishList', {}, (response, code) => {
+            listRequest = null;
+            if (!saved) return;
+            if (session !== owner) { reconcileList(); return; }
+            if (saved.size !== expected.size || [...saved].some(id => !expected.has(id))) { reconcileList(); return; }
+            const data = response?.data;
+            if (code !== 200 || !Array.isArray(data?.documents)) return;
+            const missing = data.inactiveVariationIds || [];
+            const returned = new Set([...data.documents.map(row => row.id), ...missing].map(String));
+            if (returned.size !== saved.size || [...saved].some(id => !returned.has(id))) return;
+            store.commit('setWishListItems', data.documents);
+            store.commit('setInactiveVariationIds', missing);
+        });
+    }
+
+    function sync(list) {
+        if (list === null) { session++; pending = null; }
+        const next = list === null ? null : new Set(list.map(String));
+        if (next && saved && next.size === saved.size && [...next].every(id => saved.has(id))) return;
+        saved = next;
+        for (const product of products.values()) renderHeart(product);
+        reconcileList();
+        if (dialog) {
+            if (!saved) closeDialog();
+            else renderDialog();
+        }
+    }
+
+    function write(product, id, remove) {
+        if (pending || !saved || saved.has(id) !== remove || !product.rows[id] ||
+            (!remove && !product.rows[id][0])) return;
+        const ticket = pending = {id, session};
+        notice(product, '');
+        for (const entry of products.values()) renderHeart(entry);
+        if (dialog) { save.disabled = true; modal.setAttribute('aria-busy', 'true'); }
+        function complete(response, code) {
+            if (pending !== ticket || session !== ticket.session) return;
+            pending = null;
+            modal.removeAttribute('aria-busy');
+            const ok = !response?.error && (remove ? code === 200 && response?.data === true :
+                code === 201 && String(response?.data?.variationId) === id);
+            if (ok) {
+                if (remove) saved.delete(id); else saved.add(id);
+                if (dialog?.product === product) closeDialog();
+                notice(product, window.messageServiceTranslations?.[remove ? 'wishlistminus' : 'wishlistplus'] || '');
+                reconcileList();
+                O46Core.basketHeader.refreshAfterWrite();
+            } else if (dialog?.product === product) {
+                dialog.error = labels.error;
+            } else {
+                notice(product, labels.error);
+            }
+            for (const entry of products.values()) renderHeart(entry);
+            if (dialog) renderDialog();
+        }
+        const data = {variationId: id, templateEvent: 'tpl.item'};
+        if (remove) eGuardians.apiservice.delete('/rest/io/itemWishList/' + id, data, complete);
+        else eGuardians.apiservice.post('/rest/io/itemWishList/', data, complete);
+    }
+
+    function group(title) {
+        const field = document.createElement('fieldset');
+        const legend = document.createElement('legend');
+        legend.textContent = title;
+        field.append(legend);
+        fields.append(field);
+        return field;
+    }
+    function option(field, label, key, value, chosen) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'eg-wish-option';
+        button.textContent = label;
+        button.dataset.wishKey = key;
+        button.dataset.wishValue = value;
+        if (key === 'id') button.dataset.wishId = value;
+        button.setAttribute('aria-pressed', String(chosen));
+        field.append(button);
+    }
+    function renderDialog() {
+        const {product, remove, filters} = dialog;
+        const {rows, names} = product;
+        let choices = product.ids.filter(id => remove ? saved.has(id) : rows[id][0] && !saved.has(id));
+        if (!choices.includes(dialog.selected)) dialog.selected = '';
+        fields.replaceChildren();
+        const dimensions = Object.keys(names).filter(key => choices.length && choices.every(id =>
+            names[key].values[rows[id][1][key]]) && new Set(choices.map(id => rows[id][1][key])).size > 1);
+        for (const key of dimensions.slice(0, -1)) {
+            const field = group(names[key].name);
+            for (const value of new Set(choices.map(id => String(rows[id][1][key])))) {
+                option(field, names[key].values[value], key, value, filters[key] === value);
+            }
+            choices = choices.filter(id => String(rows[id][1][key]) === filters[key]);
+            if (!choices.length) break;
+        }
+        if (choices.length) {
+            const field = group(names[dimensions.at(-1)]?.name || labels.variant);
+            for (const id of choices) {
+                const [, attributes, unit] = rows[id];
+                const parts = Object.entries(attributes).map(([key, val]) => names[key]?.values[val]).filter(Boolean);
+                option(field, [...parts, unit, labels.variant + ' ' + id].filter(Boolean).join(' / '),
+                    'id', id, dialog.selected === id);
+            }
+        }
+        status.textContent = dialog.error || '';
+        save.textContent = title.textContent = remove ? labels.remove : labels.add;
+        save.disabled = !!pending || !dialog.selected;
+    }
+
+    function closeDialog() {
+        if (!dialog?.parent) { $(modal).modal('hide'); return; }
+        const {parent, product} = dialog;
+        modal.querySelector('.modal-dialog').append(content);
+        parent.original.hidden = false;
+        parent.modal.setAttribute('aria-labelledby', parent.label);
+        dialog = null;
+        product.heart.focus({preventScroll:true});
+    }
+
+    function open(product) {
+        product.heart.classList.remove('eg-wish-hover');
+        if (pending || dialog || product.reading) return;
+        notice(product, '');
+        if (!saved) {
+            product.reading = true;
+            O46Core.basketHeader.refresh().then(ok => {
+                product.reading = false;
+                if (!ok) notice(product, labels.error);
+                else if (product.heart.isConnected && !pending && !dialog) open(product);
+            });
+            return;
+        }
+        const active = selectedId(product);
+        const marked = product.ids.filter(id => saved.has(id));
+        const remove = active ? saved.has(active) : marked.length > 0;
+        const id = active || (remove && marked.length === 1 ? marked[0] : product.ids.length === 1 ? product.ids[0] : '');
+        if (id) {
+            if (!remove && !product.rows[id][0]) notice(product, labels.unavailable);
+            else write(product, id, remove);
+            return;
+        }
+        if (!remove && !product.ids.some(id => product.rows[id][0])) { notice(product, labels.unavailable); return; }
+        dialog = {product, remove, filters: {}, selected: '', error: ''};
+        renderDialog();
+        const parent = product.heart.closest('.modal.show');
+        if (parent) {
+            const original = parent.querySelector('.modal-content');
+            dialog.parent = {modal:parent, original, label:parent.getAttribute('aria-labelledby')};
+            original.hidden = true;
+            parent.setAttribute('aria-labelledby', title.id);
+            original.after(content);
+            (fields.querySelector('button') || content.querySelector('button')).focus();
+        } else $(modal).modal('show', product.heart);
+    }
+
+    function mount(host) {
+        if (products.has(host)) return;
+        const entry = host.dataset.wishEntry;
+        const original = entry && host.querySelector('[data-testing="remove-wlist-item"]');
+        if (entry && !original) return;
+        const {rows, names} = entry ? {rows:{[entry]:[false,{}]}, names:{}} : JSON.parse(host.dataset.wishProduct);
+        const ids = Object.keys(rows);
+        if (!ids.length) return;
+        const controls = template.content.cloneNode(true);
+        const heart = controls.querySelector('button');
+        const liveNotice = controls.querySelector('[data-wish-notice]');
+        if (original) {
+            original.hidden = true;
+            original.after(controls);
+        } else host.replaceChildren(controls);
+        const article = host.closest('article.single');
+        const card = host.closest('.cat-item');
+        const product = {rows, names, ids, article: card ? null : article,
+            title: (card?.querySelector('.cat-item-name') || article?.querySelector('[data-eg-item-title]'))?.textContent.trim(),
+            heart, notice: liveNotice};
+        if (product.article && !host.closest('.modal')) {
+            const direct = location.pathname.match(/(?:\/|_)([0-9]+)_([0-9]+)\/?$/);
+            if (direct && direct[1] === article.dataset.mainitemid && direct[2] === article.dataset.egActiveVariation && rows[direct[2]]) {
+                product.linked = direct[2];
+            }
+        }
+        products.set(host, product);
+        renderHeart(product);
+    }
+    function visit(node, fn) {
+        if (node.nodeType !== 1) return;
+        if (node.matches(selector)) fn(node);
+        node.querySelectorAll(selector).forEach(fn);
+    }
+    function start() {
+        modal = document.getElementById('eg-wish-picker');
+        template = document.getElementById('eg-wish-control');
+        if (!modal || !template) return;
+        labels = modal.dataset;
+        content = modal.querySelector('.modal-content');
+        title = modal.querySelector('.modal-title');
+        content.addEventListener('click', event => {
+            if (dialog?.parent && event.target.closest('[data-dismiss="modal"]')) {
+                event.stopPropagation();
+                closeDialog();
+            }
+        });
+        content.addEventListener('keydown', event => {
+            if (dialog?.parent && event.key === 'Escape') {
+                event.stopPropagation();
+                closeDialog();
+            }
+        });
+        $('.modal-cross').on('hide.bs.modal', () => { if (dialog?.parent) closeDialog(); });
+        fields = modal.querySelector('[data-wish-choices]');
+        status = modal.querySelector('[data-wish-status]');
+        save = modal.querySelector('[data-wish-save]');
+        fields.addEventListener('click', event => {
+            const button = event.target.closest('[data-wish-key]');
+            if (!dialog || pending || !button) return;
+            const {wishKey, wishValue} = button.dataset;
+            dialog.error = '';
+            if (wishKey === 'id') dialog.selected = wishValue;
+            else {
+                const keys = Object.keys(dialog.product.names);
+                for (const later of keys.slice(keys.indexOf(wishKey) + 1)) delete dialog.filters[later];
+                dialog.filters[wishKey] = wishValue;
+                dialog.selected = '';
+            }
+            renderDialog();
+            [...fields.querySelectorAll('button')].find(el => el.dataset.wishKey === wishKey && el.dataset.wishValue === wishValue)?.focus();
+        });
+        save.addEventListener('click', () => { if (dialog) write(dialog.product, dialog.selected, dialog.remove); });
+        $(modal).on('hidden.bs.modal', () => { dialog = null; });
+        document.addEventListener('click', event => {
+            const heart = event.target.closest?.('.eg-wish-heart');
+            if (!heart) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const product = products.get(heart.closest(selector));
+            if (product) open(product);
+        });
+        for (const name of ['pointerover', 'pointerout']) document.addEventListener(name, event => {
+            const heart = event.target.closest?.('.eg-wish-heart');
+            if (heart && !heart.contains(event.relatedTarget)) {
+                heart.classList.toggle('eg-wish-hover', name === 'pointerover' && event.pointerType === 'mouse');
+            }
+        });
+        visit(document.body, mount);
+        const observer = new MutationObserver(changes => {
+            for (const change of changes) {
+                if (change.type === 'attributes') {
+                    const host = change.target.closest('article.single')?.querySelector(selector);
+                    const product = products.get(host);
+                    if (product) {
+                        product.linked = '';
+                        renderHeart(product);
+                    }
+                } else {
+                    for (const node of change.removedNodes) visit(node, host => { if (!host.isConnected) products.delete(host); });
+                    for (const node of change.addedNodes) if (node.isConnected) visit(node, mount);
+                }
+            }
+        });
+        // Ceres may replace #page-body itself on first mount.
+        observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['data-selected']});
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once:true});
+    else queueMicrotask(start);
+    return {sync, reconcileList};
 })();

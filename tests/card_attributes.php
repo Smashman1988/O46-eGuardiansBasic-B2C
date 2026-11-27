@@ -4,7 +4,7 @@ namespace Plenty\Plugin\Templates\Extensions { class Twig_Extension {} }
 namespace Plenty\Modules\Webshop\ItemSearch\SearchPresets {
     class VariationAttributeMap {
         public static function getSearchFactory($options) {
-            if (array_keys($options) !== ['itemId','afterKey'] || $options['afterKey'] !== null) {
+            if (array_keys($options) !== ['itemId','afterKey'] || ($options['afterKey'] !== null && !is_array($options['afterKey']))) {
                 throw new \RuntimeException('Changed attribute search options');
             }
             return $options;
@@ -267,6 +267,32 @@ foreach ([
     $service->attributes = $full;
     check($ext->getCardAttributeMaps([100])[100]['attributes'] === $full, 'Full map contract changed');
     check($ext->getCardAttributeMaps([100], true)[100]['attributes'] === $expected, 'Wrong first box or fallback');
+}
+// A continuation can add the only saved or salable ID. Preserve its labels and
+// never resolve a truncated map to the first variant.
+$service = new class {
+    public $calls = [];
+    function getResults($factories) {
+        $this->calls[] = array_values($factories);
+        $result = [];
+        foreach ($factories as $key => $options) {
+            $page = $options['afterKey']['page'] ?? 1;
+            $id = $options['itemId'] * 10 + $page;
+            $result[$key] = ['attributes'=>[['attributeId'=>9,'name'=>'Farbe','type'=>'image',
+                'values'=>[['attributeValueId'=>$page,'name'=>$page===1?'Grün':'Rot']]]],
+                'variations'=>[['variationId'=>$id,'isSalable'=>$page===2,'unitName'=>'Paar',
+                    'attributes'=>[['attributeId'=>9,'attributeValueId'=>$page]]]]];
+            if ($page === 1) $result[$key]['afterKey'] = ['page'=>2];
+        }
+        return $result;
+    }
+};
+$maps = $ext->getCardAttributeMaps([20,21,20],true);
+check(array_map('count',$service->calls) === [2,2], 'Continuation must batch distinct items');
+foreach ([20,21] as $itemId) {
+    $choice = $maps[$itemId]['wishChoices'];
+    check($choice['rows'] === [$itemId*10+1=>[false,[9=>1],'Paar'],$itemId*10+2=>[true,[9=>2],'Paar']], 'Incomplete sale flags or variant IDs');
+    check($choice['names'][9]['values'] === [1=>'Grün',2=>'Rot'] && !isset($choice['afterKey']), 'Incomplete labels or cursor');
 }
 file_put_contents($argv[2],json_encode(['renders'=>$report,'recommendations'=>$recommendations,'tagLists'=>$tagLists,'contextIsolation'=>true,'missingResult'=>true],JSON_PRETTY_PRINT));
 echo count($report)." list, ".count($recommendations)." recommendation and ".count($tagLists)." tag-list matching renders, language isolation and missing-result check passed.\n";
