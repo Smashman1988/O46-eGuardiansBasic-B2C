@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Bestätigte Merklistenlöschungen bleiben nach dem Abmelden und einem Browserneustart erhalten. Entfernt ein Gast eine zuvor im Konto gemerkte Variante, wird diese Änderung bei der nächsten Anmeldung mit demselben Konto übernommen. Das gilt auch bei bestätigtem Ausverkauf.
+
 - Nach einem Sitzungswechsel während eines Merklistenklicks gleicht der Shop die abgeschlossene Änderung mit der aktuellen Sitzung ab. Die Warenkorbmeldung bleibt nach der letzten bestätigten Aktion drei Sekunden sichtbar. Alte HTML-Kopien der Meldung werden für alle fünf Shopsprachen aus dem Browserspeicher entfernt. Eine sofortige An- oder Abmeldung wartet auf die laufende Merklistenänderung und den zugehörigen Sitzungsabgleich. Weitere geöffnete Tabs übernehmen wiederhergestellte Gastfavoriten.
 
 - Nach der Abmeldung zeigt derselbe Browser auch die zuletzt im Kundenkonto gemerkten Varianten. Beim Anmelden übernimmt IO ausschließlich neue Gastfavoriten. Persönliche Varianten bleiben ihrem Kundenkonto zugeordnet.

@@ -15,9 +15,12 @@ fs.mkdirSync(out,{recursive:true});
     const profile = fs.mkdtempSync(path.join(out,'profile-'));
     const guest = new Set(), a = new Set([41301]), b = new Set([58202]);
     let scope = 'one', contact = 0, reads = 0, hold, loginGate, silentlySkipped, shop = 0, blocked = false, unavailable = false, rejectLogout = false;
+    let failDelete=false, failReplay=false, soldOut=0;
+    const replays=[];
     const restores = [], imported = new Set(), customerRows = new Set();
     const current = () => contact === 31 ? a : contact === 42 ? b : guest;
     let context, writeGate, legacyProfile = true;
+    let delayAddReply;
     const sequence = [];
     let documentReads = 0, hiddenDocument = 0, missingReads = 0;
     const sessionReads = new Map();
@@ -58,7 +61,13 @@ fs.mkdirSync(out,{recursive:true});
             if (url.pathname===api+'/items' && route.request().method()==='GET') {
                 documentReads++;
                 if (hiddenDocument && ++missingReads > 3) return route.fulfill({status:503});
-                return route.fulfill({json:{data:{documents:[...current()].filter(id=>id!==hiddenDocument).map(id=>({id})),inactiveVariationIds:[]}}});
+                const pruned={};
+                if(soldOut && current().delete(soldOut)){
+                    pruned.wishListPruned=true;
+                    pruned.wishListPrunedIds=[soldOut];
+                    pruned.wishListPrunedOwner={guest:!contact,shop,plenty:17,scope:'token-'+contact,account:contact?String(contact).padStart(64,'0'):undefined};
+                }
+                return route.fulfill({json:{data:{...pruned,documents:[...current()].filter(id=>id!==hiddenDocument).map(id=>({id})),inactiveVariationIds:[]}}});
             }
             if (route.request().isNavigationRequest()) return route.fulfill({contentType:'text/html',body:'<!doctype html><html><body data-eg-wish-api="'+api+'" data-eg-wish-shop="'+shop+'"><a class="wishlist-link"></a><script src="/jquery.js"></script><script src="/core.js"></script><script>window.eGuardians={};O46Core.apiservice();O46Core.user();O46Core.basketHeader.start()</script></body></html>'});
             if (url.pathname==='/core.js' || url.pathname==='/jquery.js') return route.fulfill({path:path.resolve('resources/js',url.pathname==='/core.js'?'core.min.js':'jquery-3.7.1.min.js')});
@@ -69,6 +78,7 @@ fs.mkdirSync(out,{recursive:true});
                 if (writeGate) await writeGate;
                 target.add(id);
                 sequence.push('write-end');
+                if(delayAddReply){const reply=delayAddReply;delayAddReply=null;reply.stored();await reply.wait;}
                 return route.fulfill({status:201,json:{data:{variationId:id}}});
             }
             if (url.pathname===api+'/login') {
@@ -96,9 +106,25 @@ fs.mkdirSync(out,{recursive:true});
                 sessionReads.set(tab, (sessionReads.get(tab) || 0) + 1);
                 if (unavailable) return route.fulfill({status:503});
                 const snapshot={currency:'EUR',shippingCountryId:1,itemQuantity:0,itemSum:0,sessionId:scope,customerId:contact,
-                    itemWishListIds:[...current()],wishListOwner:{guest:contact===0,plenty:17,shop,scope:'token-'+contact,imported:contact===0?[...imported]:undefined,customerIds:contact===0?[...customerRows].filter(id=>guest.has(id)):undefined}};
+                    itemWishListIds:[...current()],wishListOwner:{guest:contact===0,plenty:17,shop,scope:'token-'+contact,account:contact?String(contact).padStart(64,'0'):undefined,imported:contact===0?[...imported]:undefined,customerIds:contact===0?[...customerRows].filter(id=>guest.has(id)):undefined}};
                 if (hold) {const gate=hold;hold=null;gate.started();await gate.wait;}
                 return route.fulfill({json:{data:snapshot}});
+            }
+            if (url.pathname===api+'/removals') {
+                const input=route.request().postDataJSON();
+                assert.equal(input.wishScope,'token-'+contact);
+                assert.equal(input.account,contact ? String(contact).padStart(64,'0') : 'guest');
+                replays.push([contact,input.ids]);
+                if(failReplay) return route.fulfill({status:503});
+                for(const id of input.ids) current().delete(id);
+                return route.fulfill({json:{data:{removed:input.ids}}});
+            }
+            if (route.request().method()==='DELETE' && url.pathname.startsWith(api+'/items/')) {
+                const id=Number(url.pathname.split('/').pop());
+                if(failDelete) return route.fulfill({status:503,json:{data:false}});
+                const success=current().delete(id);
+                if(!contact){imported.delete(id);customerRows.delete(id);}
+                return route.fulfill({json:{data:success}});
             }
             if (url.pathname===api+'/guest') {
                 const input = route.request().postDataJSON();
@@ -133,6 +159,78 @@ fs.mkdirSync(out,{recursive:true});
     const login=(p,email)=>p.evaluate(email=>new Promise(resolve=>eGuardians.user.login(email,'fixture',(response,status)=>resolve(status))),email);
     const logout=p=>p.evaluate(()=>new Promise(resolve=>eGuardians.user.logout((response,status)=>resolve(status))));
     try {
+        // A guest deletion applies to its original account only after that account signs back in.
+        shop=11;
+        a.add(80002);a.add(80003);b.add(80002);
+        let probe=await launch();await known(probe,[]);
+        assert.equal(await login(probe,'a@shop.invalid'),200);await known(probe,a);
+        assert.equal(await logout(probe),200);await known(probe,a);
+        const remove=async (tab,id)=>tab.evaluate(id=>new Promise(resolve=>{
+            eGuardians.apiservice.delete('/rest/io/itemWishList/'+id,O46Core.basketHeader.wishParams({}),async (response,code)=>{
+                if(code===200 && response.data===true) await O46Core.basketHeader.refreshAfterWrite(true);
+                resolve(code);
+            });
+        }),id);
+        const probeKey=backupKey.replace('-0','-11');
+        const backupBefore=await backupFor(probe,probeKey);
+        failDelete=true;assert.equal(await remove(probe,80002),503);failDelete=false;
+        assert.deepEqual(await backupFor(probe,probeKey),backupBefore);
+        const observer=await context.newPage();await observer.goto(origin+'/shop');await known(observer,a);
+        soldOut=80003;
+        await probe.evaluate(api=>new Promise(resolve=>jQuery.get(api+'/items').always(resolve)),api);
+        await expect.poll(async()=>(await backupFor(probe,probeKey)).customerIds).toEqual([41301,80002]);
+        assert.ok(a.has(soldOut),'Confirmed stock cleanup in guest IO defers the corresponding personal removal');
+        soldOut=0;
+        for(const id of [...guest]) assert.equal(await remove(probe,id),200);
+        await known(probe,[]);await known(observer,[]);
+        const empty=await backupFor(probe,probeKey);
+        assert.deepEqual(empty?.ids,[],'The confirmed empty list is durable');
+        assert.deepEqual(empty?.customerIds||[],[]);assert.deepEqual(empty?.imported||[],[]);
+        assert.deepEqual([...a],[41301,80002,80003],'No account changes while signed out');
+        await context.close();scope='fresh-guest-after-deletes';probe=await launch();await known(probe,[]);
+        assert.equal(await login(probe,'b@shop.invalid'),200);await known(probe,b);
+        assert.ok(b.has(80002));assert.equal(replays.length,0,'B never receives a request for A');
+        assert.equal(await logout(probe),200);await known(probe,b);
+        failReplay=true;assert.equal(await login(probe,'a@shop.invalid'),200);await known(probe,[]);
+        assert.equal(a.size,3,'Failed account replay must retain the receipt and original IO account rows');
+        failReplay=false;await probe.evaluate(()=>O46Core.basketHeader.refresh());await known(probe,[]);
+        assert.deepEqual([...a],[]);assert.ok(b.has(80002));
+        assert.deepEqual(replays.map(([owner,ids])=>[owner,[...ids].sort()]),[[31,[41301,80002,80003]],[31,[41301,80002,80003]]]);
+        await probe.reload();await known(probe,[]);assert.equal(replays.length,2);
+        assert.equal(await logout(probe),200);await known(probe,[]);
+        await context.close();a.add(41301);b.delete(80002);guest.clear();imported.clear();customerRows.clear();
+        restores.length=0;scope='one';legacyProfile=true;
+        shop=12;probe=await launch();await known(probe,[]);
+        assert.equal(await login(probe,'a@shop.invalid'),200);await known(probe,a);
+        assert.equal(await logout(probe),200);await known(probe,a);
+        let releaseOld, markOld;
+        const oldSnapshot=new Promise(resolve=>{markOld=resolve;});
+        const staleTab=await context.newPage();await staleTab.goto(origin+'/shop');await known(staleTab,a);
+        hold={started:markOld,wait:new Promise(resolve=>{releaseOld=resolve;})};
+        await staleTab.evaluate(()=>{O46Core.basketHeader.refresh();});await oldSnapshot;
+        assert.equal(await remove(probe,41301),200);releaseOld();await known(staleTab,[]);
+        // An explicit, successful re-add reverses the earlier guest removal.
+        await probe.evaluate(()=>new Promise(resolve=>eGuardians.apiservice.post('/rest/io/itemWishList/',{variationId:41301},async (r,status)=>{
+            if(status===201) await O46Core.basketHeader.refreshAfterWrite(true);resolve();
+        })));
+        await known(probe,[41301]);await known(staleTab,[41301]);
+        const callsBeforeLogin=replays.length;
+        assert.equal(await login(probe,'a@shop.invalid'),200);await known(probe,[41301]);
+        assert.equal(replays.length,callsBeforeLogin);assert.ok(a.has(41301));
+        await logout(probe);await known(probe,a);
+        // IO accepted a duplicate add first, but its HTTP reply arrives after a newer confirmed removal.
+        let acceptedAdd, releaseReply;
+        const wasAdded=new Promise(resolve=>{acceptedAdd=resolve;});
+        delayAddReply={stored:acceptedAdd,wait:new Promise(resolve=>{releaseReply=resolve;})};
+        const lateAdd=probe.evaluate(()=>new Promise(resolve=>eGuardians.apiservice.post('/rest/io/itemWishList/',{variationId:41301},async (r,status)=>{
+            if(status===201) await O46Core.basketHeader.refreshAfterWrite(true);resolve();
+        })));
+        await wasAdded;await known(staleTab,[41301]);
+        assert.equal(await remove(staleTab,41301),200);releaseReply();await lateAdd;await known(probe,[]);
+        assert.equal(await login(probe,'a@shop.invalid'),200);await known(probe,[]);
+        assert.equal(a.size,0,'An older POST reply cannot undo a newer guest deletion');
+        await logout(probe);await known(probe,[]);await context.close();a.add(41301);
+        guest.clear();imported.clear();customerRows.clear();restores.length=0;legacyProfile=true;
         // Start with a fresh shop and add a variation only after successful account authentication.
         shop=9;
         let client=await launch();await known(client,[]);
@@ -268,7 +366,7 @@ fs.mkdirSync(out,{recursive:true});
             assert.deepEqual(new Set((await backupFor(page)).customerIds),current());
             assert.doesNotMatch(await outsideBackup(page),/41301|41302|58202|58203/);
             assert.ok(!b.has(41301) && !b.has(41302));
-            const visibleAfterLogout = new Set([10001,...current()]);
+            const visibleAfterLogout = new Set(current());
             assert.equal(await logout(page),200);await known(page,visibleAfterLogout);await known(peer,visibleAfterLogout);
         }
         // Explicit guest removal updates both the IO list and its recovery record.
@@ -278,7 +376,7 @@ fs.mkdirSync(out,{recursive:true});
         guest.clear();imported.clear();customerRows.clear();
         await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
         await known(page,[]); await known(peer,[]);
-        assert.equal(await backupFor(page),null);
+        assert.deepEqual((await backupFor(page)).ids,[]);
         assert.ok(a.has(41301) && a.has(41302),'Guest removal must leave the personal account intact');
         const loginRestores = restores.length;
         // Corrupt storage, an expired server session and a different shop must never authorize personal data.

@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- Confirmed wish list removals survive logout and a browser restart. When a signed-out customer removes a variation previously saved in their account, the shop applies the removal the next time they sign in to that account. This also covers confirmed out-of-stock removals.
+
 - A wishlist write that finishes during session revalidation now refreshes the current session. The basket confirmation stays visible for three seconds after the latest confirmed addition. Legacy copies of the confirmation HTML are removed from browser storage for all five shop languages. Signing in or out immediately after a wishlist change waits for the write and its session reconciliation. Other open tabs pick up restored guest favourites.
 
 - After sign-out, the same browser also shows the last confirmed account favourites. Signing in imports only new guest favourites. Personal entries stay in their respective customer accounts.

@@ -2,11 +2,13 @@
 namespace Plenty\Plugin\Http {
     class Response { public function __construct(public $data, public $code) {} }
 }
+namespace IO\Helper { class Utils { static function getPlentyId(){return 17;} static function getWebstoreId(){return 0;} } }
 namespace IO\Api {
     class ResponseCode { const OK = 200; }
 }
 namespace IO\Api\Resources {
     use Plenty\Plugin\Http\Response;
+    class SessionResource {}
     class ItemWishListResource {
         public function __construct(protected $request, protected $response) {}
         public function store(): Response {
@@ -44,6 +46,7 @@ namespace {
     use Plenty\Modules\Webshop\ItemSearch\Services\ItemSearchService;
     use Plenty\Plugin\Http\Response;
     require __DIR__.'/../src/Resources/WishListResource.php';
+    require __DIR__.'/../src/Resources/WishListSessionResource.php';
     require __DIR__.'/../src/Services/WishListAvailability.php';
     function same($expected, $actual) {
         if ($expected !== $actual) throw new RuntimeException(json_encode([$expected,$actual]));
@@ -73,7 +76,7 @@ namespace {
     };
     $services = [\Plenty\Modules\Webshop\ItemSearch\Factories\VariationSearchFactory::class=>new \Plenty\Modules\Webshop\ItemSearch\Factories\VariationSearchFactory(),
         \Plenty\Modules\Webshop\Contracts\ContactRepositoryContract::class=>new class {function getContactId(){return 31;}},
-        ItemWishListService::class=>$owner, ItemListService::class=>$list, WishListAvailability::class=>new WishListAvailability(),
+        \IO\Services\BasketService::class=>new class{function getBasket(){return (object)['sessionId'=>'stock-test'];}}, ItemWishListService::class=>$owner, ItemListService::class=>$list, WishListAvailability::class=>new WishListAvailability(),
         ItemSearchService::class=>new class {
             function getResult($factory) {
                 if ($GLOBALS['result'] === null) throw new RuntimeException('Search unavailable');
@@ -87,6 +90,7 @@ namespace {
     $reply = $resource->index();
     same(200,$reply->code);
     same(true,$reply->data['wishListPruned']);
+    same([13,12,16,14],$reply->data['wishListPrunedIds']);
     same([11,15],array_column($reply->data['documents'],'id'));
     same([],$reply->data['inactiveVariationIds']);
     same(['15',11],$owner->saved);

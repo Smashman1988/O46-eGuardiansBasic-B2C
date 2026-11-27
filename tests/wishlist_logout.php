@@ -56,7 +56,16 @@ namespace {
     $account=new class {
         public $rows=[31=>[13],42=>[42]],$fail=0,$silent=0;
         function getContactId(){return $GLOBALS['contact'];}
-        function getItemWishList(){return $this->rows[$this->getContactId()]??[];}
+        public $switchAfterRead = 0;
+        function getItemWishList(){
+            $result = $this->rows[$this->getContactId()] ?? [];
+            if ($this->switchAfterRead) {$GLOBALS['contact']=$this->switchAfterRead;$this->switchAfterRead=0;}
+            return $result;
+        }
+        function removeItemWishListEntry($id){
+            if($this->silent===$id)return false;
+            $c=$this->getContactId();$this->rows[$c]=array_values(array_diff($this->rows[$c],[$id]));return true;
+        }
         function addItemWishListEntry($id){
             $c=$this->getContactId();check($c>0,'customer repository called as guest');
             if($id===$this->fail)throw new \RuntimeException('rejected IO write');
@@ -147,6 +156,22 @@ namespace {
             $contact=0;check($owner()->getItemWishList()===[],'Private list entered guest session');
             $contact=$contactId;$session->setSessionValue(Session::GUEST_WISHLIST_MIGRATION,true);check($owner()->getItemWishList()===$expected,'Repeated login mixed accounts');
         }
+        $aOwner=WishListSessionResource::owner('session-two',31);
+        $api->args=['ids'=>[14,15],'wishScope'=>$aOwner['scope'],'account'=>$aOwner['account']];
+        foreach([0,42] as $contact)check($res->reconcileRemovals()->code===409,'Wrong owner applied pending removals');
+        $contact=31;$api->args['wishScope']='expired';
+        check($res->reconcileRemovals()->code===409,'Expired scope applied pending removals');
+        $api->args['wishScope']=$aOwner['scope'];$api->args['ids']=[14,'15'];
+        check($res->reconcileRemovals()->code===422 && in_array(14,$owner()->getItemWishList(),true),'Malformed batch partially modified account');
+        $api->args['ids']=range(1,101);
+        check($res->reconcileRemovals()->code===422,'Oversized removal batch');
+        $api->args['ids']=[14];$account->rows[42][]=14;$account->switchAfterRead=42;
+        check($res->reconcileRemovals()->code===409 && in_array(14,$account->rows[42],true),'Account switched after list lookup');
+        $account->rows[42]=array_values(array_diff($account->rows[42],[14]));$contact=31;
+        $api->args['ids']=[14,15,123];$account->silent=15;
+        check($res->reconcileRemovals()->data===['removed'=>[14,123]],'Only confirmed or already absent IDs may be acknowledged');
+        $account->silent=0;check($res->reconcileRemovals()->data===['removed'=>[14,15,123]],'Idempotent retry');
+        check($owner()->getItemWishList()===[13,11,12] && $account->rows[42]===[42,21,22],'Scoped replay touched a different account');
         echo "Native IO migration: two accounts, duplicate, exception, silent write failure, retry and repeated logout/login passed.\n";
     }
     echo "Native logout routing, private owner metadata, guest recovery, unavailable stock, shop and tenant isolation passed.\n";

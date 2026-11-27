@@ -28,6 +28,7 @@ class GuardiansBasicRouteServiceProvider extends RouteServiceProvider
             $api->post('guardiansbasic/wishlist/login', 'WishListLoginResource@store');
             $api->resource('guardiansbasic/wishlist/items', 'WishListResource');
             $api->post('guardiansbasic/wishlist/guest', 'WishListResource@restoreGuest');
+            $api->post('guardiansbasic/wishlist/removals', 'WishListResource@reconcileRemovals');
         });
     }
 }

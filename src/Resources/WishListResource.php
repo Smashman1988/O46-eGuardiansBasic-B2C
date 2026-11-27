@@ -112,6 +112,44 @@ class WishListResource extends ItemWishListResource
         return is_string($expected) && $expected !== '' && $expected === WishListSessionResource::scope($session, $contact);
     }
 
+    /** Reconcile earlier confirmed removals only in the browser's verified current account or guest session. */
+    public function reconcileRemovals(): Response
+    {
+        $contacts = pluginApp(\Plenty\Modules\Webshop\Contracts\ContactRepositoryContract::class);
+        $contact = (int)$contacts->getContactId();
+        $session = pluginApp(\IO\Services\BasketService::class)->getBasket()->sessionId;
+        $owner = WishListSessionResource::owner($session, $contact);
+        if (!$session || $this->request->get('account') !== ($owner['account'] ?? 'guest')
+            || $this->request->get('wishScope') !== $owner['scope']) {
+            return $this->response->create(null, 409);
+        }
+        $ids = $this->request->get('ids');
+        if (!is_array($ids) || !$ids || count($ids) > 100) {
+            return $this->response->create(null, 422);
+        }
+        foreach ($ids as $id) {
+            if (!is_int($id) || $id <= 0) {
+                return $this->response->create(null, 422);
+            }
+        }
+        $repository = pluginApp(ItemWishListService::class);
+        $present = array_fill_keys($repository->getItemWishList(), true);
+        if (!$this->matchesOwner()) {
+            return $this->response->create(null, 409);
+        }
+        $removed = [];
+        foreach (array_unique($ids) as $id) {
+            // IO resolves its contact at the point of removal as well.
+            if ((int)$contacts->getContactId() !== $contact) {
+                return $this->response->create(null, 409);
+            }
+            if (!isset($present[$id]) || $repository->removeItemWishListEntry($id)) {
+                $removed[] = $id;
+            }
+        }
+        return $this->response->create(['removed' => $removed], 200, ['Cache-Control' => 'private, no-store']);
+    }
+
     public function destroy(string $selector): Response
     {
         return $this->matchesOwner() ? parent::destroy($selector) : $this->response->create(null, 409);
@@ -160,12 +198,19 @@ class WishListResource extends ItemWishListResource
                 try {
                     if ($repository->removeItemWishListEntry((int)$id)) {
                         $items['wishListPruned'] = true;
+                        $items['wishListPrunedIds'][] = (int)$id;
                     }
                 } catch (\Exception $exception) {
                     // Keep processing other entries. IO can retry this removal at the next visit.
                     continue;
                 }
             }
+        }
+        if (!empty($items['wishListPrunedIds'])) {
+            $items['wishListPrunedOwner'] = WishListSessionResource::owner(
+                pluginApp(\IO\Services\BasketService::class)->getBasket()->sessionId,
+                (int)pluginApp(\Plenty\Modules\Webshop\Contracts\ContactRepositoryContract::class)->getContactId()
+            );
         }
         if ($blocked) {
             $items['documents'] = array_values(array_filter($items['documents'], function ($doc) use ($blocked) {

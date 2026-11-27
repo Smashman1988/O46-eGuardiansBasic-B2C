@@ -14,8 +14,8 @@
       "sha256": "10ad69732d63d7611dbdbda4905b7496d1178518efe214dcf50175bdf65d2fa1"
     },
     "js/core.min.js": {
-      "version": 32,
-      "sha256": "16a6e7a5a1a74069927b641f12d88388f016c4869df8851091997149f7a9a6af"
+      "version": 33,
+      "sha256": "b49c6816461c5d412396cc37f775724ee13b78fcdede1e153e26fe795710efdd"
     },
     "js/facets.min.js": {
       "version": 2,

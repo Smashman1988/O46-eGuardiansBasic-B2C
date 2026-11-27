@@ -16,6 +16,21 @@ class WishListSessionResource extends SessionResource
         return $sessionId ? hash('sha256', json_encode([(string)$sessionId, $contact, Utils::getPlentyId(), Utils::getWebstoreId()])) : '';
     }
 
+    public static function owner($sessionId, int $contact): array
+    {
+        $owner = [
+            'guest' => $contact === 0,
+            'shop' => Utils::getWebstoreId(),
+            'plenty' => Utils::getPlentyId(),
+            'scope' => self::scope($sessionId, $contact)
+        ];
+        if ($contact > 0) {
+            // A stable comparison key in private IO responses. Session scope still authorizes every write.
+            $owner['account'] = self::scope('wishlist-account', $contact);
+        }
+        return $owner;
+    }
+
     public function basket(): Response
     {
         return $this->response->create($this->indexBasket(), ResponseCode::OK);
@@ -40,12 +55,7 @@ class WishListSessionResource extends SessionResource
             }
         }
         $contact = (int)pluginApp(ContactRepositoryContract::class)->getContactId();
-        $basket['wishListOwner'] = [
-            'guest' => $contact === 0,
-            'shop' => Utils::getWebstoreId(),
-            'plenty' => Utils::getPlentyId(),
-            'scope' => self::scope($basket['sessionId'] ?? '', $contact)
-        ];
+        $basket['wishListOwner'] = self::owner($basket['sessionId'] ?? '', $contact);
         if ($contact === 0) {
             $lists = pluginApp(\IO\Repositories\ItemWishListGuestRepository::class)->getItemWishListForAllPlentyIds();
             foreach ($lists[Utils::getPlentyId()] ?? [] as $id => $row) {
