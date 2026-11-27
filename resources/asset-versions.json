@@ -1,12 +1,12 @@
 {
   "css/checkout.min.css": 1,
   "css/main.min.css": 8,
-  "js/cat.min.js": 4,
-  "js/core.min.js": 30,
+  "js/cat.min.js": 5,
+  "js/core.min.js": 31,
   "js/facets.min.js": 2,
-  "js/item.min.js": 5,
+  "js/item.min.js": 6,
   "js/jquery-3.7.1.min.js": 1,
   "js/magiczoom.min.js": 1,
-  "js/main.min.js": 3,
-  "js/vue.min.js": 3
+  "js/main.min.js": 4,
+  "js/vue.min.js": 4
 }

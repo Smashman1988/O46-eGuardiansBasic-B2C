@@ -116,23 +116,7 @@ this.addItemToBasket = function (_this) {
         this.openBasketPreview = function(_this){
             eGuardians.basket.openBasketPreview()
         };
-        this.initBasketPreview = function(_this){
-            if($('html').hasClass('mobile-magic')){
-                // $(_this).on('click', function(){
-                 //   eGuardians.basket.openBasketPreview();
-                // }); 
-            }else{
-                $(_this).on('mouseover', function(){
-                    if(!$(_this).hasClass('basketPrevIsLoaded')){
-                        eGuardians.basket.openBasketPreviewSmall();
-                        $(_this).addClass('basketPrevIsLoaded')
-                    }
-                }); 
-                $(_this).on('mouseleave', function(){
-                   $('html').removeClass('basket-prev-small-open');
-                });
-            }
-        };
+        this.initBasketPreview = function() {}; // Legacy header binding.
         this.closeBasketPreview = function(_this){
       
             eGuardians.basket.closeBasketPreview();

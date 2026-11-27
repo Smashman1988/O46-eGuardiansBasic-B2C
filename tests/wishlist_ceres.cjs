@@ -29,10 +29,10 @@ function row(id) {
         page.setDefaultTimeout(6000);
         page.on('pageerror', e => errors.push(e.message));
         const ids = new Set([101,102,103,106,999]);
-        let accept = false, reads = 0, pruneOnRead = false;
+        let accept = false, reads = 0, pruneOnRead = false, delayDelete;
         const basket = () => ({itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,sessionId:'customer-session-fixture',customerId:17,
             itemWishListIds:[...ids],wishListOwner:{guest:false,shop:0,plenty:17,scope:'customer-scope'}});
-        await page.route('**/*', route => {
+        await page.route('**/*', async route => {
             const u = new URL(route.request().url());
             if (u.pathname === '/') return route.fulfill({contentType:'text/html',body:
                 '<body id="isVueView" data-eg-wish-api="/rest/guardiansbasic/wishlist" data-eg-wish-shop="0"><header id="page-header" data-eg-basket-currency="EUR"></header><main id="page-body"><div id="app"><wish-list></wish-list></div></main>'+controls+'</body>'});
@@ -49,6 +49,7 @@ function row(id) {
             }
             if (route.request().method()==='DELETE') {
                 const id = Number(u.pathname.split('/').pop()); writes.push(id);
+                if (delayDelete) await delayDelete;
                 if (accept) ids.delete(id);
                 return route.fulfill({status:accept?200:503,json:{data:accept,error:!accept}});
             }
@@ -128,6 +129,16 @@ function row(id) {
         assert.deepEqual(errors,[]);
         assert.equal(listPaths[0],coreFirst ? '/rest/guardiansbasic/wishlist/items' : '/rest/io/itemWishList');
         assert.ok(listPaths.slice(1).every(path=>path==='/rest/guardiansbasic/wishlist/items'));
+        // Switching back to this tab verifies the owner while the last DELETE is still in flight.
+        let finishDelete;
+        delayDelete = new Promise(resolve => { finishDelete = resolve; });
+        await control(104).click();
+        await page.waitForFunction(() => document.querySelector('[data-wish-entry="104"] button.eg-wish-heart')?.getAttribute('aria-busy') === 'true');
+        await page.evaluate(() => O46Core.basketHeader.invalidate(false, false));
+        finishDelete();
+        await control(104).waitFor({state:'detached'});
+        assert.deepEqual([...ids], []);
+        assert.deepEqual(await page.evaluate(()=>ceresStore.state.wishList.wishListItems), []);
         await page.close();
     }
 })().catch(error=>{console.error(error);process.exitCode=1;});

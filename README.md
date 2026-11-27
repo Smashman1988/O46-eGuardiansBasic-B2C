@@ -107,6 +107,8 @@ Größen auf den Karten und Merklistenoptionen stammen aus denselben konkreten V
 
 ### Merkliste, Sitzung und ShopBooster
 
+Eine sofortige An- oder Abmeldung wartet im selben Tab auf laufende Merklistenschreibvorgänge und deren Sitzungsabgleich. Nach einer erfolgreichen Gastwiederherstellung signalisiert der Tab die Änderung ohne Varianten-IDs. Andere Tabs gleichen sie über ihre eigene private Sitzung ab. Auf einer geöffneten Merklistenseite werden entfernte Zeilen lokal ausgeblendet. Eine neu hinzugekommene Variante ohne Produktdokument benötigt einen Abruf der Listendokumente.
+
 Karten, Artikeldetailseite und Quickview enthalten die öffentlichen Verkaufsoptionen des Artikels. Die Varianten-ID bleibt der interne Schlüssel für IO. Ein MutationObserver initialisiert ausschließlich neu eingefügte Elemente und verwendet das vorhandene Set auch bei Infinite Scroll.
 
 | Speicher | Inhalt und Lebensdauer |
@@ -124,7 +126,7 @@ Bei erfolgreichem Login übernimmt die native IO-Migration die tatsächlichen Ga
 
 Ein Neustart mit gültiger Gastsitzung benötigt keine Wiederherstellungsschreibanfrage. Nach einem Sitzungsablauf kann nur ein serverseitig bestätigter Gast die gesicherten Varianten in dieselbe Shop-/Mandantenkombination übernehmen. Ein Schreibaufruf verarbeitet bis zu 5.000 IDs. Der Server prüft den Bestand in Gruppen von bis zu 100 IDs und übernimmt nur kaufbare Varianten. Nach einem unterbrochenen Login wird eine zur Anmeldung vorgemerkte Gastliste bis zur Klärung zurückgehalten. Bei gesperrtem oder gelöschtem LocalStorage arbeitet die native IO-Sitzung weiter. Ist auch die Sitzung abgelaufen, gibt es in diesem Browser keine Sicherung zur Wiederherstellung.
 
-`tests/wishlist_logout.php` prüft die privaten Routen und mit `O46_IO_ROOT` die originale IO-Migration. `tests/wishlist_isolation.cjs` startet einen echten lokalen Browserprozess mit demselben Profil erneut und prüft Gäste, zwei Kunden, weitere Tabs, verzögerte Antworten und Speicherausfälle. `tests/wishlist_cache.cjs` prüft öffentliches Karten-HTML und Netzwerkzugriffe bei 12, 24, 66, 100 und 500 Karten mit 0, 3 und 5.000 Einträgen.
+`tests/wishlist_logout.php` prüft die privaten Routen und mit `O46_IO_ROOT` die originale IO-Migration. `tests/wishlist_isolation.cjs` startet einen echten lokalen Browserprozess mit demselben Profil erneut und prüft Gäste, zwei Kunden, weitere Tabs, verzögerte Antworten und Speicherausfälle. `tests/wishlist_cache.cjs` prüft öffentliches Karten-HTML und Netzwerkzugriffe bei 12, 24, 66, 100 und 500 Karten mit 0, 3 und 5.000 Einträgen. Der Toast-Test prüft bestätigte und fehlgeschlagene Warenkorbaktionen, Quickview, zwei Positionen, Übersetzungen und den gemeinsamen Timer. Mit `O46_TOAST_BASE=HEAD` vergleicht er zusätzlich die Bilder mit dem lokalen Vorgängerstand.
 
 Einen öffentlichen ShopBooster-Treffer belegt der HTTP-Antwortheader `x-plenty-cache: hit` auf dem HTML-Dokument. Für Set 428 steht ausschließlich die private Vorschau zur Verfügung. Die dort gemessene Direktive `private, no-store` liefert keinen öffentlichen Nachweis. [PlentyONE-Handbuch zum Cache-Status](https://knowledge.plentyone.com/de-de/manual/main/webshop/ceres-einrichten.html)
 

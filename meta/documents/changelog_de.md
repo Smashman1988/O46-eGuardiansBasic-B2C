@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Nach einem Sitzungswechsel während eines Merklistenklicks gleicht der Shop die abgeschlossene Änderung mit der aktuellen Sitzung ab. Die Warenkorbmeldung bleibt nach der letzten bestätigten Aktion drei Sekunden sichtbar. Alte HTML-Kopien der Meldung werden für alle fünf Shopsprachen aus dem Browserspeicher entfernt. Eine sofortige An- oder Abmeldung wartet auf die laufende Merklistenänderung und den zugehörigen Sitzungsabgleich. Weitere geöffnete Tabs übernehmen wiederhergestellte Gastfavoriten.
+
 - Die ursprünglichen Gastfavoriten bleiben nach der Abmeldung verfügbar. Bereits übernommene Varianten werden bei einer weiteren Anmeldung auf diesem Browser nicht erneut automatisch importiert. Die persönliche Kundenmerkliste bleibt im Konto.
 
 - Der Merklisten-Picker zeigt verständliche Attribute und unterschiedliche Packungsgrößen in sortierter Auswahl. Persönliche Herzfarben entstehen im Browser. Persönliche Merklisten bleiben beim Abmelden im jeweiligen Kundenkonto. Echte Gastfavoriten überstehen mit verfügbarem LocalStorage einen Sitzungsablauf und werden beim erfolgreichen Login mit dem aktuellen Konto zusammengeführt.

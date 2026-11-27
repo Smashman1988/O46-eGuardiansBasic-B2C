@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- A wishlist write that finishes during session revalidation now refreshes the current session. The basket confirmation stays visible for three seconds after the latest confirmed addition. Legacy copies of the confirmation HTML are removed from browser storage for all five shop languages. Signing in or out immediately after a wishlist change waits for the write and its session reconciliation. Other open tabs pick up restored guest favourites.
+
 - Signing out restores the original guest favourites. On a shared browser, subsequent sign-ins only import newly saved guest favourites. Personal favourites stay in their customer account.
 
 - The wish list picker shows sorted attribute choices and relevant pack sizes. Personal heart states are resolved in the browser. Signing out keeps personal wishlists in their respective accounts. With local storage available, guest favourites survive session expiry and merge into the current account on successful login.

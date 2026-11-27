@@ -17,18 +17,62 @@ fs.mkdirSync(out,{recursive:true});
     let scope = 'one', contact = 0, reads = 0, hold, loginGate, silentlySkipped, shop = 0, blocked = false, unavailable = false, rejectLogout = false;
     const restores = [], imported = new Set();
     const current = () => contact === 31 ? a : contact === 42 ? b : guest;
-    let context;
+    let context, writeGate, legacyProfile = true;
+    const sequence = [];
+    let documentReads = 0, hiddenDocument = 0, missingReads = 0;
+    const sessionReads = new Map();
     async function launch() {
         context = await chromium.launchPersistentContext(profile,{headless:true,serviceWorkers:'block',executablePath:process.env.O46_BROWSER_EXECUTABLE});
+        if (legacyProfile) {
+            legacyProfile = false;
+            await context.addInitScript(({theme,shop})=>{
+                // Older releases kept IDs in the header summary before introducing a guest-owned backup.
+                const record={scope:'a'.repeat(64),timestamp:Date.now(),change:'legacy',
+                    basket:{itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,itemWishListIds:[654321]}};
+                localStorage.setItem('basketCache_header_v2',JSON.stringify(record));
+                localStorage.setItem('basketCache_header_v3_'+theme+'-'+shop,JSON.stringify(record));
+                localStorage.setItem('other-preexisting-setting','retained');
+            },{theme,shop});
+        }
         if (blocked) await context.addInitScript(()=>{
             Object.defineProperty(window,'localStorage',{get(){throw new DOMException('blocked','SecurityError');}});
         });
         await context.route('**/*', async route=>{
             const url = new URL(route.request().url());
             assert.equal(url.origin,origin);
+            if (url.pathname==='/merkliste/') {
+                return route.fulfill({contentType:'text/html',body:`<body data-eg-wish-shop="${shop}" data-eg-wish-api="${api}"><main data-wish-list></main>
+                    <script src="/jquery.js"></script><script src="/core.js"></script><script>
+                    window.eGuardians={};O46Core.apiservice();
+                    const list={wishListIds:[],wishListItems:[],inactiveVariationIds:[],isWishListInitiallyLoading:true,isLoading:false};
+                    window.ceresStore={state:{wishList:list},commit(type,value){
+                        if(type==='setWishListItems'){
+                            list.wishListItems=value;
+                            document.querySelector('main').textContent=value.map(row=>row.id).join(',');
+                        }
+                        if(type==='setWishListIds') list.wishListIds=value.map(Number);
+                        if(type==='setInactiveVariationIds') list.inactiveVariationIds=value;
+                    }};
+                    O46Core.basketHeader.start();</script></body>`});
+            }
+            if (url.pathname===api+'/items' && route.request().method()==='GET') {
+                documentReads++;
+                if (hiddenDocument && ++missingReads > 3) return route.fulfill({status:503});
+                return route.fulfill({json:{data:{documents:[...current()].filter(id=>id!==hiddenDocument).map(id=>({id})),inactiveVariationIds:[]}}});
+            }
             if (route.request().isNavigationRequest()) return route.fulfill({contentType:'text/html',body:'<!doctype html><html><body data-eg-wish-api="'+api+'" data-eg-wish-shop="'+shop+'"><a class="wishlist-link"></a><script src="/jquery.js"></script><script src="/core.js"></script><script>window.eGuardians={};O46Core.apiservice();O46Core.user();O46Core.basketHeader.start()</script></body></html>'});
             if (url.pathname==='/core.js' || url.pathname==='/jquery.js') return route.fulfill({path:path.resolve('resources/js',url.pathname==='/core.js'?'core.min.js':'jquery-3.7.1.min.js')});
+            if (url.pathname === api+'/items/' && route.request().method() === 'POST') {
+                const id = Number(new URLSearchParams(route.request().postData()).get('variationId'));
+                const target = current();
+                sequence.push('write-start');
+                if (writeGate) await writeGate;
+                target.add(id);
+                sequence.push('write-end');
+                return route.fulfill({status:201,json:{data:{variationId:id}}});
+            }
             if (url.pathname===api+'/login') {
+                sequence.push('login');
                 const email=new URLSearchParams(route.request().postData()).get('email');
                 const owner={'a@shop.invalid':31,'b@shop.invalid':42}[email];
                 if (!owner) return route.fulfill({status:401,json:{events:{AfterAccountAuthentication:{isSuccess:false}}}});
@@ -37,6 +81,7 @@ fs.mkdirSync(out,{recursive:true});
                 return route.fulfill({json:{events:{AfterAccountAuthentication:{isSuccess:true}}}});
             }
             if (url.pathname==='/rest/io/customer/logout/') {
+                sequence.push('logout');
                 if(rejectLogout) return route.fulfill({status:503,json:{error:true}});
                 contact=0;return route.fulfill({json:{data:200}});
             }
@@ -47,6 +92,8 @@ fs.mkdirSync(out,{recursive:true});
             }
             if (url.pathname===api+'/basket/') {
                 reads++;
+                const tab = route.request().frame().page();
+                sessionReads.set(tab, (sessionReads.get(tab) || 0) + 1);
                 if (unavailable) return route.fulfill({status:503});
                 const snapshot={currency:'EUR',shippingCountryId:1,itemQuantity:0,itemSum:0,sessionId:scope,customerId:contact,
                     itemWishListIds:[...current()],wishListOwner:{guest:contact===0,plenty:17,shop,scope:'token-'+contact,imported:contact===0?[...imported]:undefined}};
@@ -83,9 +130,46 @@ fs.mkdirSync(out,{recursive:true});
         guest.add(10001); guest.add(999);
         let page=await launch();await known(page,guest);
         assert.deepEqual(JSON.parse(await page.evaluate(k=>localStorage.getItem(k),backupKey)).ids,[10001,999]);
+        assert.equal(await page.evaluate(()=>localStorage.getItem('basketCache_header_v2')),null);
+        assert.doesNotMatch(await local(page),/654321/,'A legacy header with customer IDs cannot seed the guest backup');
+        assert.equal(await page.evaluate(()=>localStorage.getItem('other-preexisting-setting')),'retained');
         // A real browser-process restart; the IO cookie can select a new guest session.
         await context.close();scope='two';guest.clear();
         page=await launch();await known(page,[10001]);assert.deepEqual(restores,[[10001,999]]);
+        // Two old profile tabs can load the first empty guest snapshot after expiry concurrently.
+        await context.close();scope='two-tabs-after-expiry';guest.clear();
+        let releaseEmpty, markEmpty;
+        const emptyStarted=new Promise(resolve=>{markEmpty=resolve;});
+        hold={started:markEmpty,wait:new Promise(resolve=>{releaseEmpty=resolve;})};
+        page=await launch();await emptyStarted;
+        const recovering=await context.newPage();await recovering.goto(origin+'/shop');await known(recovering,[10001]);
+        releaseEmpty();
+        await known(page,[10001]);await recovering.close();
+        assert.deepEqual(JSON.parse(await page.evaluate(k=>localStorage.getItem(k),backupKey)).ids,[10001]);
+        const listPage=await context.newPage();await listPage.goto(origin+'/merkliste/');
+        await expect(listPage.locator('main')).toHaveText('10001');
+        const docsBefore=documentReads;
+        const authorBefore=sessionReads.get(page), peerBefore=sessionReads.get(listPage);
+        guest.add(11001);await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
+        await expect(listPage.locator('main')).toHaveText('10001,11001');
+        guest.delete(11001);await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
+        await expect(listPage.locator('main')).toHaveText('10001');
+        assert.equal(documentReads,docsBefore+1,'One document GET for an unknown addition, zero for removal');
+        assert.equal(sessionReads.get(page)-authorBefore,2);
+        assert.equal(sessionReads.get(listPage)-peerBefore,2);
+        console.log('Two confirmed changes: 2 private session reads in the writing tab, 2 in the list tab, 1 document GET for the new row.');
+        // A temporarily unavailable document can coexist with a valid IO ID. Do not poll the server.
+        hiddenDocument=12001;guest.add(hiddenDocument);
+        await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
+        await expect.poll(()=>missingReads).toBeGreaterThan(0);
+        await listPage.evaluate(()=>O46Core.basketHeader.pendingRead);
+        await listPage.evaluate(()=>O46Core.basketHeader.refresh());
+        assert.equal(missingReads,1,'Unchanged authoritative IDs must not loop on an absent document');
+        guest.delete(hiddenDocument);hiddenDocument=0;
+        await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
+        await expect.poll(()=>listPage.evaluate(()=>window.egSessionData.basket.itemWishListIds)).toEqual([...guest]);
+        await expect(listPage.locator('main')).toHaveText('10001');
+        await listPage.close();
         const central=await page.evaluate(()=>new Promise((resolve,reject)=>jQuery.ajax('/rest/io/session?lastSeenVariationId=331',
             {dataType:'json'}).done(reply=>resolve(reply.events.AfterBasketChanged.basket)).fail(reject)));
         assert.equal(central.wishListOwner.shop,0);assert.deepEqual(central.itemWishListIds,[10001]);
@@ -179,6 +263,31 @@ fs.mkdirSync(out,{recursive:true});
         assert.deepEqual(backup.ids,[777,778,779]);
         assert.deepEqual(backup.imported.sort((a,b)=>a-b),[777,778],'An unconfirmed write must not be recorded as imported');
         assert.equal(await logout(page),200);await known(page,[777,778,779]);
+        // Start auth while the native write and its private reconciliation are outstanding.
+        // Run under the same basket session ID for both owners.
+        for (const [id, auth] of [[781, 'login'], [782, 'logout']]) {
+            let releaseWrite;
+            writeGate = new Promise(resolve => { releaseWrite = resolve; });
+            sequence.length = 0;
+            await page.evaluate(id => {
+                eGuardians.apiservice.post('/rest/io/itemWishList/', {variationId:id}, (response, status) => {
+                    if (status === 201) O46Core.basketHeader.refreshAfterWrite(true);
+                });
+            }, id);
+            await expect.poll(() => sequence[0]).toBe('write-start');
+            const authenticating = auth === 'login' ? login(page,'a@shop.invalid') : logout(page);
+            // The browser acknowledges the auth callback setup before releasing the HTTP response.
+            await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+            releaseWrite();
+            assert.equal(await authenticating,200);
+            assert.deepEqual(sequence, ['write-start','write-end',auth]);
+            await known(page, auth === 'login' ? a : [777,778,779,781]);
+            const retained = await page.evaluate(k=>JSON.parse(sessionStorage.getItem(k)),backupKey.replace('-0','-8'));
+            assert.ok(retained.ids.includes(781));
+            assert.ok(!retained.ids.includes(782));
+        }
+        assert.ok(a.has(781) && a.has(782));
+        assert.ok(guest.has(781) && !guest.has(782));
         console.log('Persistent browser restart, 5000 guest IDs, real login/logout handlers including failed login/logout, private accounts A/B, back/forward, late IO read, two tabs, storage failure and shop isolation passed.');
     } finally {
         if(context)await context.close();

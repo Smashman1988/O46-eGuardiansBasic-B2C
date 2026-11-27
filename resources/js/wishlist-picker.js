@@ -103,11 +103,15 @@ O46Core.wishPicker = (function () {
         for (const entry of products.values()) renderHeart(entry);
         if (dialog) { save.disabled = true; modal.setAttribute('aria-busy', 'true'); }
         function complete(response, code) {
-            if (pending !== ticket || session !== ticket.session) return;
-            pending = null;
-            modal.removeAttribute('aria-busy');
             const ok = !response?.error && (remove ? code === 200 && response?.data === true :
                 code === 201 && String(response?.data?.variationId) === id);
+            if (pending !== ticket || session !== ticket.session) {
+                // The write can finish after a new owner check. Read the current session without applying the old IDs.
+                if (ok) O46Core.basketHeader.refreshAfterWrite(true);
+                return;
+            }
+            pending = null;
+            modal.removeAttribute('aria-busy');
             if (ok) {
                 if (remove) saved.delete(id); else saved.add(id);
                 if (dialog?.product === product) closeDialog();

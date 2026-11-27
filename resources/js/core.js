@@ -569,7 +569,8 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
     const shop = 'b2c-' + (document.body?.dataset.egWishShop || 'default');
     const wishApi = document.body?.dataset.egWishApi;
     // Ceres and the theme share these existing reads and writes. Keep IO's query, headers and events.
-    let routedJquery, loginRequests = 0;
+    let routedJquery, loginRequests = 0, wishRead = null;
+    const wishWrites = new Set();
     function routeWishRequests() {
         const jq = window.jQuery;
         if (!wishApi || !jq?.ajaxPrefilter || routedJquery === jq) return;
@@ -602,6 +603,12 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                 });
             } else if (/^\/rest\/io\/itemWishList(?:\/[0-9]+)?\/?$/.test(url.pathname)) {
                 path = url.pathname.replace('/rest/io/itemWishList', '/items');
+                if (method === 'POST' || method === 'DELETE') {
+                    // Success handlers start the private IO reconciliation synchronously after this prefilter.
+                    const finished = new Promise(resolve => xhr.always(() => queueMicrotask(() => resolve(wishRead))));
+                    wishWrites.add(finished);
+                    finished.then(() => wishWrites.delete(finished));
+                }
             }
             if (path) settings.url = wishApi + path + url.search;
         });
@@ -725,6 +732,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
             }
             return ids;
         }
+        let restored = false;
         const known = new Set(ids.map(Number));
         // A peer can still see the live guest list while another tab is authenticating.
         // Leave that native list eligible for the first transfer until the login result arrives.
@@ -758,6 +766,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                     if (!Array.isArray(result)) return ids;
                     const batch = new Set(missing.slice(offset,offset+5000));
                     if (!result.every(id => Number.isSafeInteger(id) && batch.has(id))) return ids;
+                    restored ||= result.length > 0;
                     for (const id of batch) known.delete(id);
                     for (const id of result) known.add(id);
                 } catch (_) { return ids; }
@@ -772,6 +781,8 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
             const next = JSON.stringify({scope:verified,ids:[...known],imported:[...imported].filter(id => known.has(id))});
             if (raw !== next) guestStorage('setItem',backupKey,next);
         } else if (previous) guestStorage('removeItem',backupKey);
+        // Restoration wrote to IO. A peer may still have the preceding empty response in flight.
+        if (restored) signal('wish');
         return [...known];
     }
     async function accept(basket, changed = true, authoritative = false, bootstrap = false) {
@@ -875,9 +886,11 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
             guestStorage('setItem',guestKey,JSON.stringify(guest));
         } catch (_) {}
     }
+    let staleBootstrap = false;
     function onSignal(message) {
         if (!message || typeof message.nonce !== 'string' || message.nonce === lastSignal) return;
         lastSignal = message.nonce;
+        if (initialCeres && (message.kind === 'auth' || message.kind === 'wish')) staleBootstrap = true;
         if (message.kind === 'auth') invalidate(false);
         if (message.kind === 'wish' && hasWishes() && !initialCeres) {
             // A read already on the wire can predate the peer's committed write.
@@ -909,7 +922,12 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         if (wishlist) signal('wish');
         generation++;
         writeVersion = generation;
-        return request ? request.then(() => writeVersion && refresh()) : refresh();
+        const pending = request ? request.then(() => writeVersion && refresh()) : refresh();
+        if (wishlist) {
+            wishRead = pending;
+            pending.finally(() => { if (wishRead === pending) wishRead = null; });
+        }
+        return pending;
     }
     function invalidate(publish = true, purgeList = true) {
         if (purgeList) refusedGuestScope = '';
@@ -968,7 +986,8 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         }
         // Retire old full-basket records once, including their raw session identifiers.
         try {
-            Object.keys(localStorage).filter(k => (k.startsWith('basketCache_') && !k.startsWith('basketCache_header_v3_')) || k === 'basketCache')
+            Object.keys(localStorage).filter(k => (k.startsWith('basketCache_') && !k.startsWith('basketCache_header_v3_')) || k === 'basketCache' ||
+                /^basketPreviewSmall:(?:\/(?:en|fr|it|es))?:v2$/.test(k))
                 .forEach(k => localStorage.removeItem(k));
         } catch (_) {}
         storage('sessionStorage', 'removeItem', 'o46-basket-scope');
@@ -1019,7 +1038,10 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                 if (mutation.type === 'setBasket' && !initialCeres) accept(state.basket.data, false);
                 if (mutation.type === 'setIsBasketInitiallyLoaded') {
                     initialCeres = false;
-                    accept(state.basket.data, false, false, true);
+                    if (staleBootstrap) {
+                        staleBootstrap = false;
+                        refresh();
+                    } else accept(state.basket.data, false, false, true);
                 }
             });
             if (!initialCeres) accept(store.state.basket.data, false, false, true);
@@ -1050,6 +1072,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
     }
     return { start, accept, refresh, refreshAfterWrite, invalidate, get ownerEpoch() { return ownerEpoch; },
         get pendingRead() { return request; },
+        get pendingWishWrite() { return wishWrites.size ? Promise.all([...wishWrites, wishRead]) : wishRead; },
         wishParams(data) { return ownerToken ? {...data,wishScope:ownerToken} : data; }
     };
 })();
@@ -1064,12 +1087,7 @@ O46Core.basketAddError = function(response, status) {
 // A confirmed add belongs to its original Quickview even if the customer has since opened another product.
 O46Core.confirmBasketAdd = function (button, opening) {
     function showToast() {
-        eGuardians.basket.openBasketPreviewSmall(() => {
-            $('html').addClass('basket-prev-small-open');
-            setTimeout(() => {
-                $('html').removeClass('basket-prev-small-open');
-            }, 3000);
-        });
+        eGuardians.basket.openBasketPreviewSmall();
     }
     if (!button.isConnected) return;
     const modal = button.closest('.modal-cross');
@@ -1105,13 +1123,19 @@ this.addItem = function(variationId, quantity, callback) {
         if (typeof callback === 'function') callback(response, error);
     });
 };
+        let toastTimer;
         this.openBasketPreviewSmall = function(callback) {
             const target = document.querySelector('.basket-prev-small-data');
             const template = document.getElementById('o46-basket-toast');
             if (!target || !template) return;
             target.replaceChildren(template.content.cloneNode(true));
             const toast = target.querySelector('#wkb-toast');
-            setTimeout(() => toast?.classList.remove('show'), 3000);
+            clearTimeout(toastTimer);
+            document.documentElement.classList.add('basket-prev-small-open');
+            toastTimer = setTimeout(() => {
+                toast?.classList.remove('show');
+                document.documentElement.classList.remove('basket-prev-small-open');
+            }, 3000);
             if (typeof callback === 'function') callback({ data: target.innerHTML });
         };
         this.closeBasketPreview = function(){
@@ -1155,13 +1179,13 @@ O46Core.user = O46Core.user || function () {
                 }
             });
             // Let an expired guest session finish recovery before IO migrates its entries.
-            const pending = O46Core.basketHeader.pendingRead;
+            const pending = O46Core.basketHeader.pendingWishWrite || O46Core.basketHeader.pendingRead;
             if (pending) pending.then(submit);
             else submit();
         };
 
         this.logout = function(callback){
-            eGuardians.apiservice.post('/rest/io/customer/logout/', '', function(response, status) {
+            const submit = () => eGuardians.apiservice.post('/rest/io/customer/logout/', '', function(response, status) {
                 if (logoutConfirmed(response, status)) {
                     try { localStorage.setItem('eg:lastLogout', String(Date.now())); } catch (_) { /* Storage can be disabled. */ }
                     O46Core.basketHeader.invalidate();
@@ -1171,6 +1195,9 @@ O46Core.user = O46Core.user || function () {
                     callback(response, status);
                 }
             });
+            const pending = O46Core.basketHeader.pendingWishWrite;
+            if (pending) pending.then(submit);
+            else submit();
         };
 
         this.loginUser = function(button) {
