@@ -74,7 +74,7 @@ O46Core.wishPicker = (function () {
             const returned = new Set([...data.documents.map(row => row.id), ...missing].map(String));
             if (returned.size !== saved.size || [...saved].some(id => !returned.has(id))) {
                 // Ceres can finish a pruning GET before this script mounts. Confirm the owner's IDs via IO.
-                if ([...saved].some(id => !returned.has(id))) O46Core.basketHeader.refreshAfterWrite();
+                if ([...saved].some(id => !returned.has(id))) O46Core.basketHeader.refreshAfterWrite(true);
                 return;
             }
             store.commit('setWishListItems', data.documents);
@@ -113,7 +113,7 @@ O46Core.wishPicker = (function () {
                 if (dialog?.product === product) closeDialog();
                 notice(product, window.messageServiceTranslations?.[remove ? 'wishlistminus' : 'wishlistplus'] || '');
                 reconcileList();
-                O46Core.basketHeader.refreshAfterWrite();
+                O46Core.basketHeader.refreshAfterWrite(true);
             } else if (dialog?.product === product) {
                 dialog.error = labels.error;
             } else {
@@ -122,10 +122,84 @@ O46Core.wishPicker = (function () {
             for (const entry of products.values()) renderHeart(entry);
             if (dialog) renderDialog();
         }
-        const data = {variationId: id, templateEvent: 'tpl.item'};
+        const data = O46Core.basketHeader.wishParams({variationId:id, templateEvent:'tpl.item'});
         if (remove) eGuardians.apiservice.delete('/rest/io/itemWishList/' + id, data, complete);
         else eGuardians.apiservice.post('/rest/io/itemWishList/', data, complete);
     }
+
+    // Build the picker only when opened. A leaf always points to one exact IO variation.
+    function choiceGroups(ids, allIds, attributes, unit, filters, labels) {
+        const compare = new Intl.Collator(document.documentElement.lang || 'de', {numeric:true, sensitivity:'base'});
+        function sizeRank(text) {
+            const match = /^(?:(\d+)X|(X*))([SML])(?=$|[\s(/-])/i.exec(text);
+            if (!match) return null;
+            const n = match[1] ? Number(match[1]) : match[2].length;
+            return match[3].toUpperCase() === 'S' ? -1 - n : match[3].toUpperCase() === 'L' ? 1 + n : 0;
+        }
+        function numberSize(text) {
+            const value = text.replace(/½/g,' 1/2').replace(/⅓/g,' 1/3').replace(/⅔/g,' 2/3').trim();
+            const match = /^(\d+(?:[.,]\d+)?)(?:\s+(\d+)\/(\d+))?$/.exec(value);
+            return match ? Number(match[1].replace(',','.')) + (match[2] ? match[2]/match[3] : 0) : null;
+        }
+        function sort(a,b) {
+            for (const rank of [sizeRank, numberSize]) {
+                const x = rank(a), y = rank(b);
+                if (x !== null || y !== null) {
+                    if (x === null) return 1;
+                    if (y === null) return -1;
+                    if (x !== y) return x-y;
+                    break;
+                }
+            }
+            return compare.compare(a,b);
+        }
+        const pack = {key:'pack', name:labels.pack, text:unit};
+        const dimensions = [...attributes, pack].filter(dim => new Set(ids.map(dim.text)).size > 1);
+        if (!dimensions.length && ids.length === 1) {
+            const meaningful = attributes.find(dim => dim.text(ids[0]));
+            if (meaningful) dimensions.push(meaningful);
+        }
+        const groups = [];
+        let choices = ids;
+        for (const [index, dim] of dimensions.entries()) {
+            const options = new Map();
+            for (const id of choices) {
+                const text = dim.text(id) || labels.unspecified;
+                if (!options.has(text)) options.set(text, []);
+                options.get(text).push(id);
+            }
+            const leaf = index === dimensions.length - 1 && [...options.values()].every(group => group.length === 1);
+            groups.push({name:dim.name, options:[...options.keys()].sort(sort).map(text => ({
+                text, key:leaf ? 'id' : dim.key, value:leaf ? options.get(text)[0] : text, ids:options.get(text)
+            }))});
+            if (leaf || !options.has(filters[dim.key])) return groups;
+            choices = options.get(filters[dim.key]);
+        }
+        // A catalog can contain identical public attributes and packs. Use a stable,
+        // product-relative letter only for those rows, including in removal mode.
+        function signature(id) { return JSON.stringify([...attributes.map(dim => dim.text(id)), unit(id)]); }
+        function letter(index) {
+            let result = '';
+            do { result = String.fromCharCode(65 + index % 26) + result; index = Math.floor(index / 26) - 1; } while (index >= 0);
+            return result;
+        }
+        if (choices.length) {
+            const peers = new Map();
+            for (const id of allIds) {
+                const key = signature(id);
+                if (!peers.has(key)) peers.set(key, []);
+                peers.get(key).push(id);
+            }
+            groups.push({name:labels.variant, options:choices.map(id => {
+                const same = peers.get(signature(id));
+                const text = same.length > 1 ? labels.variant + ' ' + letter(same.indexOf(id)) :
+                    attributes.map(dim => dim.text(id)).filter(Boolean).join(' · ') || unit(id) || labels.variant;
+                return {text, key:'id', value:id, ids:[id]};
+            })});
+        }
+        return groups;
+    }
+
 
     function group(title) {
         const field = document.createElement('fieldset');
@@ -152,25 +226,17 @@ O46Core.wishPicker = (function () {
         let choices = product.ids.filter(id => rows[id][0] && saved.has(id) === remove);
         if (!choices.includes(dialog.selected)) dialog.selected = '';
         fields.replaceChildren();
-        const dimensions = Object.keys(names).filter(key => choices.length && choices.every(id =>
-            names[key].values[rows[id][1][key]]) && new Set(choices.map(id => rows[id][1][key])).size > 1);
-        for (const key of dimensions.slice(0, -1)) {
-            const field = group(names[key].name);
-            for (const value of new Set(choices.map(id => String(rows[id][1][key])))) {
-                option(field, names[key].values[value], key, value, filters[key] === value);
-            }
-            choices = choices.filter(id => String(rows[id][1][key]) === filters[key]);
-            if (!choices.length) break;
-        }
-        if (choices.length) {
-            const field = group(names[dimensions.at(-1)]?.name || labels.variant);
-            for (const id of choices) {
-                const [, attributes, unit] = rows[id];
-                const parts = Object.entries(attributes).map(([key, val]) => names[key]?.values[val]).filter(Boolean);
-                option(field, [...parts, unit, labels.variant + ' ' + id].filter(Boolean).join(' / '),
-                    'id', id, dialog.selected === id);
+        const attributes = Object.entries(names).map(([key, field]) => ({
+            key, name:field.name, text:id => field.values?.[rows[id][1][key]] || ''
+        }));
+        const groups = choiceGroups(choices, product.ids, attributes, id => rows[id][2] || '', filters, labels);
+        for (const {name, options} of groups) {
+            const field = group(name);
+            for (const {key, value, text} of options) {
+                option(field, text, key, value, key === 'id' ? dialog.selected === value : filters[key] === value);
             }
         }
+        content.classList.toggle('eg-wish-compact', choices.length <= 6);
         status.textContent = dialog.error || '';
         save.textContent = title.textContent = remove ? labels.remove : labels.add;
         save.disabled = !!pending || !dialog.selected;
@@ -286,7 +352,7 @@ O46Core.wishPicker = (function () {
             dialog.error = '';
             if (wishKey === 'id') dialog.selected = wishValue;
             else {
-                const keys = Object.keys(dialog.product.names);
+                const keys = [...Object.keys(dialog.product.names), 'pack'];
                 for (const later of keys.slice(keys.indexOf(wishKey) + 1)) delete dialog.filters[later];
                 dialog.filters[wishKey] = wishValue;
                 dialog.selected = '';

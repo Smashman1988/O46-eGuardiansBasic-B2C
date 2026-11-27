@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Der Merklisten-Picker zeigt verständliche Attribute und unterschiedliche Packungsgrößen in sortierter Auswahl. Persönliche Herzfarben entstehen im Browser. Persönliche Merklisten bleiben beim Abmelden im jeweiligen Kundenkonto. Echte Gastfavoriten überstehen mit verfügbarem LocalStorage einen Sitzungsablauf und werden beim erfolgreichen Login mit dem aktuellen Konto zusammengeführt.
+
 - Produktkarten, Größenauswahl und Merklisten-Picker verwenden dieselben kaufbaren Varianten mit positivem Nettobestand. IO prüft die Variante beim Speichern erneut. Beim Öffnen der Merkliste entfernt IO bestätigt ausverkaufte oder fehlende Varianten aus der eigenen Liste. Bei unklarem Bestand bleibt ein gespeicherter Eintrag erhalten.
 
 - Die Prüfung der Varianten-IDs und der Attributwerte für die Merkliste verwendet die von PlentyONE freigegebene PHP-Funktionalität.

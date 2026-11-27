@@ -38,6 +38,44 @@ async function pickerChoice(page, id) {
     await page.locator('[data-wish-save]:visible').click();
 }
 
+test('Größen, Farben und Packungsgrößen zeigen nur verständliche und kaufbare Optionen', async ({context,page,shop}) => {
+    const io = await session(context, []);
+    await shop.open();
+    const host = page.locator('[data-picker-test]');
+    const modal = page.locator('#eg-wish-picker');
+    async function addFixture(rows, names) {
+        await page.evaluate(({rows,names})=>{
+            document.querySelector('[data-picker-test]')?.remove();
+            const node = document.createElement('div');
+            node.setAttribute('data-picker-test','');
+            node.dataset.wishProduct = JSON.stringify({rows,names});
+            document.body.prepend(node);
+        }, {rows,names});
+        await host.locator('button').click();
+    }
+    const sizes = ['L','2XL','S/M','M','XS','S','XL','42 2/3','42.5','42','42 1/3'];
+    const names = {1:{name:'Größe',values:Object.fromEntries(sizes.map((name,i)=>[i,name]))}};
+    await addFixture(Object.fromEntries(sizes.map((name,i)=>[1449867+i,[true,{1:i},'1 Stück']])), names);
+    await expect(modal.locator('legend')).toHaveText(['Größe']);
+    await expect(modal.locator('[data-wish-id]')).toHaveText(['XS','S','S/M','M','L','XL','2XL','42','42 1/3','42.5','42 2/3']);
+    await expect(modal.locator('[data-wish-id="1449867"]')).toHaveAccessibleName('L');
+    await modal.locator('.close').click();
+    await expect(modal).toBeHidden();
+    await addFixture({901:[true,{1:1,2:1},'1 Stück'],902:[false,{1:1,2:2},'1 Stück'],
+        903:[true,{1:2,2:2},'1 Stück'],904:[true,{1:2,2:2},'6 Stück']},
+        {1:{name:'Farbe',values:{1:'Rot',2:'Blau'}},2:{name:'Größe',values:{1:'S',2:'L'}}});
+    await modal.getByRole('button',{name:'Rot',exact:true}).click();
+    await expect(modal.getByRole('button',{name:'L',exact:true})).toHaveCount(0);
+    await modal.getByRole('button',{name:'Blau',exact:true}).click();
+    await modal.getByRole('button',{name:'L',exact:true}).click();
+    await expect(modal.locator('legend')).toHaveText(['Farbe','Größe','Packungsgröße']);
+    await expect(modal.locator('[data-wish-id]')).toHaveText(['1 Stück','6 Stück']);
+    await pickerChoice(page,904);
+    await expect.poll(()=>io.writes).toEqual([['POST',904]]);
+    io.confirm(true);
+    await state(host.locator('button'),true);
+});
+
 test('Merklistenherz mit bestätigten Antworten, Hover, Touch und Wiederholung', async ({context,page,shop,hasTouch},info) => {
     const io = await session(context, []);
     await shop.open();
@@ -143,6 +181,33 @@ test('Varianten zwischen Karte, Schnellansicht, Produktseite und Verlauf', async
     await state(button,true);
     await page.goForward();
     await state(detail,true);
+});
+
+test('Beide Tabs verwerfen den alten Herzzustand während des Kontowechsels',async ({context,page,shop})=>{
+    let customerId=0, delay, release;
+    await context.route('**/rest/io/basket/',async route=>{
+        if (delay) await delay;
+        return route.fulfill({json:{data:{itemSum:0,itemQuantity:0,currency:'EUR',shippingCountryId:1,
+            sessionId:'rotated-'+customerId,customerId,itemWishListIds:customerId ? [101] : [110002]}}});
+    });
+    await shop.open();
+    const peer=await context.newPage();
+    try {
+        await peer.goto(origin+'/alle-artikel/');
+        await Promise.all([page,peer].map(p=>state(heart(card(p,10002)),true)));
+        customerId=7;
+        delay=new Promise(resolve=>{release=resolve;});
+        await page.evaluate(()=>{ O46Core.basketHeader.invalidate(); });
+        for (const p of [page,peer]) {
+            await expect(heart(card(p,10002))).not.toHaveAttribute('aria-pressed',/./);
+            await expect(heart(card(p,10002)).locator('svg')).toHaveCSS('visibility','hidden');
+        }
+        release();
+        for (const p of [page,peer]) {
+            await state(heart(card(p,10002)),false);
+            await state(heart(card(p,10001)),true);
+        }
+    } finally { release?.();await peer.close(); }
 });
 
 test('Nachgeladene und doppelte Karten übernehmen die Gastmerkliste tabübergreifend',async ({context,page,shop}) => {

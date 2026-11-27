@@ -13212,6 +13212,10 @@ body.modal-open .btnfilter-mobile { visibility: hidden; }
 #shop-mode-modal[data-eg-dialog] .modal-dialog { max-width: 720px; }
 .smm-header .close { float: right; margin-inline-start: 8px; }
 .smm-card .smm-grid { padding: var(--eg-dialog-padding); }
+.eg-wish-content.eg-wish-compact .modal-body { padding-block: 12px; }
+.eg-wish-content.eg-wish-compact fieldset:last-child { margin-bottom: 0; }
+.eg-wish-content.eg-wish-compact #eg-wish-hint { margin-bottom: 6px; }
+.eg-wish-heart:not([aria-pressed]) svg { visibility: hidden; }
 #eg-wish-hint { margin: 0 0 16px; color: #4e5d52; }
 .eg-wish-content fieldset { min-width: 0; border: 0; margin: 0 0 12px; padding: 0; }
 .eg-wish-content legend { margin: 0 0 6px; font-size: 15px; font-weight: 600; }

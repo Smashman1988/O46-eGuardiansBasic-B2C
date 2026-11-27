@@ -204,7 +204,7 @@
         {% endif %}
         {% endif %}
     </head>
-    <body class="hold-transition" {% if isVueView %}id="isVueView"{% endif %}{% if isBasketPage %} data-o46-basket-sync{% endif %}{% if not isBasketPage and currentTemplate != 'tpl.checkout' and category.id not in wkbkasse|default([]) %} data-eg-shop-dialogs{% endif %}>
+    <body data-eg-wish-shop="{{ webstoreConfig.webstoreId|default('') }}" class="hold-transition" {% if isVueView %}id="isVueView"{% endif %}{% if isBasketPage %} data-o46-basket-sync{% endif %}{% if not isBasketPage and currentTemplate != 'tpl.checkout' and category.id not in wkbkasse|default([]) %} data-eg-shop-dialogs{% endif %}>
         {% if isQuickView %}
         {{ context.renderState() }}
         <!-- SSR:app() -->
@@ -577,7 +577,7 @@
             {% if themeNeedsJquery %}
                 <script src="{{ plugin_path('GuardiansBasic') }}/js/jquery-3.7.1.min.js?v=1"></script>
             {% endif %}
-            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=16" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
+            <script src="{{ plugin_path('GuardiansBasic') }}/js/core.min.js?v=25" data-eg-magiczoom-src="{{ plugin_path('GuardiansBasic') }}/js/magiczoom.min.js?v=1" defer></script>
             <script src="{{ plugin_path('GuardiansBasic') }}/js/{{ themePageScript }}"{% if not themeNeedsJquery %} data-eg-vue-logout{% endif %} defer></script>
             {% if isItem %}
                 {# After item.js defines mzOptions, before DOMContentLoaded initializes the gallery. #}

@@ -68,7 +68,7 @@ namespace {
     };
     $request = new class {
         public $id = 11;
-        function get($key, $default = null) { return $key === 'quantity' ? 3 : $this->id; }
+        function get($key, $default = null) { return $key === 'quantity' ? 3 : ($key === 'variationId' ? $this->id : $default); }
         function create($data, $code) { return new Response($data, $code); }
     };
     $services = [\Plenty\Modules\Webshop\ItemSearch\Factories\VariationSearchFactory::class=>new \Plenty\Modules\Webshop\ItemSearch\Factories\VariationSearchFactory(),

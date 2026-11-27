@@ -20,6 +20,10 @@ class GuardiansBasicRouteServiceProvider extends RouteServiceProvider
             $api->get('guardiansbasic/item/search/autocomplete', 'SearchAutocompleteResource@index');
             $api->resource('io/facet', 'FacetResource');
             $api->resource('io/itemWishList', 'WishListResource');
+            $api->get('io/basket', 'WishListSessionResource@basket');
+            $api->get('io/session', 'WishListSessionResource@index');
+            $api->post('io/customer/login', 'WishListLoginResource@store');
+            $api->post('guardiansbasic/wishlist/guest', 'WishListResource@restoreGuest');
         });
     }
 }

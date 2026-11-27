@@ -103,7 +103,30 @@ Mit den Dev-Abhängigkeiten aus `package-lock.json` baut `npm run build` die CSS
 
 Die PHP-/Twig- und Browsertests verwenden lokale Testdaten. `tests/ceres-list-query.php` erwartet den Pfad zu Ceres `src`. `tests/seo_pagination.php` und `tests/pdp_render_contract.php` erwarten den Twig-Autoloader und den Pfad zur JSON-Ergebnisdatei. Der lokale Vergleichsbericht liegt unter `.cache/b2c-parity/Auftrag-04-Produktkarten-Grids.html`.
 
-Größen auf den Karten und Merklistenoptionen stammen aus denselben konkreten Varianten. Die Produktliste liefert den Nettobestand ihrer bereits geladenen Varianten. Fehlende Bestände werden je Seitenaufruf für höchstens 100 weitere IDs gemeinsam gelesen und im Speicher wiederverwendet. Beim Speichern prüft IO die gewählte ID frisch. Beim Öffnen der Merkliste verwendet die Bereinigung die reguläre IO-Listenantwort. Ceres hält die Liste für die aktuelle Seite im Speicher und prüft sie bei einer Rückkehr aus dem Browser-Verlauf erneut.
+Größen auf den Karten und Merklistenoptionen stammen aus denselben konkreten Varianten. Die Produktliste liefert den Nettobestand ihrer bereits geladenen Varianten. Fehlende Bestände werden in Gruppen von höchstens 100 Varianten-IDs gelesen und innerhalb desselben Seitenaufrufs wiederverwendet. Beim Speichern prüft IO die gewählte ID frisch. Beim Öffnen der Merkliste verwendet die Bereinigung die reguläre IO-Listenantwort. Ceres hält die Liste für die aktuelle Seite im Speicher und prüft sie bei einer Rückkehr aus dem Browser-Verlauf erneut.
+
+### Merkliste, Sitzung und ShopBooster
+
+Karten, Artikeldetailseite und Quickview enthalten die öffentlichen Verkaufsoptionen des Artikels. Die Varianten-ID bleibt der interne Schlüssel für IO. Ein MutationObserver initialisiert ausschließlich neu eingefügte Elemente und verwendet das vorhandene Set auch bei Infinite Scroll.
+
+| Speicher | Inhalt und Lebensdauer |
+| --- | --- |
+| PlentyONE-Gastsitzung | IO speichert Varianten unter `SessionStorageRepositoryContract::GUEST_WISHLIST`, getrennt nach Plenty-ID. Das ist ein serverseitiger Sitzungsspeicher. |
+| Kundenkonto | IO persistiert Merklisteneinträge für Kontakt, Plenty-ID und konkrete Variante. |
+| Cookies | Die Plattform ordnet den Browser seiner Sitzung zu. Die Theme-Merkliste schreibt keine Cookies und speichert ihre Varianten-IDs in keinem Cookie. |
+| LocalStorage | Pro Origin, Theme, Plenty-ID und Webshop liegt höchstens eine Sicherung der bestätigten Gastvarianten vor. Sie enthält die exakten IDs und den Hash der letzten Gastsitzung. Der Headercache enthält Menge, Betrag, Währung, Versandland, einen Sitzungshash und Änderungsmetadaten. |
+| SessionStorage des Browsers | Der Header hält den Hash der bestätigten Sitzung. Kundenvarianten bleiben ausschließlich im Arbeitsspeicher der Seite und im persönlichen IO-Konto. |
+| Weitere Tabs | BroadcastChannel und das Storage-Ereignis melden eine Änderung ohne Varianten-IDs. Empfangende Tabs verwenden ihre eigene zentrale Sitzung. |
+
+Die privaten IO-Antworten von `/rest/io/session` und `/rest/io/basket` kennzeichnen Gast, Shop und Mandant serverseitig. Ceres verwendet seinen bestehenden Sitzungsabruf. Andere Seiten mit Merklistensteuerung verwenden einmal denselben zentralen Warenkorbabruf. Hover und Infinite Scroll arbeiten mit dem bestätigten JavaScript-Set. Eine Freigabe im Browsercache ersetzt keine aktuelle Bestätigung der persönlichen Liste.
+
+Bei erfolgreichem Login übernimmt die native IO-Migration die tatsächlichen Gastvarianten. Das Theme erfasst die Gastzeilen vor der Anmeldung und bestätigt die konkreten IDs im IO-Repository des aktuellen Kunden. Das gilt auch dann, wenn IO die Migration schon beim Erstellen der Loginantwort ausführt. Ein Schreib- oder Lesefehler erhält die unbestätigten Gastzeilen und die Wiederholungsmarkierung. Logout verwendet den originalen IO-Endpunkt. Der Browser verwirft den persönlichen Zustand und benachrichtigt andere Tabs. Jede neue Sitzung lädt ihre eigenen Daten.
+
+Ein Neustart mit gültiger Gastsitzung benötigt keine Wiederherstellungsschreibanfrage. Nach einem Sitzungsablauf kann nur ein serverseitig bestätigter Gast die gesicherten Varianten in dieselbe Shop-/Mandantenkombination übernehmen. Ein Schreibaufruf verarbeitet bis zu 5.000 IDs. Der Server prüft den Bestand in Gruppen von bis zu 100 IDs und übernimmt nur kaufbare Varianten. Nach einem unterbrochenen Login wird eine zur Anmeldung vorgemerkte Gastliste bis zur Klärung zurückgehalten. Bei gesperrtem oder gelöschtem LocalStorage arbeitet die native IO-Sitzung weiter. Ist auch die Sitzung abgelaufen, gibt es in diesem Browser keine Sicherung zur Wiederherstellung.
+
+`tests/wishlist_logout.php` prüft die privaten Routen und mit `O46_IO_ROOT` die originale IO-Migration. `tests/wishlist_isolation.cjs` startet einen echten lokalen Browserprozess mit demselben Profil erneut und prüft Gäste, zwei Kunden, weitere Tabs, verzögerte Antworten und Speicherausfälle. `tests/wishlist_cache.cjs` prüft öffentliches Karten-HTML und Netzwerkzugriffe bei 12, 24, 66, 100 und 500 Karten mit 0, 3 und 5.000 Einträgen.
+
+Einen öffentlichen ShopBooster-Treffer belegt der HTTP-Antwortheader `x-plenty-cache: hit` auf dem HTML-Dokument. Für Set 428 steht ausschließlich die private Vorschau zur Verfügung. Die dort gemessene Direktive `private, no-store` liefert keinen öffentlichen Nachweis. [PlentyONE-Handbuch zum Cache-Status](https://knowledge.plentyone.com/de-de/manual/main/webshop/ceres-einrichten.html)
 
 ### Lokale Browserprüfung
 

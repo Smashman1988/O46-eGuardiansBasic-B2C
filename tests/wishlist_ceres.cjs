@@ -86,17 +86,16 @@ function row(id) {
         assert.deepEqual(writes,[101,101]);
         assert.equal(reads,1);
         ids.delete(999); ids.delete(103); ids.delete(106); ids.add(104);
-        await page.evaluate(data=>O46Core.basketHeader.accept(data,false),basket());
+        await page.evaluate(()=>O46Core.basketHeader.refresh());
         await control(104).waitFor();
         assert.equal(reads,2);
         assert.deepEqual(await page.evaluate(()=>ceresStore.state.wishList.wishListIds),[102,104]);
-        // IO stores one scoped header snapshot. A peer may use a different currency.
+        // A peer only signals the write. The recipient reads its own current IO session.
         ids.delete(102);
         await page.evaluate(() => {
-            const key='basketCache_header_v2', record=JSON.parse(localStorage.getItem(key));
-            const received={...record, change:'peer-wish-delete', basket:{...record.basket,currency:'USD',itemWishListIds:[104]}};
-            localStorage.setItem(key,JSON.stringify(received));
-            dispatchEvent(new StorageEvent('storage',{key,newValue:JSON.stringify(received)}));
+            const key='o46-wish-change-b2c-default';
+            const message={kind:'wish',nonce:'peer-wish-delete'};
+            dispatchEvent(new StorageEvent('storage',{key,newValue:JSON.stringify(message)}));
         });
         await control(102).waitFor({state:'detached'});
         assert.equal(await page.evaluate(()=>window.egSessionData.basket.currency),'EUR');
@@ -104,7 +103,7 @@ function row(id) {
         assert.equal(reads,2);
         pruneOnRead = true;
         ids.add(105);
-        await page.evaluate(data=>O46Core.basketHeader.accept(data,false),basket());
+        await page.evaluate(()=>O46Core.basketHeader.refresh());
         await page.waitForFunction(()=>ceresStore.state.wishList.wishListIds.join(',')==='104');
         assert.deepEqual([...ids],[104]);
         assert.equal(await control(105).count(),0);

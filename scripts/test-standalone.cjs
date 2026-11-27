@@ -50,7 +50,7 @@ for (const v of [2, 3]) {
     }
 }
 for (const [file, args] of Object.entries({
-    asset_manifest: [], attribute_lookups: [], wishlist_availability: [], 'ceres-list-query': [path.join(ceres, 'src')],
+    asset_manifest: [], attribute_lookups: [], wishlist_availability: [], wishlist_logout: [io], 'ceres-list-query': [path.join(ceres, 'src')],
     content_controller: [path.join(out, 'content.json')], search_index: [ceres, io, path.join(out, 'search.json')],
     variation_salability: [io, path.join(out, 'salability.json')]
 })) test(file + '.php', args);
@@ -58,7 +58,7 @@ for (const file of ['api_transport.cjs', 'auth_responses.cjs']) {
     test(file);
     test(file, ['--min'], '-min');
 }
-for (const name of ['cache_compatibility', 'variation_prices', 'quickview_pointer', 'search_response_order', 'search_escape']) test(name + '.cjs');
+for (const name of ['cache_compatibility', 'variation_prices', 'quickview_pointer', 'search_response_order', 'search_escape', 'wishlist_cache', 'wishlist_isolation']) test(name + '.cjs');
 
 // The aggregate npm test also checks the PlentyONE allowlist and rebuilds assets in check mode.
 assert.ok(require('../package.json').scripts.test.includes('npm run test:plentyone'));

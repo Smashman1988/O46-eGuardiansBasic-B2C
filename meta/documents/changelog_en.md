@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- The wish list picker shows sorted attribute choices and relevant pack sizes. Personal heart states are resolved in the browser. Signing out keeps personal wishlists in their respective accounts. With local storage available, guest favourites survive session expiry and merge into the current account on successful login.
+
 - Product cards, size selection and the wishlist picker use saleable variations with positive net stock. IO checks the variation again when saving. Opening the wishlist removes confirmed sold-out or missing variations from the current owner’s list. Inconclusive stock checks retain saved entries.
 
 - Wishlist variation IDs and attribute values are validated using PHP functionality supported by PlentyONE.

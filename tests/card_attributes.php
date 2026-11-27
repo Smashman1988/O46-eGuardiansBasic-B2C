@@ -100,9 +100,13 @@ $twig->addFilter(new \Twig\TwigFilter('orderByKey', callback(function ($rows,$ke
     usort($rows,function ($a,$b) use ($key) { return $a[$key] <=> $b[$key]; }); return $rows;
 })));
 $report = [];
+if (getenv('O46_WISH_CACHE_FIXTURES')) {
+    $picker = file_get_contents(dirname(__DIR__).'/resources/views/Item/Partials/WishListPicker.twig');
+    file_put_contents(getenv('O46_WISH_CACHE_FIXTURES').'/controls.html', $twig->createTemplate($picker)->render([]));
+}
 foreach (['category','content','simple'] as $template) {
     foreach ([1,2] as $page) {
-        foreach ([0,1,6,12,24,48,50,60,66,100,'duplicates'] as $n) {
+        foreach ([0,1,6,12,24,48,50,60,66,100,500,'duplicates'] as $n) {
             $ids = $n === 'duplicates' ? [100,101,102,100] : ($n ? range(100,99+$n) : []);
             $items = [];
             foreach ($ids as $id) {
@@ -129,6 +133,18 @@ foreach (['category','content','simple'] as $template) {
                     check(strpos($html,'>blue</span>') === false,'Image or color attribute displayed as a size');
                 }
                 check(!$service->singles && $service->batches === array_chunk(array_unique($ids),24),'Unexpected calls');
+                if ($template === 'category' && $page === 1 && in_array($n,[12,24,66,100,500],true)) {
+                    $forbidden = new class {
+                        public function __call($name, $args) { throw new \RuntimeException('Personal service called on category: '.$name); }
+                    };
+                    foreach ([[],[1000,1030,1090],range(1000,5999)] as $savedIds) {
+                        $visitor = ['services'=>['wishList'=>$forbidden,'basket'=>$forbidden],
+                            'savedWishIds'=>$savedIds,'basketItems'=>['itemWishListIds'=>$savedIds]];
+                        check($html === $twig->render($template,$visitor + $ctx),'Personal category HTML for '.$n.' cards');
+                    }
+                    $directory = getenv('O46_WISH_CACHE_FIXTURES');
+                    if ($directory) file_put_contents($directory.'/cards-'.$n.'.html',$html);
+                }
                 $report[] = ['template'=>$template,'page'=>$page,'cards'=>count($ids),'before'=>count($ids),
                     'after'=>count($service->batches),'factories'=>count(array_unique($ids)),'sha256'=>hash('sha256',$html)];
             }
