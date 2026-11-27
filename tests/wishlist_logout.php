@@ -10,11 +10,11 @@ namespace Plenty\Modules\Webshop\Contracts {
         function setSessionValue($key,$value){$this->writes++;$this->values[$key]=$value;}
     }
 }
-namespace IO\Helper { class Utils {static function getPlentyId(){return $GLOBALS['plenty'];} static function getWebstoreId(){return 7;}} }
+namespace IO\Helper { class Utils {static function getPlentyId(){return $GLOBALS['plenty'];} static function getWebstoreId(){return 0;}} }
 namespace IO\Api { class ResponseCode {const OK=200;} }
 namespace Plenty\Plugin\Log { trait Loggable { function getLogger($name){return new class{function warning($message){}};} } }
 namespace IO\Api\Resources {
-    class CustomerAuthenticationResource {public function store(): \Plenty\Plugin\Http\Response {global $contact,$loginResponse,$session;if($loginResponse===200){$contact=31;$session->setSessionValue('migrate',true);if(!empty($GLOBALS['eagerLogin']))new \IO\Services\ItemWishListService($session);}return new \Plenty\Plugin\Http\Response(null,$loginResponse);} }
+    class CustomerAuthenticationResource {public function store(): \Plenty\Plugin\Http\Response {global $contact,$loginResponse,$session;if($loginResponse===200){$contact=$GLOBALS['nextContact']??31;\pluginApp(\GuardiansBasic\Services\WishListMigration::class)->beforeNativeMigration($contact);$session->setSessionValue('migrate',true);if(!empty($GLOBALS['eagerLogin']))new \IO\Services\ItemWishListService($session);}return new \Plenty\Plugin\Http\Response(null,$loginResponse);} }
     class ItemWishListResource {
         function __construct(protected $request,protected $response){}
     }
@@ -45,6 +45,13 @@ namespace {
     check(!str_contains($routes,'io/customer/logout') && !is_file($root.'/src/Resources/WishListLogoutResource.php'),'Logout must use IO; customer favorites must never be exported');
     check(str_contains($routes,"'io/session', 'WishListSessionResource@index'") && str_contains($routes,"'io/basket', 'WishListSessionResource@basket'"),'Both existing central reads must identify the server-verified owner');
     check(str_contains($routes,"'io/customer/login', 'WishListLoginResource@store'"),'Confirmed native login hook');
+    foreach (['basket' => 'WishListSessionResource@basket', 'session' => 'WishListSessionResource@index',
+              'login' => 'WishListLoginResource@store', 'items' => 'WishListResource'] as $path => $handler) {
+        check(str_contains($routes, "'guardiansbasic/wishlist/".$path."', '".$handler."'"), 'Theme-owned private route '.$path);
+    }
+    $provider=file_get_contents($root.'/src/Providers/GuardiansBasicServiceProvider.php');
+    check(str_contains($provider,'AfterAccountAuthentication::class') && str_contains($provider,'$event->isSuccessful()') &&
+        str_contains($provider,'->beforeNativeMigration('),'Every successful native authentication filters guest-only rows');
     $plenty=17;$contact=0;$activeIds=[11];$session=new Session();
     $account=new class {
         public $rows=[31=>[13],42=>[42]],$fail=0,$silent=0;
@@ -57,7 +64,7 @@ namespace {
         }
     };
     $guest=new class($session) {function __construct(public $s){} function getItemWishListForAllPlentyIds(){return json_decode($this->s->getSessionValue(Session::GUEST_WISHLIST)??'[]',true);}};
-    $api=new class {public $args=[]; function get($k){return $this->args[$k]??null;}function create($data,$code){return new \Plenty\Plugin\Http\Response($data,$code);} };
+    $api=new class {public $args=[],$headers=[]; function header($key,$value){$this->headers[$key]=$value;} function get($k){return $this->args[$k]??null;}function create($data,$code){return new \Plenty\Plugin\Http\Response($data,$code);} };
     $stock=new class {public $unknown=false,$groups=[];function lookup($ids){$this->groups[]=count($ids);return $this->unknown?[]:array_combine($ids,array_map(fn($id)=>$id!==999,$ids));}};
     $services=[\GuardiansBasic\Services\WishListMigration::class=>new \GuardiansBasic\Services\WishListMigration(),
         \IO\Services\BasketService::class=>new class{function getBasket(){return (object)['sessionId'=>'session-two'];}},
@@ -66,7 +73,7 @@ namespace {
         \Plenty\Modules\Webshop\Contracts\WebstoreConfigurationRepositoryContract::class=>new class{function getWebstoreConfiguration(){return (object)['sessionLifetime'=>0];}},
         GuardiansBasic\Services\WishListAvailability::class=>$stock];
     $res=new WishListResource($api,$api);$central=new WishListSessionResource($api);
-    $api->args=['session'=>'session-two','shop'=>7,'plenty'=>17,'ids'=>[11,11,999]];
+    $api->args=['session'=>'session-two','shop'=>0,'plenty'=>17,'ids'=>[11,11,999]];
     foreach([31,42] as $contact){
         check($res->restoreGuest()->code===409 && $guest->getItemWishListForAllPlentyIds()===[],'Recovery wrote into a customer session');
         check($central->basket()->data['wishListOwner']['guest']===false,'Customer mislabeled as guest');
@@ -75,12 +82,13 @@ namespace {
     check($res->store()->code===409 && $res->destroy('11')->code===409,'Late writes from A must be refused in B');
     unset($api->args['wishScope']);
     $contact=0;$api->args['session']='expired';check($res->restoreGuest()->code===409,'Old guest session');$api->args['session']='session-two';$api->args['plenty']=18;check($res->restoreGuest()->code===409,'Wrong tenant');$api->args['plenty']=17;
-    $api->args['shop']=8;check($res->restoreGuest()->code===409,'Wrong shop');$api->args['shop']=7;
+    $api->args['shop']=8;check($res->restoreGuest()->code===409,'Wrong shop');$api->args['shop']=0;
     $api->args['ids']=['11'];check($res->restoreGuest()->code===422,'Malformed IDs');$api->args['ids']=[11,11,999];
     $stock->unknown=true;check($res->restoreGuest()->code===503 && $guest->getItemWishListForAllPlentyIds()===[],'Unconfirmed stock');$stock->unknown=false;
     check($res->restoreGuest()->data===['available'=>[11]],'Guest recovery');
     $res->restoreGuest();check($guest->getItemWishListForAllPlentyIds()[17][11]['quantity']===1,'Idempotent recovery');
-    check($central->index()->data['basket']['wishListOwner']===['guest'=>true,'shop'=>7,'plenty'=>17,'scope'=>WishListSessionResource::scope('session-two',0)],'Native session response metadata');
+    check($central->index()->data['basket']['wishListOwner']===['guest'=>true,'shop'=>0,'plenty'=>17,'scope'=>WishListSessionResource::scope('session-two',0)],'Native session response metadata');
+    check($api->headers['Cache-Control']==='private, no-store','Personal central responses must remain private');
     $original=$session->values;
     $api->args['ids']=range(20000,24999);$before=$session->writes;$stock->groups=[];
     check($res->restoreGuest()->data===['available'=>$api->args['ids']],'Large guest restoration lost variants');
@@ -110,7 +118,15 @@ namespace {
         $native->addItemWishListEntry(15);$eagerLogin=true;$account->silent=15;
         check($login->store()->status()===200 && $native->getItemWishList()===[15],'Early native migration lost an unconfirmed ID');
         $account->silent=0;$migration->confirm();$contact=0;$eagerLogin=false;
-        $native->addItemWishListEntry(21);$contact=42;$session->setSessionValue(Session::GUEST_WISHLIST_MIGRATION,true);
+        $api->args['ids']=[11,12];$api->args['imported']=[13];
+        check($res->restoreGuest()->code===422,'Imported metadata must be confined to original guest rows');
+        $api->args['imported']=[11,12];
+        check($res->restoreGuest()->data['available']===[11,12] && $owner()->getItemWishList()===[11,12],'Original guest recovered after account A');
+        check($central->basket()->data['wishListOwner']['imported']===[11,12],'Guest migration history survives clearing browser storage');
+        $loginResponse=401;
+        check($login->store()->status()===401 && $owner()->getItemWishList()===[11,12],'Failed login lost restored guest rows');
+        $loginResponse=200;
+        $native->addItemWishListEntry(21);$nextContact=42;check($login->store()->status()===200,'Login of customer B');
         $migration->confirm();
         $bb=$owner();check($bb->getItemWishList()===[42,21],'A to B leakage');$bb->addItemWishListEntry(22,1);
         for($i=0;$i<3;$i++)foreach([31=>[13,11,12,14,15],42=>[42,21,22]] as $contactId=>$expected){

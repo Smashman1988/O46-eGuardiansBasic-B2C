@@ -13,7 +13,30 @@ class WishListMigration
     public function guestRows(): array
     {
         $guest = pluginApp(ItemWishListGuestRepository::class);
-        return $guest->getItemWishListForAllPlentyIds()[Utils::getPlentyId()] ?? [];
+        $rows = $guest->getItemWishListForAllPlentyIds()[Utils::getPlentyId()] ?? [];
+        return $this->eligible($rows, (int)pluginApp(ContactRepositoryContract::class)->getContactId());
+    }
+
+    private function eligible(array $rows, int $contact): array
+    {
+        return array_filter($rows, function ($row) use ($contact) {
+            return empty($row['o46GuestOnly']) && (empty($row['o46MigrationOwner']) || $row['o46MigrationOwner'] === $contact);
+        });
+    }
+
+    /** IO migrates every current guest row after authentication, including on native login routes. */
+    public function beforeNativeMigration(int $contact)
+    {
+        $plenty = Utils::getPlentyId();
+        $lists = pluginApp(ItemWishListGuestRepository::class)->getItemWishListForAllPlentyIds();
+        $rows = $lists[$plenty] ?? [];
+        $eligible = $this->eligible($rows, $contact);
+        if (count($eligible) !== count($rows)) {
+            $lists[$plenty] = $eligible;
+            pluginApp(SessionStorageRepositoryContract::class)->setSessionValue(
+                SessionStorageRepositoryContract::GUEST_WISHLIST, json_encode($lists)
+            );
+        }
     }
 
     public function confirm(array $before = [])
@@ -49,7 +72,11 @@ class WishListMigration
         $session = pluginApp(SessionStorageRepositoryContract::class);
         $plenty = Utils::getPlentyId();
         $lists = pluginApp(ItemWishListGuestRepository::class)->getItemWishListForAllPlentyIds();
-        $lists[$plenty] = ($lists[$plenty] ?? []) + $pending;
+        $owner = (int)pluginApp(ContactRepositoryContract::class)->getContactId();
+        foreach ($pending as $id => $row) {
+            $row['o46MigrationOwner'] = $owner;
+            $lists[$plenty][$id] = $row;
+        }
         $session->setSessionValue(SessionStorageRepositoryContract::GUEST_WISHLIST, json_encode($lists));
         $session->setSessionValue(SessionStorageRepositoryContract::GUEST_WISHLIST_MIGRATION, true);
     }

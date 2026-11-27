@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Die ursprünglichen Gastfavoriten bleiben nach der Abmeldung verfügbar. Bereits übernommene Varianten werden bei einer weiteren Anmeldung auf diesem Browser nicht erneut automatisch importiert. Die persönliche Kundenmerkliste bleibt im Konto.
+
 - Der Merklisten-Picker zeigt verständliche Attribute und unterschiedliche Packungsgrößen in sortierter Auswahl. Persönliche Herzfarben entstehen im Browser. Persönliche Merklisten bleiben beim Abmelden im jeweiligen Kundenkonto. Echte Gastfavoriten überstehen mit verfügbarem LocalStorage einen Sitzungsablauf und werden beim erfolgreichen Login mit dem aktuellen Konto zusammengeführt.
 
 - Produktkarten, Größenauswahl und Merklisten-Picker verwenden dieselben kaufbaren Varianten mit positivem Nettobestand. IO prüft die Variante beim Speichern erneut. Beim Öffnen der Merkliste entfernt IO bestätigt ausverkaufte oder fehlende Varianten aus der eigenen Liste. Bei unklarem Bestand bleibt ein gespeicherter Eintrag erhalten.

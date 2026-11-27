@@ -31,6 +31,17 @@ class WishListResource extends ItemWishListResource
             }
         }
         $ids = array_unique($ids);
+        $imported = $this->request->get('imported') ?? [];
+        if (!is_array($imported) || count($imported) > count($ids)) {
+            return $this->response->create(null, 422);
+        }
+        $requested = array_fill_keys($ids, true);
+        foreach ($imported as $id) {
+            if (!is_int($id) || !isset($requested[$id])) {
+                return $this->response->create(null, 422);
+            }
+        }
+        $guestOnly = array_fill_keys($imported, true);
         $allowed = [];
         $availability = pluginApp(WishListAvailability::class);
         foreach (array_chunk($ids, 100) as $group) {
@@ -41,7 +52,7 @@ class WishListResource extends ItemWishListResource
         }
         $guest = pluginApp(\IO\Repositories\ItemWishListGuestRepository::class);
         $lists = $guest->getItemWishListForAllPlentyIds();
-        $added = [];
+        $changed = false;
         foreach ($ids as $id) {
             if ($allowed[$id] && !isset($lists[$plenty][$id])) {
                 $row = pluginApp(\IO\DBModels\ItemWishList::class);
@@ -51,10 +62,14 @@ class WishListResource extends ItemWishListResource
                 $row->quantity = 1;
                 $row->createdAt = date('Y-m-d H:i:s');
                 $lists[$plenty][$id] = $row->jsonSerialize();
-                $added[] = $id;
+                $changed = true;
+            }
+            if ($allowed[$id] && isset($guestOnly[$id]) && empty($lists[$plenty][$id]['o46GuestOnly'])) {
+                $lists[$plenty][$id]['o46GuestOnly'] = true;
+                $changed = true;
             }
         }
-        if ($added) {
+        if ($changed) {
             $encoded = json_encode($lists);
             if ($encoded === false) {
                 return $this->response->create(null, 503);
@@ -122,6 +137,6 @@ class WishListResource extends ItemWishListResource
             }));
             $items['inactiveVariationIds'] = array_values(array_diff($items['inactiveVariationIds'] ?? [], array_keys($blocked)));
         }
-        return $this->response->create($items, ResponseCode::OK);
+        return $this->response->create($items, ResponseCode::OK, ['Cache-Control' => 'private, no-store']);
     }
 }

@@ -12,6 +12,7 @@ const phpArgs = process.env.O46_PHP_EXT ? ['-d','extension_dir='+process.env.O46
 execFileSync(php,[...phpArgs,'tests/card_attributes.php',twig,path.join(out,'cards.json')],{
     env:{...process.env,O46_WISH_CACHE_FIXTURES:out},stdio:['ignore','pipe','inherit']});
 const retail = require('../package.json').name.includes('b2c');
+const api = '/rest/' + (retail ? 'guardiansbasic' : 'guardiansbasicb2b') + '/wishlist';
 const controls = retail ? fs.readFileSync(path.join(out,'controls.html'),'utf8') : '';
 const sizes = [12,24,66,100,500];
 const results = [];
@@ -21,7 +22,7 @@ const results = [];
         for (const size of sizes) {
             const grid = fs.readFileSync(path.join(out,'cards-'+size+'.html'),'utf8');
             assert.doesNotMatch(grid,/data-saved=|item-in-wishlist|itemWishListIds/);
-            const html = '<!doctype html><html lang="de"><head><meta charset="UTF-8"><link rel="stylesheet" href="/assets/main.min.css"></head><body>' +
+            const html = '<!doctype html><html lang="de"><head><meta charset="UTF-8"><link rel="stylesheet" href="/assets/main.min.css"></head><body data-eg-wish-api="'+api+'" data-eg-wish-shop="0">' +
                 grid + controls + '<script src="/assets/jquery-3.7.1.min.js"></script><script src="/assets/core.min.js"></script>' +
                 '<script src="/assets/cat.min.js"></script><script>O46Core.basketHeader.start()</script></body></html>';
             for (const saved of [[],[1000,1030,1090],Array.from({length:5000},(_,i)=>1000+i)]) {
@@ -40,11 +41,11 @@ const results = [];
                     }
                     if (url.pathname.startsWith('/rest/')) {
                         logs.push(url.pathname);
-                        if (url.pathname==='/rest/io/basket/') {
+                        if (url.pathname===api+'/basket/') {
                             await wait;
                             return route.fulfill({json:{data:{currency:'EUR',shippingCountryId:1,itemSum:0,itemQuantity:0,
                                 sessionId:'test-session',customerId:saved.length?17:0,itemWishListIds:saved,
-                                wishListOwner:{guest:!saved.length,shop:7,plenty:17,scope:'test-scope'}}}});
+                                wishListOwner:{guest:!saved.length,shop:0,plenty:17,scope:'test-scope'}}}});
                         }
                         throw Error('Unexpected private request: '+url.pathname);
                     }
@@ -74,7 +75,7 @@ const results = [];
                     if (retail) await expect(page.locator('[data-cache-test-append] .eg-wish-heart')).toHaveAttribute('aria-pressed',String(marked[0]));
                     await cards.first().hover();
                     await page.evaluate(()=>new Promise(requestAnimationFrame));
-                    assert.deepEqual(logs,['/rest/io/basket/']);
+                    assert.deepEqual(logs,[api+'/basket/']);
                     assert.deepEqual(errors,[]);
                     assert.equal((await page.context().cookies()).length,0);
                     results.push({cards:size,saved:saved.length,hearts:retail?size:0,centralReads:logs.length,wishlistRequests:0,

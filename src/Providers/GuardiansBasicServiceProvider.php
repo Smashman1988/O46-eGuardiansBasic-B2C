@@ -104,6 +104,19 @@ class GuardiansBasicServiceProvider extends ServiceProvider
     public function boot(Twig $twig, Dispatcher $dispatcher, ConfigRepository $config)
     {
         $twig->addExtension(Base_Extension::class);
+        // A failed transfer belongs to the outgoing account. IO must not retry it as the next guest.
+        $dispatcher->listen(\Plenty\Modules\Authentication\Events\AfterAccountContactLogout::class, function () {
+            $session = pluginApp(\Plenty\Modules\Webshop\Contracts\SessionStorageRepositoryContract::class);
+            if ($session->getSessionValue(\Plenty\Modules\Webshop\Contracts\SessionStorageRepositoryContract::GUEST_WISHLIST_MIGRATION)) {
+                $session->setSessionValue(\Plenty\Modules\Webshop\Contracts\SessionStorageRepositoryContract::GUEST_WISHLIST_MIGRATION, false);
+            }
+        }, 100);
+        $dispatcher->listen(\Plenty\Modules\Authentication\Events\AfterAccountAuthentication::class, function ($event) {
+            if ($event->isSuccessful()) {
+                pluginApp(\GuardiansBasic\Services\WishListMigration::class)->beforeNativeMigration((int)($event->getAccountContact()->id ?? 0));
+            }
+        }, 100);
+
         $dispatcher->listen('IO.ctx.search', function (TemplateContainer $container)
         {
             if (EnglishTextSearch::applies()) {

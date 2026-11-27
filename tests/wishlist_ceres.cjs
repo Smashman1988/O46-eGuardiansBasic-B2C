@@ -18,17 +18,26 @@ function row(id) {
 (async () => {
     const browser = await chromium.launch({executablePath:process.env.O46_BROWSER_EXECUTABLE});
     try {
+        await checkMount(false);
+        await checkMount(true);
+        console.log('Ceres wishlist: both mount orders, HTTP 503, retry, hidden missing and unsaleable variants, remote addition, cross-currency removal and request counts passed.');
+    } finally { await browser.close(); }
+
+    async function checkMount(coreFirst) {
         const page = await browser.newPage(), errors = [], writes = [];
+        const listPaths = [];
         page.setDefaultTimeout(6000);
         page.on('pageerror', e => errors.push(e.message));
         const ids = new Set([101,102,103,106,999]);
         let accept = false, reads = 0, pruneOnRead = false;
-        const basket = () => ({itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,sessionId:'customer-session-fixture',customerId:17,itemWishListIds:[...ids]});
+        const basket = () => ({itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,sessionId:'customer-session-fixture',customerId:17,
+            itemWishListIds:[...ids],wishListOwner:{guest:false,shop:0,plenty:17,scope:'customer-scope'}});
         await page.route('**/*', route => {
             const u = new URL(route.request().url());
             if (u.pathname === '/') return route.fulfill({contentType:'text/html',body:
-                '<body id="isVueView"><header id="page-header" data-eg-basket-currency="EUR"></header><main id="page-body"><div id="app"></div></main>'+controls+'</body>'});
-            if (u.pathname === '/rest/io/itemWishList') {
+                '<body id="isVueView" data-eg-wish-api="/rest/guardiansbasic/wishlist" data-eg-wish-shop="0"><header id="page-header" data-eg-basket-currency="EUR"></header><main id="page-body"><div id="app"><wish-list></wish-list></div></main>'+controls+'</body>'});
+            if (['/rest/io/itemWishList','/rest/guardiansbasic/wishlist/items'].includes(u.pathname)) {
+                listPaths.push(u.pathname);
                 reads++;
                 const pruned = pruneOnRead && ids.delete(105);
                 const documents = [...ids].filter(id=>id!==999).map(row);
@@ -43,16 +52,19 @@ function row(id) {
                 if (accept) ids.delete(id);
                 return route.fulfill({status:accept?200:503,json:{data:accept,error:!accept}});
             }
-            if (u.pathname==='/rest/io/basket/') return route.fulfill({json:{data:basket()}});
+            if (u.pathname==='/rest/guardiansbasic/wishlist/basket/') return route.fulfill({json:{data:basket()}});
             return route.fulfill({status:204});
         });
         await page.goto('https://fixture.test/');
         await page.addScriptTag({content:base.replace(startup,'window.ceresRequire = __webpack_require__;')});
         await page.addScriptTag({content:chunks});
-        await page.evaluate(({template,basket})=>{
+        await page.evaluate(()=>{
             window.App={language:'de',templateType:'wish-list',config:{log:{data:[]}}};
             window.$=window.jQuery=ceresRequire('./node_modules/jquery/dist/jquery.js');
             ceresRequire('./node_modules/bootstrap/dist/js/bootstrap.js');
+        });
+        if (coreFirst) await page.addScriptTag({path:'resources/js/core.min.js'});
+        await page.evaluate(({template,basket})=>{
             const Vue=ceresRequire('./node_modules/vue/dist/vue.js');
             const Vuex=ceresRequire('./node_modules/vuex/dist/vuex.esm.js').default;
             Vue.use(Vuex);
@@ -69,7 +81,7 @@ function row(id) {
             const WishList={...ceresRequire('./resources/js/src/app/components/wishList/WishList.vue').default,...Vue.compile(template)};
             new Vue({store:ceresStore,render:h=>h(WishList)}).$mount('#app');
         },{template,basket:basket()});
-        await page.addScriptTag({path:'resources/js/core.min.js'});
+        if (!coreFirst) await page.addScriptTag({path:'resources/js/core.min.js'});
         await page.addScriptTag({path:'resources/js/main.min.js'});
         await page.evaluate(()=>O46Core.basketHeader.start());
         const control=id=>page.locator('[data-wish-entry="'+id+'"] .eg-wish-heart');
@@ -93,7 +105,7 @@ function row(id) {
         // A peer only signals the write. The recipient reads its own current IO session.
         ids.delete(102);
         await page.evaluate(() => {
-            const key='o46-wish-change-b2c-default';
+            const key='o46-wish-change-b2c-0';
             const message={kind:'wish',nonce:'peer-wish-delete'};
             dispatchEvent(new StorageEvent('storage',{key,newValue:JSON.stringify(message)}));
         });
@@ -109,11 +121,13 @@ function row(id) {
         assert.equal(await control(105).count(),0);
         assert.equal(reads,3);
         await Promise.all([
-            page.waitForResponse(response=>new URL(response.url()).pathname==='/rest/io/itemWishList'),
+            page.waitForResponse(response=>new URL(response.url()).pathname==='/rest/guardiansbasic/wishlist/items'),
             page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})))
         ]);
         assert.equal(reads,4);
         assert.deepEqual(errors,[]);
-        console.log('Ceres wishlist: HTTP 503, retry, hidden missing and unsaleable variants, remote addition, cross-currency removal and request counts passed.');
-    } finally { await browser.close(); }
+        assert.equal(listPaths[0],coreFirst ? '/rest/guardiansbasic/wishlist/items' : '/rest/io/itemWishList');
+        assert.ok(listPaths.slice(1).every(path=>path==='/rest/guardiansbasic/wishlist/items'));
+        await page.close();
+    }
 })().catch(error=>{console.error(error);process.exitCode=1;});

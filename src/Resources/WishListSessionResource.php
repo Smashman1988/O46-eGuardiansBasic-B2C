@@ -23,6 +23,7 @@ class WishListSessionResource extends SessionResource
 
     protected function indexBasket()
     {
+        $this->response->header('Cache-Control', 'private, no-store');
         $migration = pluginApp(\GuardiansBasic\Services\WishListMigration::class);
         try {
             $migration->confirm();
@@ -45,6 +46,15 @@ class WishListSessionResource extends SessionResource
             'plenty' => Utils::getPlentyId(),
             'scope' => self::scope($basket['sessionId'] ?? '', $contact)
         ];
+        if ($contact === 0) {
+            $lists = pluginApp(\IO\Repositories\ItemWishListGuestRepository::class)->getItemWishListForAllPlentyIds();
+            $guestOnly = array_keys(array_filter($lists[Utils::getPlentyId()] ?? [], function ($row) {
+                return !empty($row['o46GuestOnly']) || !empty($row['o46MigrationOwner']);
+            }));
+            if ($guestOnly) {
+                $basket['wishListOwner']['imported'] = $guestOnly;
+            }
+        }
         return $basket;
     }
 }
