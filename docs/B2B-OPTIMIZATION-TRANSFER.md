@@ -290,3 +290,14 @@ Für diese Qualitätskorrekturen wurde kein Performance-Gewinn gemessen. [B2C-Bi
 Für diese Qualitätskorrekturen wurde kein Performancegewinn erhoben. Das externe GTM-Plugin und die vier B2C-Mandanteninhalte begründen keinen Theme-Transfer.
 
 [Bildvergleich und Testinventar](../.cache/b2c-audit/qualitaet-rest-20261127/Qualitaetsbericht.html) · [GTM-Befund](../.cache/b2c-audit/qualitaet-rest-20261127/GTM-Fehlerbericht.html) · [Herkunft der Rechtstexte](../.cache/b2c-audit/qualitaet-rest-20261127/Rechtsseiten.html)
+
+### Warenkorbheader auf 428 und lokaler B2B-Galerietest · 27. November 2026
+
+| ID | Geprüfter Stand und Befund | B2C | B2B |
+| --- | --- | --- | --- |
+| T38, native Folgeprüfung | Das ausgelieferte kritische CSS aus `PageDesign/Partials/Head.twig` stimmt auf 428 mit B2C `980cbd9` überein. 144 native Headerbilder aus echten Gastkörben bei neun Breiten und acht zusätzliche Browserzoomstufen sind dokumentiert. | **B2C nativ abgenommen**. 11,98 € und 179,88 € stehen auch bei 320 px einzeilig. Bei 1573,95 € wechselt dort das Eurozeichen auf die zweite Zeile. Alle 13 Währungen blieben im Bild. Logo und Headerhöhe waren bei gleicher Breite über alle Warenwerte konstant. | **B2B lokal getestet**. Je 509 Geometriefälle und 832 Direktvergleiche in beiden Themes. Die native B2B-Prüfung bleibt zurückgestellt. |
+| QA-04, MagicZoom-Lebenszyklus | Der lokale B2B-Einzeltest schloss die Galerie, sobald das Bühnenbild Layoutfläche hatte. In allen sechs Browser-/Breitenkombinationen konnte der Aufruf der Öffnungsbestätigung zuvorkommen. | **B2C nativ abgenommen** für den sichtbaren Bildwechsel und das Schließen der Vollansicht. Der betroffene Einzeltest gehört zu B2B. | **B2B lokal getestet** auf `15a1570` mit angepasstem `tests/pdp_gallery_browser.cjs`. Der Test kontrolliert `onExpandOpen`, `onExpandClose`, Overlay und Fokusrückgabe. 30 vollständige Einzelwiederholungen bestanden. Ergänzend 48 Ablaufprüfungen und zwölf Sichtbarkeitskontrollen über drei Browser-Engines, einschließlich negativer Kontrollen. |
+
+Im vollständigen lokalen Lauf bestanden B2C 85/85 und B2B 229/229 Einzelprogramme. Unter Windows bestanden 471/480 B2C- und 351/360 B2B-Fälle. Unter Ubuntu bestanden 46/48 und 34/36. Die übrigen Fälle betrafen Touchgesten im Desktopprofil oder einen vom Browser nicht bestätigten Hintergrundtab. Beide Themes bauten zweimal bytegleich. Auf acht nativ geprüften B2C-Seitentypen kamen die geladenen Theme-Skripte und Stylesheets aus Pluginset 428.
+
+Die Prüfung ergab keine Änderung am Laufzeitcode und keinen gemessenen Performancegewinn. [Native Screenshots, MagicZoom-Protokolle und lokale Regression](../.cache/b2c-audit/qualitaet-nativ-galerie-20261127/Qualitaetskontrolle.html)
