@@ -48,11 +48,13 @@ class WishListSessionResource extends SessionResource
         ];
         if ($contact === 0) {
             $lists = pluginApp(\IO\Repositories\ItemWishListGuestRepository::class)->getItemWishListForAllPlentyIds();
-            $guestOnly = array_keys(array_filter($lists[Utils::getPlentyId()] ?? [], function ($row) {
-                return !empty($row['o46GuestOnly']) || !empty($row['o46MigrationOwner']);
-            }));
-            if ($guestOnly) {
-                $basket['wishListOwner']['imported'] = $guestOnly;
+            foreach ($lists[Utils::getPlentyId()] ?? [] as $id => $row) {
+                if (!empty($row['o46GuestOnly']) || !empty($row['o46MigrationOwner'])) {
+                    $basket['wishListOwner']['imported'][] = $id;
+                }
+                if (($row['o46GuestOnly'] ?? false) === 'customer') {
+                    $basket['wishListOwner']['customerIds'][] = $id;
+                }
             }
         }
         return $basket;

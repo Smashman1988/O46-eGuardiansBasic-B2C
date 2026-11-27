@@ -42,7 +42,7 @@ namespace {
     $io=$argv[1]??getenv('O46_IO_ROOT');
     require $root.'/src/Resources/WishListResource.php';require $root.'/src/Resources/WishListSessionResource.php';
     $routes=file_get_contents($root.'/src/Providers/GuardiansBasicRouteServiceProvider.php');
-    check(!str_contains($routes,'io/customer/logout') && !is_file($root.'/src/Resources/WishListLogoutResource.php'),'Logout must use IO; customer favorites must never be exported');
+    check(!str_contains($routes,'io/customer/logout') && !is_file($root.'/src/Resources/WishListLogoutResource.php'),'Logout must use IO; browser recovery must use the verified guest route');
     check(str_contains($routes,"'io/session', 'WishListSessionResource@index'") && str_contains($routes,"'io/basket', 'WishListSessionResource@basket'"),'Both existing central reads must identify the server-verified owner');
     check(str_contains($routes,"'io/customer/login', 'WishListLoginResource@store'"),'Confirmed native login hook');
     foreach (['basket' => 'WishListSessionResource@basket', 'session' => 'WishListSessionResource@index',
@@ -65,7 +65,9 @@ namespace {
     };
     $guest=new class($session) {function __construct(public $s){} function getItemWishListForAllPlentyIds(){return json_decode($this->s->getSessionValue(Session::GUEST_WISHLIST)??'[]',true);}};
     $api=new class {public $args=[],$headers=[]; function header($key,$value){$this->headers[$key]=$value;} function get($k){return $this->args[$k]??null;}function create($data,$code){return new \Plenty\Plugin\Http\Response($data,$code);} };
-    $stock=new class {public $unknown=false,$groups=[];function lookup($ids){$this->groups[]=count($ids);return $this->unknown?[]:array_combine($ids,array_map(fn($id)=>$id!==999,$ids));}};
+    $stock=new class {public $unknown=false,$groups=[],$switchContact=0;function lookup($ids){
+        if($this->switchContact)$GLOBALS['contact']=$this->switchContact;
+        $this->groups[]=count($ids);return $this->unknown?[]:array_combine($ids,array_map(fn($id)=>$id!==999,$ids));}};
     $services=[\GuardiansBasic\Services\WishListMigration::class=>new \GuardiansBasic\Services\WishListMigration(),
         \IO\Services\BasketService::class=>new class{function getBasket(){return (object)['sessionId'=>'session-two'];}},
         \IO\Repositories\ItemWishListGuestRepository::class=>$guest,\IO\Repositories\ItemWishListRepository::class=>$account,
@@ -85,6 +87,9 @@ namespace {
     $api->args['shop']=8;check($res->restoreGuest()->code===409,'Wrong shop');$api->args['shop']=0;
     $api->args['ids']=['11'];check($res->restoreGuest()->code===422,'Malformed IDs');$api->args['ids']=[11,11,999];
     $stock->unknown=true;check($res->restoreGuest()->code===503 && $guest->getItemWishListForAllPlentyIds()===[],'Unconfirmed stock');$stock->unknown=false;
+    $stock->switchContact=42;
+    check($res->restoreGuest()->code===409 && $guest->getItemWishListForAllPlentyIds()===[],'Owner changed during availability lookup');
+    $stock->switchContact=0;$contact=0;
     check($res->restoreGuest()->data===['available'=>[11]],'Guest recovery');
     $res->restoreGuest();check($guest->getItemWishListForAllPlentyIds()[17][11]['quantity']===1,'Idempotent recovery');
     check($central->index()->data['basket']['wishListOwner']===['guest'=>true,'shop'=>0,'plenty'=>17,'scope'=>WishListSessionResource::scope('session-two',0)],'Native session response metadata');
@@ -123,8 +128,17 @@ namespace {
         $api->args['imported']=[11,12];
         check($res->restoreGuest()->data['available']===[11,12] && $owner()->getItemWishList()===[11,12],'Original guest recovered after account A');
         check($central->basket()->data['wishListOwner']['imported']===[11,12],'Guest migration history survives clearing browser storage');
+        $api->args['ids']=[14];$api->args['imported']=[];$api->args['customerIds']=[15];
+        check($res->restoreGuest()->code===422,'Customer provenance outside the requested batch');
+        $api->args['customerIds']=[14];
+        check($res->restoreGuest()->data['available']===[14],'Customer-only favorite visible after logout');
+        check($central->basket()->data['wishListOwner']['customerIds']===[14],'Provenance survives local storage loss');
+        $api->args['variationId']=14;$api->args['quantity']=2;
+        check($res->store()->code===201 && $native->getItemWishListForAllPlentyIds()[17][14]['o46GuestOnly']==='customer','Duplicate native add must preserve migration protection');
+        check($native->getItemWishListForAllPlentyIds()[17][14]['quantity']===3,'Preserve native quantities on repeated adds');
+        $eagerLogin=true;
         $loginResponse=401;
-        check($login->store()->status()===401 && $owner()->getItemWishList()===[11,12],'Failed login lost restored guest rows');
+        check($login->store()->status()===401 && $owner()->getItemWishList()===[11,12,14],'Failed login lost restored guest rows');
         $loginResponse=200;
         $native->addItemWishListEntry(21);$nextContact=42;check($login->store()->status()===200,'Login of customer B');
         $migration->confirm();

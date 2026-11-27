@@ -20,20 +20,34 @@ function row(id) {
     try {
         await checkMount(false);
         await checkMount(true);
+        await checkMount(false, true);
+        await checkMount(true, true);
         console.log('Ceres wishlist: both mount orders, HTTP 503, retry, hidden missing and unsaleable variants, remote addition, cross-currency removal and request counts passed.');
     } finally { await browser.close(); }
 
-    async function checkMount(coreFirst) {
+    async function checkMount(coreFirst, afterLogout = false) {
         const page = await browser.newPage(), errors = [], writes = [];
         const listPaths = [];
         page.setDefaultTimeout(6000);
         page.on('pageerror', e => errors.push(e.message));
-        const ids = new Set([101,102,103,106,999]);
+        const ids = new Set(afterLogout ? [] : [101,102,103,106,999]);
+        const recovery = [];
+        const backupKey = 'o46-guest-wish-b2c-17-0';
         let accept = false, reads = 0, pruneOnRead = false, delayDelete;
-        const basket = () => ({itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,sessionId:'customer-session-fixture',customerId:17,
-            itemWishListIds:[...ids],wishListOwner:{guest:false,shop:0,plenty:17,scope:'customer-scope'}});
+        const basket = () => ({itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,sessionId:'customer-session-fixture',customerId:afterLogout ? 0 : 17,
+            itemWishListIds:[...ids],wishListOwner:{guest:afterLogout,shop:0,plenty:17,scope:afterLogout ? 'guest-scope' : 'customer-scope',
+                ...(afterLogout ? {imported:[...ids],customerIds:[...ids]} : {})}});
         await page.route('**/*', async route => {
             const u = new URL(route.request().url());
+            if (u.pathname.endsWith('/wishlist/guest')) {
+                const data = route.request().postDataJSON();
+                recovery.push(data.ids);
+                assert.ok(afterLogout);
+                assert.deepEqual(data.customerIds, [202,203]);
+                assert.deepEqual(data.imported, data.customerIds);
+                data.ids.forEach(id=>ids.add(id));
+                return route.fulfill({json:{data:{available:[...ids]}}});
+            }
             if (u.pathname === '/') return route.fulfill({contentType:'text/html',body:
                 '<body id="isVueView" data-eg-wish-api="/rest/guardiansbasic/wishlist" data-eg-wish-shop="0"><header id="page-header" data-eg-basket-currency="EUR"></header><main id="page-body"><div id="app"><wish-list></wish-list></div></main>'+controls+'</body>'});
             if (['/rest/io/itemWishList','/rest/guardiansbasic/wishlist/items'].includes(u.pathname)) {
@@ -57,6 +71,9 @@ function row(id) {
             return route.fulfill({status:204});
         });
         await page.goto('https://fixture.test/');
+        if (afterLogout) await page.evaluate(key=>localStorage.setItem(key,JSON.stringify({
+            scope:'a'.repeat(64), ids:[], imported:[], customerIds:[202,203], restoreAfterLogin:true
+        })),backupKey);
         await page.addScriptTag({content:base.replace(startup,'window.ceresRequire = __webpack_require__;')});
         await page.addScriptTag({content:chunks});
         await page.evaluate(()=>{
@@ -86,6 +103,22 @@ function row(id) {
         await page.addScriptTag({path:'resources/js/main.min.js'});
         await page.evaluate(()=>O46Core.basketHeader.start());
         const control=id=>page.locator('[data-wish-entry="'+id+'"] .eg-wish-heart');
+        if (afterLogout) {
+            await control(202).waitFor();
+            await control(203).waitFor();
+            assert.equal(await control(202).getAttribute('aria-pressed'),'true');
+            accept=true;
+            await control(202).click();
+            await control(202).waitFor({state:'detached'});
+            await page.waitForFunction(key=>JSON.parse(localStorage.getItem(key))?.customerIds?.join(',')==='203',backupKey);
+            assert.deepEqual([...ids],[203]);
+            assert.deepEqual(await page.evaluate(()=>ceresStore.state.wishList.wishListIds),[203]);
+            assert.deepEqual(writes,[202]);
+            assert.deepEqual(recovery,[[202,203]]);
+            assert.deepEqual(errors,[]);
+            await page.close();
+            return;
+        }
         await control(101).waitFor();
         assert.equal(await control(103).count(),0);
         assert.equal(await control(106).count(),0);

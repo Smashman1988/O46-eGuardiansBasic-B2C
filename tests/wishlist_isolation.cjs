@@ -15,7 +15,7 @@ fs.mkdirSync(out,{recursive:true});
     const profile = fs.mkdtempSync(path.join(out,'profile-'));
     const guest = new Set(), a = new Set([41301]), b = new Set([58202]);
     let scope = 'one', contact = 0, reads = 0, hold, loginGate, silentlySkipped, shop = 0, blocked = false, unavailable = false, rejectLogout = false;
-    const restores = [], imported = new Set();
+    const restores = [], imported = new Set(), customerRows = new Set();
     const current = () => contact === 31 ? a : contact === 42 ? b : guest;
     let context, writeGate, legacyProfile = true;
     const sequence = [];
@@ -77,7 +77,7 @@ fs.mkdirSync(out,{recursive:true});
                 const owner={'a@shop.invalid':31,'b@shop.invalid':42}[email];
                 if (!owner) return route.fulfill({status:401,json:{events:{AfterAccountAuthentication:{isSuccess:false}}}});
                 if (loginGate) {const gate=loginGate;loginGate=null;gate.started();await gate.wait;}
-                contact=owner;guest.forEach(id=>{if(!imported.has(id) && id!==silentlySkipped)current().add(id);});guest.clear();imported.clear();
+                contact=owner;guest.forEach(id=>{if(!imported.has(id) && id!==silentlySkipped)current().add(id);});guest.clear();imported.clear();customerRows.clear();
                 return route.fulfill({json:{events:{AfterAccountAuthentication:{isSuccess:true}}}});
             }
             if (url.pathname==='/rest/io/customer/logout/') {
@@ -96,7 +96,7 @@ fs.mkdirSync(out,{recursive:true});
                 sessionReads.set(tab, (sessionReads.get(tab) || 0) + 1);
                 if (unavailable) return route.fulfill({status:503});
                 const snapshot={currency:'EUR',shippingCountryId:1,itemQuantity:0,itemSum:0,sessionId:scope,customerId:contact,
-                    itemWishListIds:[...current()],wishListOwner:{guest:contact===0,plenty:17,shop,scope:'token-'+contact,imported:contact===0?[...imported]:undefined}};
+                    itemWishListIds:[...current()],wishListOwner:{guest:contact===0,plenty:17,shop,scope:'token-'+contact,imported:contact===0?[...imported]:undefined,customerIds:contact===0?[...customerRows].filter(id=>guest.has(id)):undefined}};
                 if (hold) {const gate=hold;hold=null;gate.started();await gate.wait;}
                 return route.fulfill({json:{data:snapshot}});
             }
@@ -106,6 +106,7 @@ fs.mkdirSync(out,{recursive:true});
                 assert.equal(input.plenty,17);assert.equal(input.shop,shop);assert.equal(input.session,scope);
                 restores.push(input.ids);
                 input.imported.forEach(id=>imported.add(id));
+                input.customerIds.forEach(id=>customerRows.add(id));
                 input.ids.filter(id=>id!==999).forEach(id=>guest.add(id));
                 return route.fulfill({json:{data:{available:input.ids.filter(id=>id!==999)}}});
             }
@@ -123,10 +124,52 @@ fs.mkdirSync(out,{recursive:true});
         session:Object.fromEntries(Object.entries(sessionStorage)),
         cookie:document.cookie
     }));
+    const backupFor = (page,key=backupKey)=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),key);
+    const outsideBackup = p=>p.evaluate(()=>JSON.stringify([
+        Object.entries(localStorage).filter(([key])=>!key.startsWith('o46-guest-wish-')),
+        Object.entries(sessionStorage), document.cookie
+    ]));
     const invalidate = p=>p.evaluate(()=>O46Core.basketHeader.invalidate());
     const login=(p,email)=>p.evaluate(email=>new Promise(resolve=>eGuardians.user.login(email,'fixture',(response,status)=>resolve(status))),email);
     const logout=p=>p.evaluate(()=>new Promise(resolve=>eGuardians.user.logout((response,status)=>resolve(status))));
     try {
+        // Start with a fresh shop and add a variation only after successful account authentication.
+        shop=9;
+        let client=await launch();await known(client,[]);
+        assert.equal(await login(client,'a@shop.invalid'),200);await known(client,a);
+        await client.evaluate(()=>new Promise((resolve,reject)=>{
+            eGuardians.apiservice.post('/rest/io/itemWishList/',{variationId:61701},(response,status)=>{
+                if(status!==201) reject(new Error('Customer write failed'));
+                else O46Core.basketHeader.refreshAfterWrite(true).then(resolve,reject);
+            });
+        }));
+        const expectedA=[...a];
+        const visible=async (tab,expected)=>{
+            await tab.goto(origin+'/merkliste/');
+            await expect.poll(()=>tab.locator('main').innerText()).toBe(expected.join(','));
+        };
+        let listing=await context.newPage();await visible(listing,expectedA);await listing.close();
+        assert.equal(await logout(client),200);await known(client,expectedA);
+        assert.deepEqual([...imported],expectedA,'Every account-origin guest row must be blocked for native IO migration');
+        await visible(client,expectedA);
+        const count=restores.length;
+        await context.close();client=await launch();await known(client,expectedA);
+        assert.equal(restores.length,count,'Matching IO rows need no restore after browser restart');
+        await visible(client,expectedA);
+        await context.close();guest.clear();imported.clear();customerRows.clear();
+        client=await launch();await known(client,expectedA);
+        assert.equal(restores.length,count+1,'An empty guest session with the same basket ID is recovered once');
+        await context.close();scope='expired-account-copy';guest.clear();imported.clear();customerRows.clear();
+        client=await launch();await known(client,expectedA);assert.equal(restores.length,count+2);
+        assert.equal(await login(client,'a@shop.invalid'),200);await known(client,expectedA);
+        a.delete(41301);await client.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
+        assert.equal(await logout(client),200);await known(client,[61701]);
+        guest.add(61702);await client.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
+        assert.equal(await login(client,'b@shop.invalid'),200);await known(client,[58202,61702]);
+        assert.ok(!b.has(61701) && !b.has(41301));assert.deepEqual([...a],[61701]);
+        assert.equal(await logout(client),200);await known(client,[61702,58202]);
+        await context.close();guest.clear();imported.clear();customerRows.clear();restores.length=0;
+        a.clear();a.add(41301);b.delete(61702);shop=0;scope='one';legacyProfile=true;
         guest.add(10001); guest.add(999);
         let page=await launch();await known(page,guest);
         assert.deepEqual(JSON.parse(await page.evaluate(k=>localStorage.getItem(k),backupKey)).ids,[10001,999]);
@@ -195,7 +238,8 @@ fs.mkdirSync(out,{recursive:true});
         assert.equal(await signingIn,200);assert.equal(a.has(10001),true);
         await known(page,a);await known(peer,a);
         assert.deepEqual(JSON.parse(await page.evaluate(k=>localStorage.getItem(k),backupKey)).imported,[10001]);
-        assert.doesNotMatch(await local(page),/41301/);
+        assert.deepEqual(new Set((await backupFor(page)).customerIds),a);
+        assert.doesNotMatch(await outsideBackup(page),/41301/);
         a.add(41302);await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));await known(peer,a);
         rejectLogout=true;
         assert.equal(await logout(page),503);await known(page,a);await known(peer,a);rejectLogout=false;
@@ -205,27 +249,37 @@ fs.mkdirSync(out,{recursive:true});
         await page.evaluate(()=>{O46Core.basketHeader.refresh();});await oldRead;
         assert.equal(await logout(page),200); // IO may retain its basket session ID across logout.
         assert.equal(await page.evaluate(()=>window.egSessionData?.basket?.itemWishListIds),undefined);
-        release();await known(page,[10001]);await known(peer,[10001]);
-        assert.deepEqual([...guest],[10001]);assert.deepEqual([...imported],[10001]);
+        release();await known(page,a);await known(peer,a);
+        assert.deepEqual(guest,a);assert.deepEqual(imported,a);
         unavailable=true;
         await invalidate(page);
         assert.equal(await page.evaluate(data=>O46Core.basketHeader.accept(data),copied.data),false);
         assert.equal(await page.evaluate(()=>window.egSessionData?.basket?.itemWishListIds),undefined);
-        unavailable=false;await page.evaluate(()=>O46Core.basketHeader.refresh());await known(page,[10001]);
+        unavailable=false;await page.evaluate(()=>O46Core.basketHeader.refresh());await known(page,a);
         // Losing browser metadata during an active guest session cannot make an old import eligible again.
         await page.evaluate(k=>localStorage.removeItem(k),backupKey);await page.evaluate(()=>O46Core.basketHeader.refresh());
         assert.deepEqual(JSON.parse(await page.evaluate(k=>localStorage.getItem(k),backupKey)).imported,[10001]);
+        assert.deepEqual(new Set((await backupFor(page)).customerIds),new Set([41301,41302]));
         for (const owner of [42,31,42,31]) {
             assert.equal(await login(page,owner===31?'a@shop.invalid':'b@shop.invalid'),200);
             await known(page,current());await known(peer,current());
             if(owner===42){assert.equal(b.has(10001),false,'B must never automatically import the restored guest ID');b.add(58203);}
             await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
-            assert.doesNotMatch(await local(page),/41301|41302|58202|58203/);
-            assert.equal(await logout(page),200);await known(page,[10001]);await known(peer,[10001]);
+            assert.deepEqual(new Set((await backupFor(page)).customerIds),current());
+            assert.doesNotMatch(await outsideBackup(page),/41301|41302|58202|58203/);
+            assert.ok(!b.has(41301) && !b.has(41302));
+            const visibleAfterLogout = new Set([10001,...current()]);
+            assert.equal(await logout(page),200);await known(page,visibleAfterLogout);await known(peer,visibleAfterLogout);
         }
         // Explicit guest removal updates both the IO list and its recovery record.
         guest.delete(10001); imported.delete(10001); await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
+        await known(page,[41301,41302]);await known(peer,[41301,41302]);
+        assert.deepEqual((await backupFor(page)).ids,[]);
+        guest.clear();imported.clear();customerRows.clear();
+        await page.evaluate(()=>O46Core.basketHeader.refreshAfterWrite(true));
         await known(page,[]); await known(peer,[]);
+        assert.equal(await backupFor(page),null);
+        assert.ok(a.has(41301) && a.has(41302),'Guest removal must leave the personal account intact');
         const loginRestores = restores.length;
         // Corrupt storage, an expired server session and a different shop must never authorize personal data.
         await page.evaluate(k=>localStorage.setItem(k,'{bad'),backupKey);
@@ -252,17 +306,17 @@ fs.mkdirSync(out,{recursive:true});
         const other=await context.newPage();await other.goto(origin+'/shop');await known(other,a);
         contact=42;await invalidate(page);await known(page,b);await known(other,b);
         assert.equal(restores.length,loginRestores+2);
-        contact=0;guest.add(777);await invalidate(page);await known(page,[777]);
+        contact=0;guest.add(777);await invalidate(page);await known(page,new Set([...b,777]));
         assert.equal(await login(page,'a@shop.invalid'),200);await known(page,a);
-        assert.equal(await logout(page),200);await known(page,[777]);
+        assert.equal(await logout(page),200);await known(page,new Set([...a,777]));
         assert.deepEqual(await page.evaluate(k=>JSON.parse(sessionStorage.getItem(k)).ids,backupKey.replace('-0','-8')),[777]);
         guest.add(778);guest.add(779);silentlySkipped=779;
-        await page.evaluate(()=>O46Core.basketHeader.refresh());await known(page,[777,778,779]);
+        await page.evaluate(()=>O46Core.basketHeader.refresh());await known(page,new Set([...a,777,778,779]));
         assert.equal(await login(page,'a@shop.invalid'),200);await known(page,a);
         const backup=await page.evaluate(k=>JSON.parse(sessionStorage.getItem(k)),backupKey.replace('-0','-8'));
         assert.deepEqual(backup.ids,[777,778,779]);
         assert.deepEqual(backup.imported.sort((a,b)=>a-b),[777,778],'An unconfirmed write must not be recorded as imported');
-        assert.equal(await logout(page),200);await known(page,[777,778,779]);
+        assert.equal(await logout(page),200);await known(page,new Set([...a,777,778,779]));
         // Start auth while the native write and its private reconciliation are outstanding.
         // Run under the same basket session ID for both owners.
         for (const [id, auth] of [[781, 'login'], [782, 'logout']]) {
@@ -281,13 +335,13 @@ fs.mkdirSync(out,{recursive:true});
             releaseWrite();
             assert.equal(await authenticating,200);
             assert.deepEqual(sequence, ['write-start','write-end',auth]);
-            await known(page, auth === 'login' ? a : [777,778,779,781]);
+            await known(page, auth === 'login' ? a : new Set([...a,777,778,779,781]));
             const retained = await page.evaluate(k=>JSON.parse(sessionStorage.getItem(k)),backupKey.replace('-0','-8'));
             assert.ok(retained.ids.includes(781));
             assert.ok(!retained.ids.includes(782));
         }
         assert.ok(a.has(781) && a.has(782));
-        assert.ok(guest.has(781) && !guest.has(782));
+        assert.ok(guest.has(781) && guest.has(782) && !b.has(782));
         console.log('Persistent browser restart, 5000 guest IDs, real login/logout handlers including failed login/logout, private accounts A/B, back/forward, late IO read, two tabs, storage failure and shop isolation passed.');
     } finally {
         if(context)await context.close();

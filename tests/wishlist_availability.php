@@ -72,6 +72,7 @@ namespace {
         function create($data, $code) { return new Response($data, $code); }
     };
     $services = [\Plenty\Modules\Webshop\ItemSearch\Factories\VariationSearchFactory::class=>new \Plenty\Modules\Webshop\ItemSearch\Factories\VariationSearchFactory(),
+        \Plenty\Modules\Webshop\Contracts\ContactRepositoryContract::class=>new class {function getContactId(){return 31;}},
         ItemWishListService::class=>$owner, ItemListService::class=>$list, WishListAvailability::class=>new WishListAvailability(),
         ItemSearchService::class=>new class {
             function getResult($factory) {

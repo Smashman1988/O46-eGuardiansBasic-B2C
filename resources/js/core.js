@@ -598,7 +598,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                 const scopeAtLogin = scope;
                 xhr.done(response => {
                     if (response?.events?.AfterAccountAuthentication?.isSuccess === true) {
-                        retainGuest(keyAtLogin, scopeAtLogin);
+                        markGuestLogin(keyAtLogin, scopeAtLogin, true, true);
                     }
                 });
             } else if (/^\/rest\/io\/itemWishList(?:\/[0-9]+)?\/?$/.test(url.pathname)) {
@@ -689,28 +689,21 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         try { return window.localStorage[method](...args); }
         catch (_) { return storage('sessionStorage', method, ...args); }
     }
-    function retainGuest(keyAtLogin, scopeAtLogin, confirmed) {
-        if (!keyAtLogin) return;
+    function markGuestLogin(key, guestScope, pending, succeeded = false) {
+        if (!key) return;
         try {
-            const raw = guestStorage('getItem', keyAtLogin);
-            const guest = JSON.parse(raw);
-            if (guest?.scope !== scopeAtLogin || !Array.isArray(guest.ids)) return;
-            guest.restoreAfterLogin = true;
-            if (confirmed) {
-                const imported = new Set(guest.imported || []);
-                for (const id of guest.ids) if (confirmed.has(id)) imported.add(id);
-                guest.imported = [...imported];
-                delete guest.loginPending;
-            } else {
-                // The login succeeded. Only a subsequent private account read can confirm individual IDs.
-                guest.loginPending = true;
-            }
-            const next = JSON.stringify(guest);
-            if (next !== raw) guestStorage('setItem', keyAtLogin, next);
+            const raw = guestStorage('getItem', key);
+            const backup = JSON.parse(raw);
+            if (!backup || backup.scope !== guestScope) return;
+            if (pending) backup.loginPending = true;
+            else delete backup.loginPending;
+            if (succeeded) backup.restoreAfterLogin = true;
+            const next = JSON.stringify(backup);
+            if (raw !== next) guestStorage('setItem', key, next);
         } catch (_) {}
     }
-    // Only the private IO response identifies the owner. Never reconstruct a guest list from a customer basket.
-    async function guestFavorites(basket, ids, verified, ticket) {
+    // Only the owner's private IO snapshot can update the browser's wishlist.
+    async function browserFavorites(basket, ids, verified, ticket) {
         const owner = basket.wishListOwner;
         if (!verified || !owner || typeof owner.guest !== 'boolean' ||
             !Number.isSafeInteger(owner.shop) || owner.shop < 0 || !Number.isSafeInteger(owner.plenty) || owner.plenty <= 0) return ids;
@@ -721,40 +714,58 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         try { previous = JSON.parse(raw); } catch (_) {}
         const validIds = list => Array.isArray(list) && list.every(id => Number.isSafeInteger(id) && id > 0);
         if (!previous || !/^[0-9a-f]{64}$/.test(previous.scope) || !validIds(previous.ids) ||
-            (previous.imported !== undefined && !validIds(previous.imported))) {
+            (previous.imported !== undefined && !validIds(previous.imported)) ||
+            (previous.customerIds !== undefined && !validIds(previous.customerIds))) {
             if (raw !== null) guestStorage('removeItem', backupKey);
             previous = null;
         }
+        const known = new Set(ids.map(Number));
+        const guestIds = new Set(previous?.ids || []);
+        const customerIds = new Set(previous?.customerIds || []);
+        const imported = new Set(previous?.imported || []);
         if (!owner.guest) {
-            // Retain only the original guest IDs. The native login owns their one migration attempt.
-            if (previous && (!previous.restoreAfterLogin || previous.loginPending || previous.imported?.length !== previous.ids.length)) {
-                retainGuest(backupKey, previous.scope, new Set(ids.map(Number)));
+            // Replace the last account snapshot. Keep genuine guest entries across account changes.
+            // A confirmed removal in this account also drops its copy from the browser.
+            if (previous?.restoreAfterLogin && previous.scope === verified) {
+                for (const id of customerIds) if (!known.has(id)) guestIds.delete(id);
             }
+            const next = JSON.stringify({scope:verified, ids:[...guestIds],
+                imported:[...guestIds].filter(id => imported.has(id) || known.has(id)),
+                customerIds:[...known], restoreAfterLogin:true});
+            if (raw !== next) guestStorage('setItem', backupKey, next);
             return ids;
         }
+        // Recover provenance from IO even if this tab lost its storage.
+        for (const id of Array.isArray(owner.customerIds) ? owner.customerIds : []) customerIds.add(id);
         let restored = false;
-        const known = new Set(ids.map(Number));
         // A peer can still see the live guest list while another tab is authenticating.
         // Leave that native list eligible for the first transfer until the login result arrives.
         if (previous?.loginPending && previous.scope === verified && !previous.restoreAfterLogin &&
             (loginRequests > 0 || known.size > 0)) return ids;
         // Keep the IO row's migration history even if browser storage was cleared in a live guest session.
         const serverImported = new Set(Array.isArray(owner.imported) ? owner.imported : []);
-        const imported = new Set([...(previous?.loginPending ? previous.ids : previous?.imported || []), ...serverImported]);
-        if (previous && (previous.scope !== verified || previous.restoreAfterLogin || previous.loginPending)) {
+        // IO filters protected rows before its native guest-to-account migration.
+        const protectedIds = new Set([...imported, ...serverImported, ...customerIds]);
+        if (previous?.loginPending) for (const id of guestIds) protectedIds.add(id);
+        // A fresh page can also receive an empty IO guest list under the same basket session ID.
+        const emptyOnArrival = !known.size && !verifiedHere && !invalidating && !writeVersion && !staleBootstrap;
+        if (previous && (previous.scope !== verified || previous.restoreAfterLogin || previous.loginPending || emptyOnArrival)) {
             if (refusedGuestScope === verified) return ids;
-            const missing = previous.ids.filter(id => !known.has(id) || (imported.has(id) && !serverImported.has(id)));
+            const saved = new Set([...guestIds, ...customerIds]);
+            const missing = [...saved].filter(id => !known.has(id) || (protectedIds.has(id) && !serverImported.has(id)));
             for (let offset = 0; offset < missing.length; offset += 5000) {
                 if (generation !== ticket) return ids;
                 if (guestStorage('getItem',backupKey) !== raw) {
                     if (request) request.then(refresh);
                     return ids;
                 }
+                const batchIds = missing.slice(offset, offset + 5000);
                 try {
                     const reply = await fetch((wishApi || '/rest/guardiansbasic/wishlist') + '/guest', {method:'POST', credentials:'same-origin',
                         cache:'no-store',headers:{'Content-Type':'application/json',Accept:'application/json'},
-                        body:JSON.stringify({plenty:owner.plenty,shop:owner.shop,session:basket.sessionId,ids:missing.slice(offset,offset+5000),
-                            imported:missing.slice(offset,offset+5000).filter(id => imported.has(id))})});
+                        body:JSON.stringify({plenty:owner.plenty,shop:owner.shop,session:basket.sessionId,ids:batchIds,
+                            imported:batchIds.filter(id => protectedIds.has(id)),
+                            customerIds:batchIds.filter(id => customerIds.has(id) && !guestIds.has(id))})});
                     if (!reply.ok) {
                         if (reply.status === 409 && ticket === generation) {
                             refusedGuestScope = verified;
@@ -764,7 +775,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                     }
                     const result = (await reply.json())?.data?.available;
                     if (!Array.isArray(result)) return ids;
-                    const batch = new Set(missing.slice(offset,offset+5000));
+                    const batch = new Set(batchIds);
                     if (!result.every(id => Number.isSafeInteger(id) && batch.has(id))) return ids;
                     restored ||= result.length > 0;
                     for (const id of batch) known.delete(id);
@@ -778,7 +789,10 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
             }
         }
         if (known.size) {
-            const next = JSON.stringify({scope:verified,ids:[...known],imported:[...imported].filter(id => known.has(id))});
+            const guest = [...known].filter(id => guestIds.has(id) || !customerIds.has(id));
+            const customer = [...known].filter(id => customerIds.has(id) && !guestIds.has(id));
+            const next = JSON.stringify({scope:verified, ids:guest, imported:guest.filter(id => protectedIds.has(id)),
+                ...(customer.length ? {customerIds:customer} : {})});
             if (raw !== next) guestStorage('setItem',backupKey,next);
         } else if (previous) guestStorage('removeItem',backupKey);
         // Restoration wrote to IO. A peer may still have the preceding empty response in flight.
@@ -821,7 +835,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         }
         if (verifiedHere && (scope !== verified || (token && ownerToken && token !== ownerToken))) clearWishes();
         if (central && basket.wishListOwner) {
-            summary.itemWishListIds = await guestFavorites(basket, summary.itemWishListIds, verified, ticket);
+            summary.itemWishListIds = await browserFavorites(basket, summary.itemWishListIds, verified, ticket);
             if (ticket !== generation) return false;
         }
         if (central && typeof token === 'string') ownerToken = token;
@@ -874,17 +888,6 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         const message = {kind, nonce:Date.now() + '-' + Math.random().toString(36).slice(2)};
         if (channel) channel.postMessage(message);
         storage('localStorage', 'setItem', signalKey, JSON.stringify(message));
-    }
-    function loginPending(value) {
-        if (!guestKey) return;
-        try {
-            const raw = guestStorage('getItem',guestKey);
-            const guest = JSON.parse(raw);
-            if (!guest || guest.scope !== scope) return;
-            if (value) guest.loginPending = true;
-            else delete guest.loginPending;
-            guestStorage('setItem',guestKey,JSON.stringify(guest));
-        } catch (_) {}
     }
     let staleBootstrap = false;
     function onSignal(message) {
@@ -979,9 +982,9 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                 const url = new URL(settings.url,location.href);
                 return settings.type === 'POST' && url.origin === location.origin && (/\/rest\/io\/customer\/login\/?$/.test(url.pathname) || url.pathname === wishApi + '/login');
             };
-            window.jQuery(document).on('ajaxSend.o46WishLogin', (event,xhr,settings) => { if (isLogin(settings)) loginPending(true); })
+            window.jQuery(document).on('ajaxSend.o46WishLogin', (event,xhr,settings) => { if (isLogin(settings)) markGuestLogin(guestKey, scope, true); })
                 .on('ajaxComplete.o46WishLogin', (event,xhr,settings) => {
-                    if (isLogin(settings) && (xhr.status === 401 || xhr.responseJSON?.events?.AfterAccountAuthentication?.isSuccess === false)) loginPending(false);
+                    if (isLogin(settings) && (xhr.status === 401 || xhr.responseJSON?.events?.AfterAccountAuthentication?.isSuccess === false)) markGuestLogin(guestKey, scope, false);
                 });
         }
         // Retire old full-basket records once, including their raw session identifiers.

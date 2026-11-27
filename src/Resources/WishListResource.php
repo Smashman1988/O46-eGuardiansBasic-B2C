@@ -16,9 +16,7 @@ class WishListResource extends ItemWishListResource
     {
         $plenty = \IO\Helper\Utils::getPlentyId();
         $shop = \IO\Helper\Utils::getWebstoreId();
-        if ((int)pluginApp(\Plenty\Modules\Webshop\Contracts\ContactRepositoryContract::class)->getContactId() !== 0
-            || $this->request->get('shop') !== $shop || $this->request->get('plenty') !== $plenty
-            || !$this->request->get('session') || $this->request->get('session') !== pluginApp(\IO\Services\BasketService::class)->getBasket()->sessionId) {
+        if ($this->request->get('shop') !== $shop || $this->request->get('plenty') !== $plenty || !$this->matchesGuestSession()) {
             return $this->response->create(null, 409);
         }
         $ids = $this->request->get('ids');
@@ -31,17 +29,21 @@ class WishListResource extends ItemWishListResource
             }
         }
         $ids = array_unique($ids);
-        $imported = $this->request->get('imported') ?? [];
-        if (!is_array($imported) || count($imported) > count($ids)) {
-            return $this->response->create(null, 422);
-        }
         $requested = array_fill_keys($ids, true);
-        foreach ($imported as $id) {
-            if (!is_int($id) || !isset($requested[$id])) {
+        $guestOnly = [];
+        // Older clients send only imported. Both kinds are ineligible for IO's automatic migration.
+        foreach (['imported' => true, 'customerIds' => 'customer'] as $field => $marker) {
+            $marked = $this->request->get($field) ?? [];
+            if (!is_array($marked) || count($marked) > count($ids)) {
                 return $this->response->create(null, 422);
             }
+            foreach ($marked as $id) {
+                if (!is_int($id) || !isset($requested[$id])) {
+                    return $this->response->create(null, 422);
+                }
+                $guestOnly[$id] = $marker;
+            }
         }
-        $guestOnly = array_fill_keys($imported, true);
         $allowed = [];
         $availability = pluginApp(WishListAvailability::class);
         foreach (array_chunk($ids, 100) as $group) {
@@ -49,6 +51,10 @@ class WishListResource extends ItemWishListResource
         }
         if (count($allowed) !== count($ids)) {
             return $this->response->create(null, 503);
+        }
+        // Authentication or session rotation can finish during a batched stock lookup.
+        if (!$this->matchesGuestSession()) {
+            return $this->response->create(null, 409);
         }
         $guest = pluginApp(\IO\Repositories\ItemWishListGuestRepository::class);
         $lists = $guest->getItemWishListForAllPlentyIds();
@@ -64,21 +70,35 @@ class WishListResource extends ItemWishListResource
                 $lists[$plenty][$id] = $row->jsonSerialize();
                 $changed = true;
             }
-            if ($allowed[$id] && isset($guestOnly[$id]) && empty($lists[$plenty][$id]['o46GuestOnly'])) {
-                $lists[$plenty][$id]['o46GuestOnly'] = true;
+            $existing = $lists[$plenty][$id]['o46GuestOnly'] ?? false;
+            if ($allowed[$id] && isset($guestOnly[$id]) && (!$existing || ($existing !== 'customer' && $guestOnly[$id] === 'customer'))) {
+                $lists[$plenty][$id]['o46GuestOnly'] = $guestOnly[$id];
                 $changed = true;
             }
         }
-        if ($changed) {
-            $encoded = json_encode($lists);
-            if ($encoded === false) {
-                return $this->response->create(null, 503);
-            }
-            pluginApp(\Plenty\Modules\Webshop\Contracts\SessionStorageRepositoryContract::class)->setSessionValue(
-                \Plenty\Modules\Webshop\Contracts\SessionStorageRepositoryContract::GUEST_WISHLIST, $encoded
-            );
+        if ($changed && !$this->saveGuestRows($lists)) {
+            return $this->response->create(null, 503);
         }
         return $this->response->create(['available' => array_keys(array_filter($allowed))], 200);
+    }
+
+    private function matchesGuestSession(): bool
+    {
+        $session = $this->request->get('session');
+        return $session && (int)pluginApp(\Plenty\Modules\Webshop\Contracts\ContactRepositoryContract::class)->getContactId() === 0
+            && $session === pluginApp(\IO\Services\BasketService::class)->getBasket()->sessionId;
+    }
+
+    private function saveGuestRows(array $lists): bool
+    {
+        $encoded = json_encode($lists);
+        if ($encoded === false) {
+            return false;
+        }
+        pluginApp(\Plenty\Modules\Webshop\Contracts\SessionStorageRepositoryContract::class)->setSessionValue(
+            \Plenty\Modules\Webshop\Contracts\SessionStorageRepositoryContract::GUEST_WISHLIST, $encoded
+        );
+        return true;
     }
 
     private function matchesOwner(): bool
@@ -106,6 +126,22 @@ class WishListResource extends ItemWishListResource
         $status = $id > 0 ? pluginApp(WishListAvailability::class)->lookup([$id]) : [];
         if (($status[$id] ?? null) !== true) {
             return $this->response->create(null, $id < 1 || isset($status[$id]) ? 422 : 503);
+        }
+        if ((int)pluginApp(\Plenty\Modules\Webshop\Contracts\ContactRepositoryContract::class)->getContactId() === 0) {
+            $lists = pluginApp(\IO\Repositories\ItemWishListGuestRepository::class)->getItemWishListForAllPlentyIds();
+            $plenty = \IO\Helper\Utils::getPlentyId();
+            $row = $lists[$plenty][$id] ?? [];
+            if (!empty($row['o46GuestOnly']) || !empty($row['o46MigrationOwner'])) {
+                // IO replaces the row on a duplicate add, which would discard its migration protection.
+                $row['quantity'] = ($row['quantity'] ?? 0) + (int)$this->request->get('quantity', 0);
+                $row['createdAt'] = date('Y-m-d H:i:s');
+                $lists[$plenty][$id] = $row;
+                if (!$this->saveGuestRows($lists)) {
+                    return $this->response->create(null, 503);
+                }
+                unset($row['o46GuestOnly'], $row['o46MigrationOwner']);
+                return $this->response->create($row, 201);
+            }
         }
         return parent::store();
     }
