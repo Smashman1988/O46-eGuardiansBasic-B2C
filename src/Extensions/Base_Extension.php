@@ -231,12 +231,14 @@ class Base_Extension extends Twig_Extension
         return ['values' => $values, 'selected' => $selected, 'active' => $active];
     }
 
-    public function getAttributesWithImages($itemId){
+    public function getAttributesWithImages($itemId, $itemData = null){
         $result = pluginApp(ItemSearchService::class)->getResult($this->cardAttributeFactory($itemId));
         $result['wishChoices'] = $this->cardWishChoices($result);
-        $maps = [$itemId => ['wishChoices' => $result['wishChoices']]];
-        $this->completeWishChoices($maps);
+        $maps = [$itemId => ['wishChoices' => $result['wishChoices'], 'attributes' => $result['attributes'] ?? []]];
+        $this->completeWishChoices($maps, [['data' => $itemData]]);
         $result['wishChoices'] = $maps[$itemId]['wishChoices'];
+        $result['availableSizes'] = $maps[$itemId]['availableSizes'];
+        $result['attributes'] = $maps[$itemId]['attributes'];
         return $result;
     }
 
@@ -326,7 +328,7 @@ class Base_Extension extends Twig_Extension
         return $values;
     }
 
-    public function getCardAttributeMaps(array $itemIds, bool $firstBoxOnly = false): array
+    public function getCardAttributeMaps(array $itemIds, bool $firstBoxOnly = false, iterable $items = []): array
     {
         $mapsByItem = [];
         // Attribute maps can include documents and images. Keep only the attributes
@@ -350,12 +352,12 @@ class Base_Extension extends Twig_Extension
             }
             unset($results);
         }
-        $this->completeWishChoices($mapsByItem);
+        $this->completeWishChoices($mapsByItem, $items);
         return $mapsByItem;
     }
 
     /** IO paginates very large attribute maps. Batch only their outstanding pages. */
-    private function completeWishChoices(array &$maps): void
+    private function completeWishChoices(array &$maps, iterable $items): void
     {
         $pending = [];
         foreach ($maps as $id => $map) {
@@ -381,7 +383,9 @@ class Base_Extension extends Twig_Extension
                     if (!isset($results['item' . $id]['variations'])) {
                         throw pluginApp(\UnexpectedValueException::class, ['message' => 'Missing variation map page for ' . $id]);
                     }
-                    $page = $this->cardWishChoices($results['item' . $id]);
+                    $result = $results['item' . $id];
+                    $page = $this->cardWishChoices($result);
+                    $this->mergeCardSizeValues($maps[$id]['attributes'], $result['attributes'] ?? []);
                     $choices = &$maps[$id]['wishChoices'];
                     $choices['rows'] += $page['rows'];
                     foreach ($page['names'] as $attributeId => $field) {
@@ -399,6 +403,66 @@ class Base_Extension extends Twig_Extension
             }
             $pending = $next;
         }
+        $this->checkWishStock($maps, $items);
+        foreach ($maps as &$map) {
+            $sizes = ['any' => false, 'values' => []];
+            foreach ($map['wishChoices']['rows'] as $row) {
+                if ($row[0]) {
+                    $sizes['any'] = true;
+                    foreach ($row[1] as $attributeId => $valueId) {
+                        $sizes['values'][$attributeId][$valueId] = true;
+                    }
+                }
+            }
+            $map['availableSizes'] = $sizes;
+        }
+        unset($map);
+    }
+
+    private function mergeCardSizeValues(array &$attributes, array $page): void
+    {
+        $box = $this->firstCardBox($page)[0] ?? null;
+        if (!is_array($box) || ($box['type'] ?? null) !== 'box' || !isset($box['attributeId'])) {
+            return;
+        }
+        foreach ($attributes as &$field) {
+            if (!is_array($field) || ($field['type'] ?? null) !== 'box') {
+                continue;
+            }
+            if (($field['attributeId'] ?? null) == $box['attributeId']) {
+                $values = array_column($field['values'] ?? [], null, 'attributeValueId');
+                $field['values'] = array_values($values + array_column($box['values'] ?? [], null, 'attributeValueId'));
+            }
+            return;
+        }
+        unset($field);
+        $attributes[] = $box;
+    }
+
+    private $wishAvailability;
+
+    private function checkWishStock(array &$maps, iterable $items): void
+    {
+        $ids = [];
+        foreach ($maps as $map) {
+            foreach ($map['wishChoices']['rows'] as $id => $row) {
+                if ($row[0]) {
+                    $ids[$id] = true;
+                }
+            }
+        }
+        if (!$ids) {
+            return;
+        }
+        $this->wishAvailability = $this->wishAvailability ?? pluginApp(\GuardiansBasic\Services\WishListAvailability::class);
+        $status = $this->wishAvailability->forPicker(array_keys($ids), $items);
+        foreach ($maps as &$map) {
+            foreach ($map['wishChoices']['rows'] as $id => &$row) {
+                $row[0] = $row[0] && ($status[$id] ?? false);
+            }
+            unset($row);
+        }
+        unset($map);
     }
 
     /** Send only the IDs, sale flags and labels used by the shared picker. */
@@ -415,7 +479,7 @@ class Base_Extension extends Twig_Extension
             }
             $names[$field['attributeId']] = ['name' => $field['name'], 'values' => $values];
         }
-        $choices = $this->getWishChoices($result['variations'] ?? [], $names);
+        $choices = $this->formatWishChoices($result['variations'] ?? [], $names);
         if (!empty($result['afterKey'])) {
             $choices['afterKey'] = $result['afterKey'];
         }
@@ -423,6 +487,13 @@ class Base_Extension extends Twig_Extension
     }
 
     public function getWishChoices(iterable $variations, array $names, array $salability = [], array $units = [], $itemData = null, bool $selectorLabels = false): array
+    {
+        $maps = [['wishChoices' => $this->formatWishChoices($variations, $names, $salability, $units, $itemData, $selectorLabels)]];
+        $this->checkWishStock($maps, [['data' => $itemData]]);
+        return $maps[0]['wishChoices'];
+    }
+
+    private function formatWishChoices(iterable $variations, array $names, array $salability = [], array $units = [], $itemData = null, bool $selectorLabels = false): array
     {
         if ($selectorLabels) {
             $labels = [];

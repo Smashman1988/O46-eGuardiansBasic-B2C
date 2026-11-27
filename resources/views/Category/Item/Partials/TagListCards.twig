@@ -9,7 +9,7 @@
     availsizeonesize: transLabels.availsizeonesize|default('') ?: trans('GuardiansBasic::Template.availsizeonesize')
 } %}
 {% set tagListAttributeMaps = (cardAttributeMap ?? null) is null
-    ? getCardAttributeMaps(itemListHomeTopSell|map(item => item.data.variation.itemId), true)
+    ? getCardAttributeMaps(itemListHomeTopSell|map(item => item.data.variation.itemId), true, itemListHomeTopSell|default([]))
     : [] %}
 {% for item in itemListHomeTopSell %}
     <div class="{{ cardColumnClass }}">

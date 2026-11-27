@@ -120,6 +120,12 @@ const server=http.createServer((req,res)=>{
    if(route==='/category/' && width===390) {
      const appended=page.locator('.cat-item').nth(12);
      await appended.scrollIntoViewIfNeeded();
+     // IntersectionObserver assigns the lazy picture source after scrolling.
+     // Calling decode() on its initial empty URL rejects before that callback.
+     await page.waitForFunction(() => {
+       const image = document.querySelectorAll('.cat-item picture img')[12];
+       return image?.currentSrc && image.complete && image.naturalWidth > 0;
+     });
      await appended.locator('picture img').evaluate(img=>img.decode());
      await page.screenshot({path:path.join(D,'nachgeladen-390.png')});
    }

@@ -29,14 +29,15 @@ O46Core.wishPicker = (function () {
     function renderHeart(product) {
         const {heart, ids} = product;
         const active = selectedId(product);
-        const marked = !!saved && (active ? saved.has(active) : ids.some(id => saved.has(id)));
+        const markedIds = saved ? ids.filter(id => product.rows[id][0] && saved.has(id)) : [];
+        const marked = active ? markedIds.includes(active) : markedIds.length > 0;
         if (saved) heart.setAttribute('aria-pressed', String(marked));
         else heart.removeAttribute('aria-pressed');
         heart.setAttribute('aria-label', (marked ? labels.remove : labels.add) + (product.title ? ' · ' + product.title : ''));
         const busy = !!pending && ids.includes(pending.id);
         heart.setAttribute('aria-busy', String(busy || !saved));
         heart.setAttribute('aria-disabled', String(!!pending));
-        const needsChoice = !active && ids.length > 1 && (!marked || ids.filter(id => saved.has(id)).length > 1);
+        const needsChoice = !active && ids.length > 1 && (!marked || markedIds.length > 1);
         if (needsChoice) {
             heart.setAttribute('aria-haspopup', 'dialog');
             heart.setAttribute('aria-controls', modal.id);
@@ -71,7 +72,11 @@ O46Core.wishPicker = (function () {
             if (code !== 200 || !Array.isArray(data?.documents)) return;
             const missing = data.inactiveVariationIds || [];
             const returned = new Set([...data.documents.map(row => row.id), ...missing].map(String));
-            if (returned.size !== saved.size || [...saved].some(id => !returned.has(id))) return;
+            if (returned.size !== saved.size || [...saved].some(id => !returned.has(id))) {
+                // Ceres can finish a pruning GET before this script mounts. Confirm the owner's IDs via IO.
+                if ([...saved].some(id => !returned.has(id))) O46Core.basketHeader.refreshAfterWrite();
+                return;
+            }
             store.commit('setWishListItems', data.documents);
             store.commit('setInactiveVariationIds', missing);
         });
@@ -92,7 +97,7 @@ O46Core.wishPicker = (function () {
 
     function write(product, id, remove) {
         if (pending || !saved || saved.has(id) !== remove || !product.rows[id] ||
-            (!remove && !product.rows[id][0])) return;
+            (!remove && (product.entry || !product.rows[id][0]))) return;
         const ticket = pending = {id, session};
         notice(product, '');
         for (const entry of products.values()) renderHeart(entry);
@@ -144,7 +149,7 @@ O46Core.wishPicker = (function () {
     function renderDialog() {
         const {product, remove, filters} = dialog;
         const {rows, names} = product;
-        let choices = product.ids.filter(id => remove ? saved.has(id) : rows[id][0] && !saved.has(id));
+        let choices = product.ids.filter(id => rows[id][0] && saved.has(id) === remove);
         if (!choices.includes(dialog.selected)) dialog.selected = '';
         fields.replaceChildren();
         const dimensions = Object.keys(names).filter(key => choices.length && choices.every(id =>
@@ -195,8 +200,8 @@ O46Core.wishPicker = (function () {
             return;
         }
         const active = selectedId(product);
-        const marked = product.ids.filter(id => saved.has(id));
-        const remove = active ? saved.has(active) : marked.length > 0;
+        const marked = product.ids.filter(id => product.rows[id][0] && saved.has(id));
+        const remove = active ? marked.includes(active) : marked.length > 0;
         const id = active || (remove && marked.length === 1 ? marked[0] : product.ids.length === 1 ? product.ids[0] : '');
         if (id) {
             if (!remove && !product.rows[id][0]) notice(product, labels.unavailable);
@@ -222,7 +227,7 @@ O46Core.wishPicker = (function () {
         const entry = host.dataset.wishEntry;
         const original = entry && host.querySelector('[data-testing="remove-wlist-item"]');
         if (entry && !original) return;
-        const {rows, names} = entry ? {rows:{[entry]:[false,{}]}, names:{}} : JSON.parse(host.dataset.wishProduct);
+        const {rows, names} = entry ? {rows:{[entry]:[true,{}]}, names:{}} : JSON.parse(host.dataset.wishProduct);
         const ids = Object.keys(rows);
         if (!ids.length) return;
         const controls = template.content.cloneNode(true);
@@ -234,7 +239,7 @@ O46Core.wishPicker = (function () {
         } else host.replaceChildren(controls);
         const article = host.closest('article.single');
         const card = host.closest('.cat-item');
-        const product = {rows, names, ids, article: card ? null : article,
+        const product = {rows, names, ids, entry, article: card ? null : article,
             title: (card?.querySelector('.cat-item-name') || article?.querySelector('[data-eg-item-title]'))?.textContent.trim(),
             heart, notice: liveNotice};
         if (product.article && !host.closest('.modal')) {

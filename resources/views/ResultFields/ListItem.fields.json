@@ -16,5 +16,6 @@
 	"tags.id",
     "filter.hasChildren",
     "filter.isSalable",
+    "stock.net",
     "filter.hasActiveChildren"
 ]

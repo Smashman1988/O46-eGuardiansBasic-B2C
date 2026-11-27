@@ -24,6 +24,10 @@ require __DIR__ . '/../src/Extensions/Base_Extension.php';
 function check($ok, $msg) { if (!$ok) { throw new \RuntimeException($msg); } }
 function pluginApp($class, $params = []) {
     global $service;
+    if ($class === \GuardiansBasic\Services\WishListAvailability::class) {
+        require_once __DIR__.'/fixtures/WishStock.php';
+        return fixtureWishStock($class);
+    }
     if ($class === \UnexpectedValueException::class) { return new \UnexpectedValueException($params['message']); }
     check($class === \Plenty\Modules\Webshop\ItemSearch\Services\ItemSearchService::class, $class);
     return $service;
@@ -31,11 +35,15 @@ function pluginApp($class, $params = []) {
 class AttributeService {
     public $batches = [], $singles = [], $omit = false, $lang = 'de';
     private function result($id) {
-        $values = [['position'=>2,'name'=>$this->lang . '-L-' . $id], ['position'=>1,'name'=>$this->lang . '-M-' . $id]];
+        $values = [['attributeValueId'=>10,'position'=>2,'name'=>$this->lang . '-L-' . $id], ['attributeValueId'=>11,'position'=>1,'name'=>$this->lang . '-M-' . $id]];
         $attributes = [['type'=>'image','values'=>[['position'=>1,'name'=>'blue']]]];
-        if ($id % 3 === 1) { $attributes[] = ['type'=>'box','values'=>$values]; }
+        if ($id % 3 === 1) { $attributes[] = ['attributeId'=>1,'name'=>'Größe','type'=>'box','values'=>$values]; }
         if ($id % 3 === 2) { $attributes = []; }
-        return ['attributes'=>$attributes, 'documents'=>[['id'=>$id]]];
+        $rows = [];
+        foreach ($values as $i => $value) {
+            $rows[] = ['variationId'=>$id * 10 + $i, 'isSalable'=>true, 'attributes'=>[['attributeId'=>1,'attributeValueId'=>10+$i]]];
+        }
+        return ['attributes'=>$attributes, 'variations'=>$rows, 'documents'=>[['id'=>$id]]];
     }
     public function getResult($factory) {
         $this->singles[] = $factory['itemId'];
@@ -113,7 +121,7 @@ foreach (['category','content','simple'] as $template) {
                 check($html === $reference,'Different markup in '.$template);
                 check(substr_count($html,'data-eg-item="') === count($ids),'Rendered card count');
                 if ($ids) {
-                    check(strpos($html,'de-M-100') < strpos($html,'de-L-100') && strpos($html,'de-M-100') !== false,'Size order');
+                    check(strpos($html,'>de-M-100<') < strpos($html,'>de-L-100<') && strpos($html,'>de-M-100<') !== false,'Size order');
                     check(strpos($html,'5 EUR') !== false && strpos($html,'/product/100') !== false,'Price or product link');
                 }
                 if (count($ids) > 1) {
@@ -278,7 +286,7 @@ $service = new class {
         foreach ($factories as $key => $options) {
             $page = $options['afterKey']['page'] ?? 1;
             $id = $options['itemId'] * 10 + $page;
-            $result[$key] = ['attributes'=>[['attributeId'=>9,'name'=>'Farbe','type'=>'image',
+            $result[$key] = ['attributes'=>[['attributeId'=>9,'name'=>'Größe','type'=>'box',
                 'values'=>[['attributeValueId'=>$page,'name'=>$page===1?'Grün':'Rot']]]],
                 'variations'=>[['variationId'=>$id,'isSalable'=>$page===2,'unitName'=>'Paar',
                     'attributes'=>[['attributeId'=>9,'attributeValueId'=>$page]]]]];
@@ -287,11 +295,18 @@ $service = new class {
         return $result;
     }
 };
+require_once __DIR__.'/fixtures/WishStock.php';
+$stock = fixtureWishStock(\GuardiansBasic\Services\WishListAvailability::class);
+$stock->groups = [];
+$stock->blocked = [212];
 $maps = $ext->getCardAttributeMaps([20,21,20],true);
+check($stock->groups === [[202,212]], 'Both cards must share one availability check');
 check(array_map('count',$service->calls) === [2,2], 'Continuation must batch distinct items');
 foreach ([20,21] as $itemId) {
     $choice = $maps[$itemId]['wishChoices'];
-    check($choice['rows'] === [$itemId*10+1=>[false,[9=>1],'Paar'],$itemId*10+2=>[true,[9=>2],'Paar']], 'Incomplete sale flags or variant IDs');
+    check(array_column($maps[$itemId]['attributes'][0]['values'], 'attributeValueId') === [1,2], 'Card size from the continuation is missing');
+    check($maps[$itemId]['availableSizes']['any'] === ($itemId===20), 'Card sizes must use picker availability');
+    check($choice['rows'] === [$itemId*10+1=>[false,[9=>1],'Paar'],$itemId*10+2=>[$itemId===20,[9=>2],'Paar']], 'Incomplete stock flags or variant IDs');
     check($choice['names'][9]['values'] === [1=>'Grün',2=>'Rot'] && !isset($choice['afterKey']), 'Incomplete labels or cursor');
 }
 file_put_contents($argv[2],json_encode(['renders'=>$report,'recommendations'=>$recommendations,'tagLists'=>$tagLists,'contextIsolation'=>true,'missingResult'=>true],JSON_PRETTY_PRINT));

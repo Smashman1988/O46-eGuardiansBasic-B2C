@@ -1130,3 +1130,38 @@ u=-1===u.indexOf("url(")?"url("+u+")":u,1===d.length?t.style.backgroundImage=u:t
     });
     scheduleUpdate();
 })();
+
+// Ceres owns the list documents. Only an actual stock cleanup needs fresh owner IDs.
+(function () {
+    function start() {
+        if (!document.querySelector('[data-component="wish-list"], [data-wish-list], wish-list')) return;
+        function refreshIds() {
+            O46Core.basketHeader.refreshAfterWrite().then(ok => {
+                const ids = window.egSessionData?.basket?.itemWishListIds;
+                if (ok && Array.isArray(ids) && window.ceresStore?.state.wishList) {
+                    window.ceresStore.commit('setWishListIds', ids);
+                }
+            });
+        }
+        window.jQuery?.(document).on('ajaxComplete.o46WishList', (event, xhr, settings) => {
+            if (settings.type !== 'GET' || xhr.status !== 200 || xhr.responseJSON?.data?.wishListPruned !== true) return;
+            const url = new URL(settings.url, location.href);
+            if (url.origin === location.origin && /^\/(?:[a-z]{2}\/)?rest\/io\/itemWishList\/?$/i.test(url.pathname)) refreshIds();
+        });
+        window.addEventListener('pageshow', event => {
+            const store = window.ceresStore;
+            const list = store?.state.wishList;
+            if (!event.persisted || !list?.isWishListInitiallyLoading) return;
+            const snapshot = list.wishListIds.join(',');
+            eGuardians.apiservice.get('/rest/io/itemWishList', {}, (response, status) => {
+                const data = response?.data;
+                if (status !== 200 || !Array.isArray(data?.documents) || list.wishListIds.join(',') !== snapshot) return;
+                store.commit('setWishListItems', data.documents);
+                store.commit('setInactiveVariationIds', data.inactiveVariationIds || []);
+                if (data.wishListPruned === true) refreshIds();
+            });
+        });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once:true});
+    else start();
+})();

@@ -2,6 +2,8 @@
 
 ## Unreleased · B2C develop
 
+- Product cards, size selection and the wishlist picker use saleable variations with positive net stock. IO checks the variation again when saving. Opening the wishlist removes confirmed sold-out or missing variations from the current owner’s list. Inconclusive stock checks retain saved entries.
+
 - Wishlist variation IDs and attribute values are validated using PHP functionality supported by PlentyONE.
 
 - Product cards, product details and quick view share a wishlist heart. Customers and guests can remove a saved variation directly or choose a specific variation when several match. Confirmed changes also appear on the wishlist page and in other tabs.

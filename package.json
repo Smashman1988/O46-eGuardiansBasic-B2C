@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "test:plentyone": "node tests/plentyone_php.cjs",
+    "test:standalone": "node scripts/test-standalone.cjs",
     "test:cross": "playwright test --config=playwright.config.cjs",
     "build": "node scripts/build-assets.cjs",
     "check:assets": "node scripts/build-assets.cjs --check",
@@ -11,7 +12,7 @@
     "check:css": "node scripts/build-css.cjs --check",
     "build:js": "node scripts/build-js.cjs",
     "check:js": "node scripts/build-js.cjs --check",
-    "test": "npm run test:plentyone && npm run check:identity && npm run check:assets && node tests/cache_compatibility.cjs && node tests/variation_prices.cjs && node tests/api_transport.cjs && node tests/api_transport.cjs --min && node tests/auth_responses.cjs && node tests/auth_responses.cjs --min"
+    "test": "node scripts/test-standalone.cjs --list && npm run test:plentyone && npm run check:identity && npm run check:assets && node tests/cache_compatibility.cjs && node tests/variation_prices.cjs && node tests/api_transport.cjs && node tests/api_transport.cjs --min && node tests/auth_responses.cjs && node tests/auth_responses.cjs --min"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

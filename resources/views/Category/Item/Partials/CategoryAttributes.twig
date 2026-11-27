@@ -7,12 +7,12 @@
     {% set boxAttribute = boxAttributeList | first -%}
     {% if boxAttribute is defined and boxAttribute.values is defined and boxAttribute.values is iterable -%}
         {% set attributeValues = boxAttribute.values | orderByKey('position') -%}
-        {% for attributeValue in attributeValues -%}
+        {% for attributeValue in attributeValues|filter(value => variationAttributes.availableSizes.values[boxAttribute.attributeId][value.attributeValueId] ?? false) -%}
             <span class="availsize">{{ attributeValue.name }}</span>{{ ' ' }}
         {%- endfor -%}
-    {% else -%}
+    {% elseif variationAttributes.availableSizes.any|default(false) -%}
         <span class="availsize">{{ transLabels.availsizeonesize }}</span>
     {%- endif -%}
-{% else -%}
+{% elseif variationAttributes.availableSizes.any|default(false) -%}
     <span class="availsize">{{ transLabels.availsizeonesize }}</span>
 {%- endif -%}

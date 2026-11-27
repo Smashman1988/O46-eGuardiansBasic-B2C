@@ -1,7 +1,7 @@
 {# Shared card; the legacy first-page entry point selects eager images explicitly. #}
 {% set cardEagerImages = cardEagerImages|default(false) -%}
 {% set links = getCardLinks(item.data | itemURL, currencycheck ?? services.checkout.getCurrencyData.name ?? 'EUR') -%}
-{% set cardAttributeMap = cardAttributeMap ?? getAttributesWithImages(item.data.variation.itemId) -%}
+{% set cardAttributeMap = cardAttributeMap ?? getAttributesWithImages(item.data.variation.itemId, item.data) -%}
 {% set img = item.data.images.all[0].urlPreview ?? '' -%}
 {% set cardHasPriorityImage = not cardEagerImages and cardPriorityImage|default(false) and img is not empty -%}
 {% set cardHasResponsiveImage = not cardEagerImages and not cardHasPriorityImage and cardImageMinViewport|default(null) in [768, 1200] and img is not empty -%}

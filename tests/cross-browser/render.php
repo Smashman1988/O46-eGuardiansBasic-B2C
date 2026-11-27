@@ -101,13 +101,15 @@ $attributes = [['attributeId'=>9,'name'=>'Farbe','type'=>'text','values'=>[
 class BrowserTwigExtensionStub {}
 class_alias(BrowserTwigExtensionStub::class, 'Plenty\\Plugin\\Templates\\Extensions\\Twig_Extension');
 require_once $root.'/src/Extensions/Base_Extension.php';
+require_once $root . '/tests/fixtures/WishStock.php';
+function pluginApp($class) { return fixtureWishStock($class); }
 $attributesExtension = (new ReflectionClass(\GuardiansBasic\Extensions\Base_Extension::class))->newInstanceWithoutConstructor();
 $salableByVariation = array_column($variants,'isSalable','variationId');
 $choices = $attributesExtension->getWishChoices($variants,$attributes,$salableByVariation,[],null,true);
 $result['quickWish'] = $twig->createTemplate(fragment($pdp,'<span class="eg-quick-wish"','{% endif %}'))->render(['wishChoices'=>$choices]);
 $result['gallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>$images,'mainImg'=>$images[0],'galleryCount'=>count($images),'itemData'=>[], 'wishChoices'=>$choices]);
 $result['selection'] = $twig->createTemplate(divSource($pdp,'<div data-item-variation class='))->render([
-    'linkedAttributes'=>[], 'attributes'=>$attributes, 'variationsWithAttributes'=>$variants,
+    'linkedAttributes'=>[], 'attributes'=>$attributes, 'selectableVariations'=>$variants,
     'salableAttributeValues'=>$attributesExtension->getSalableAttributeValues($variants,$salableByVariation)]);
 $result['singleGallery']=$twig->createTemplate($gallery)->render(['sortedItemImages'=>[$images[0]],'mainImg'=>$images[0],'galleryCount'=>1,'itemData'=>[], 'wishChoices'=>$choices]);
 $homepage=$templates['GuardiansBasic::Homepage.Homepage'];

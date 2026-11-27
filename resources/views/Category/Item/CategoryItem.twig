@@ -179,7 +179,7 @@
                 {% endmacro %}
  
 
-                {% set attributeMapsByItem = getCardAttributeMaps(itemList|default([])|map(item => item.data.variation.itemId), true) %}
+                {% set attributeMapsByItem = getCardAttributeMaps(itemList|default([])|map(item => item.data.variation.itemId), true, itemList|default([])) %}
                 {% for item in itemList %}
                     <article class="post col-6 col-sm-6 col-md-3 col-lg-3 col-xl-2 col-xlg-2 col-xxlg-2">
                         {%- include 'GuardiansBasic::Category.Item.Partials.CategoryListItem' with {

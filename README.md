@@ -103,7 +103,13 @@ Mit den Dev-Abhängigkeiten aus `package-lock.json` baut `npm run build` die CSS
 
 Die PHP-/Twig- und Browsertests verwenden lokale Testdaten. `tests/ceres-list-query.php` erwartet den Pfad zu Ceres `src`. `tests/seo_pagination.php` und `tests/pdp_render_contract.php` erwarten den Twig-Autoloader und den Pfad zur JSON-Ergebnisdatei. Der lokale Vergleichsbericht liegt unter `.cache/b2c-parity/Auftrag-04-Produktkarten-Grids.html`.
 
+Größen auf den Karten und Merklistenoptionen stammen aus denselben konkreten Varianten. Die Produktliste liefert den Nettobestand ihrer bereits geladenen Varianten. Fehlende Bestände werden je Seitenaufruf für höchstens 100 weitere IDs gemeinsam gelesen und im Speicher wiederverwendet. Beim Speichern prüft IO die gewählte ID frisch. Beim Öffnen der Merkliste verwendet die Bereinigung die reguläre IO-Listenantwort. Ceres hält die Liste für die aktuelle Seite im Speicher und prüft sie bei einer Rückkehr aus dem Browser-Verlauf erneut.
+
 ### Lokale Browserprüfung
+
+`npm run test:standalone` führt die Einzelprogramme mit Twig 2 und 3, PHP-Lint und dem Ceres-Merklistentest aus. Der Ceres-Test verwendet die im selben Lauf gerenderte Produktdetailseite. Die Laufprotokolle liegen unter `.cache/standalone/`. `npm run test:standalone -- --list` zeigt das Inventar. Auch `npm test` meldet fehlende Zuordnungen neuer Einzelprogramme.
+
+Für den vollständigen Lauf können `O46_CERES_ROOT`, `O46_IO_ROOT`, `O46_CARD_PHOTOS`, `O46_TWIG2_AUTOLOAD`, `O46_TWIG_AUTOLOAD` und `O46_PHP` auf die lokalen Referenzprojekte, Testbilder, Autoloader und PHP zeigen. Unter Windows kann `O46_PHP_EXT` auf das Verzeichnis mit mbstring zeigen.
 
 Nach `npm ci` stellt `npx playwright install chromium firefox webkit` die zu diesem Lockfile passenden lokalen Browser bereit. Die Twig-Fixtures benötigen PHP mit mbstring und einen Twig-Autoloader. Deren Pfade werden über `O46_PHP` und `O46_TWIG_AUTOLOAD` gesetzt.
 

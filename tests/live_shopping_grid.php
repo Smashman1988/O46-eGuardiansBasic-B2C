@@ -22,6 +22,10 @@ set_error_handler(function ($level, $message) use (&$deprecations) {
 });
 function check($ok, $message) { if (!$ok) throw new \RuntimeException($message); }
 function pluginApp($class, $params = []) {
+    if ($class === \GuardiansBasic\Services\WishListAvailability::class) {
+        require_once __DIR__.'/fixtures/WishStock.php';
+        return fixtureWishStock($class);
+    }
     if ($class === \UnexpectedValueException::class) return new \UnexpectedValueException($params['message']);
     check($class === \Plenty\Modules\Webshop\ItemSearch\Services\ItemSearchService::class, 'Unexpected service '.$class);
     return $GLOBALS['attributeService'];
@@ -29,15 +33,16 @@ function pluginApp($class, $params = []) {
 class AttributeFixture {
     public $singles = [], $batches = [], $omit = false;
     function result($id) {
-        $attributes = $id % 2 ? [['type'=>'box','values'=>[['position'=>2,'name'=>'L'],['position'=>1,'name'=>'M']]]] : [];
-        $rows = [['variationId'=>$id+100000,'isSalable'=>true,'attributes'=>[]]];
+        $attributes = $id % 2 ? [['attributeId'=>1,'name'=>'Größe','type'=>'box','values'=>[
+            ['attributeValueId'=>1,'position'=>2,'name'=>'L'],['attributeValueId'=>2,'position'=>1,'name'=>'M']]]] : [];
+        $rows = [['variationId'=>$id+100000,'isSalable'=>true,'attributes'=>$attributes ? [['attributeId'=>1,'attributeValueId'=>1]] : []]];
+        if ($attributes) $rows[] = ['variationId'=>$id+200000,'isSalable'=>true,'attributes'=>[['attributeId'=>1,'attributeValueId'=>2]]];
         if ($id === 10001) {
-            $attributes[] = ['type'=>'image','attributeId'=>9,'name'=>'Farbe','values'=>[
-                ['attributeValueId'=>1,'name'=>'Grün'],['attributeValueId'=>2,'name'=>'Rot'],['attributeValueId'=>3,'name'=>'Blau']]];
+            $attributes[0]['values'][] = ['attributeValueId'=>3,'position'=>3,'name'=>'XL'];
             $rows = [];
-            foreach ([101=>1,102=>2,103=>3] as $variation=>$colour) {
+            foreach ([101=>2,102=>1,103=>3] as $variation=>$size) {
                 $rows[] = ['variationId'=>$variation,'isSalable'=>$variation !== 103,
-                    'attributes'=>[['attributeId'=>9,'attributeValueId'=>$colour]]];
+                    'attributes'=>[['attributeId'=>1,'attributeValueId'=>$size]]];
             }
         }
         return ['attributes'=>$attributes, 'variations'=>$rows, 'documents'=>[['id'=>$id]]];

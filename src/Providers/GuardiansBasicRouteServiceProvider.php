@@ -19,6 +19,7 @@ class GuardiansBasicRouteServiceProvider extends RouteServiceProvider
         $api->version(['v1'], ['namespace' => 'GuardiansBasic\Resources'], function ($api) {
             $api->get('guardiansbasic/item/search/autocomplete', 'SearchAutocompleteResource@index');
             $api->resource('io/facet', 'FacetResource');
+            $api->resource('io/itemWishList', 'WishListResource');
         });
     }
 }

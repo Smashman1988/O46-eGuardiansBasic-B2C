@@ -21,8 +21,8 @@ function row(id) {
         const page = await browser.newPage(), errors = [], writes = [];
         page.setDefaultTimeout(6000);
         page.on('pageerror', e => errors.push(e.message));
-        const ids = new Set([101,102,999]);
-        let accept = false, reads = 0;
+        const ids = new Set([101,102,103,106,999]);
+        let accept = false, reads = 0, pruneOnRead = false;
         const basket = () => ({itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,sessionId:'customer-session-fixture',customerId:17,itemWishListIds:[...ids]});
         await page.route('**/*', route => {
             const u = new URL(route.request().url());
@@ -30,7 +30,13 @@ function row(id) {
                 '<body id="isVueView"><header id="page-header" data-eg-basket-currency="EUR"></header><main id="page-body"><div id="app"></div></main>'+controls+'</body>'});
             if (u.pathname === '/rest/io/itemWishList') {
                 reads++;
-                return route.fulfill({json:{data:{documents:[...ids].filter(id=>id!==999).map(row),inactiveVariationIds:ids.has(999)?[999]:[]}}});
+                const pruned = pruneOnRead && ids.delete(105);
+                const documents = [...ids].filter(id=>id!==999).map(row);
+                for (const item of documents) {
+                    item.data.filter.isSalable = item.id !== 103;
+                    item.data.stock = {net: item.id === 106 ? 0 : 2};
+                }
+                return route.fulfill({json:{data:{documents,inactiveVariationIds:ids.has(999)?[999]:[],wishListPruned:pruned}}});
             }
             if (route.request().method()==='DELETE') {
                 const id = Number(u.pathname.split('/').pop()); writes.push(id);
@@ -68,16 +74,18 @@ function row(id) {
         await page.evaluate(()=>O46Core.basketHeader.start());
         const control=id=>page.locator('[data-wish-entry="'+id+'"] .eg-wish-heart');
         await control(101).waitFor();
+        assert.equal(await control(103).count(),0);
+        assert.equal(await control(106).count(),0);
+        assert.equal(await control(999).count(),0);
         assert.equal(await control(101).getAttribute('aria-pressed'),'true');
         await control(101).click();
         await page.waitForFunction(()=>document.querySelector('[data-wish-entry="101"] [role=status]').textContent.length>0);
-        assert.deepEqual(await page.evaluate(()=>ceresStore.state.wishList.wishListItems.map(i=>i.id)),[101,102]);
+        assert.deepEqual(await page.evaluate(()=>ceresStore.state.wishList.wishListItems.map(i=>i.id)),[101,102,103,106]);
         accept=true;
         await control(101).press('Space'); await control(101).waitFor({state:'detached'});
-        await control(999).press('Enter'); await control(999).waitFor({state:'detached'});
-        assert.deepEqual(writes,[101,101,999]);
+        assert.deepEqual(writes,[101,101]);
         assert.equal(reads,1);
-        ids.add(104);
+        ids.delete(999); ids.delete(103); ids.delete(106); ids.add(104);
         await page.evaluate(data=>O46Core.basketHeader.accept(data,false),basket());
         await control(104).waitFor();
         assert.equal(reads,2);
@@ -94,7 +102,19 @@ function row(id) {
         assert.equal(await page.evaluate(()=>window.egSessionData.basket.currency),'EUR');
         assert.equal(await control(104).getAttribute('aria-pressed'),'true');
         assert.equal(reads,2);
+        pruneOnRead = true;
+        ids.add(105);
+        await page.evaluate(data=>O46Core.basketHeader.accept(data,false),basket());
+        await page.waitForFunction(()=>ceresStore.state.wishList.wishListIds.join(',')==='104');
+        assert.deepEqual([...ids],[104]);
+        assert.equal(await control(105).count(),0);
+        assert.equal(reads,3);
+        await Promise.all([
+            page.waitForResponse(response=>new URL(response.url()).pathname==='/rest/io/itemWishList'),
+            page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})))
+        ]);
+        assert.equal(reads,4);
         assert.deepEqual(errors,[]);
-        console.log('Ceres wishlist: first-row HTTP 503, retry, inactive removal, remote addition, cross-currency peer removal and request counts passed.');
+        console.log('Ceres wishlist: HTTP 503, retry, hidden missing and unsaleable variants, remote addition, cross-currency removal and request counts passed.');
     } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

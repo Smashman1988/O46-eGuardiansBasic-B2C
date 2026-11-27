@@ -7,6 +7,8 @@ require $root . '/src/Helper/SeoPage.php';
 class GuardTwigExtensionStub {}
 class_alias(GuardTwigExtensionStub::class, 'Plenty\\Plugin\\Templates\\Extensions\\Twig_Extension');
 require $root . '/src/Extensions/Base_Extension.php';
+require_once $root . '/tests/fixtures/WishStock.php';
+function pluginApp($class) { return fixtureWishStock($class); }
 $propertyExtension = (new ReflectionClass(\GuardiansBasic\Extensions\Base_Extension::class))->newInstanceWithoutConstructor();
 $notices = [];
 set_error_handler(function ($level,$message,$file,$line) use (&$notices) {

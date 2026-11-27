@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Produktkarten, Größenauswahl und Merklisten-Picker verwenden dieselben kaufbaren Varianten mit positivem Nettobestand. IO prüft die Variante beim Speichern erneut. Beim Öffnen der Merkliste entfernt IO bestätigt ausverkaufte oder fehlende Varianten aus der eigenen Liste. Bei unklarem Bestand bleibt ein gespeicherter Eintrag erhalten.
+
 - Die Prüfung der Varianten-IDs und der Attributwerte für die Merkliste verwendet die von PlentyONE freigegebene PHP-Funktionalität.
 
 - Produktkarten, Artikeldetailseite und Schnellansicht teilen ein Merklistenherz. Die gespeicherte Variante lässt sich direkt entfernen. Bei mehreren möglichen Varianten zeigt die Größenauswahl die konkreten Optionen. Gäste und Kunden sehen bestätigte Änderungen auch auf der Merklistenseite und in anderen Tabs.

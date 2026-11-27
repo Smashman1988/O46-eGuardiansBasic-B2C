@@ -86,6 +86,7 @@
 {% endif %}
 {% set wishChoices = getWishChoices(wishRows, pdpQuickview ? attributes|default([]) : itemAttributes.attributes|default({}),
     salableByVariation, itemAttributes.units|default({}), itemData, pdpQuickview) %}
+{% set selectableVariations = variationsWithAttributes|default([])|filter(v => wishChoices.rows[v.variationId][0] ?? false) %}
 {% set itemPrices = itemData.prices %}
 {% set unitPriceValue = itemPrices.default.unitPrice.value ?? itemPrices.default.data.unitPrice ?? '' %}
 {% set rrpUnitValue = itemPrices.rrp.unitPrice.value ?? itemPrices.rrp.data.unitPrice ?? '' %}
@@ -389,9 +390,7 @@
                 {% set linkedAttributes = [] %}
                 {% set linkedSelectionComplete = false %}
                 {% if variationsWithAttributes[0].attributes  | length > 0 %}
-                 {% if itemData.item.flagTwo!=3 %}   
-                    {% set salableAttributeValues = getSalableAttributeValues(variationsWithAttributes, salableByVariation) %}
-                {% endif %}
+                    {% set salableAttributeValues = getSalableAttributeValues(selectableVariations, wishChoices.rows|map(row => row[0])) %}
                               {% for property in item.documents[0].data.properties %}
                                 {% if property.property.id in [110, 73] %}
                                   <p class="margin-top-0-bottom-05{% if property.property.id == 110 %} f-size12" style="background-color: lightgrey; padding: 10px;{% endif %}">
@@ -403,13 +402,13 @@
                               {% endfor %}
                 {# IO's explicit itemId_variationId route already renders the chosen variation. #}
                 {% if request.get('quickViewItem') is empty and (request.getRequestUri()|split('?')|first|trim('/')|split('/')|last) == (itemData.item.id ~ '_' ~ itemData.variation.id) %}
-                    {% for candidate in variationsWithAttributes %}
-                        {% if candidate.variationId == itemData.variation.id and (itemData.item.flagTwo == 3 or salableByVariation[candidate.variationId]) %}
+                    {% for candidate in selectableVariations %}
+                        {% if candidate.variationId == itemData.variation.id %}
                             {% set linkedAttributes = candidate.attributes %}
                         {% endif %}
                     {% endfor %}
                 {% endif %}
-                <div data-item-variation class="row" data-eg-handler="initVariation" data-eg-event="load" data-eg-variations="{{ variationsWithAttributes | json_encode() }}">
+                <div data-item-variation class="row" data-eg-handler="initVariation" data-eg-event="load" data-eg-variations="{{ selectableVariations|merge([])|json_encode() }}">
                 {% set linkedSelectionComplete = linkedAttributes is not empty and linkedAttributes|length == attributes|length %}
                 {% for itemAttribute in attributes %}
                     {% set activeAttrName = "" %}
@@ -430,10 +429,7 @@
                             {% endif %}
                              <ul data-eg-attributes="{{ itemAttribute.attributeId }}"  class="list-no-style clearfix">
                             {% for itemAttributeValue in itemAttribute.values %}
-                                {% if item.data.item.flagTwo!=3 %}
-                                    {% set attrIsSalable = salableAttributeValues[itemAttribute.attributeId|int][itemAttributeValue.attributeValueId|int] ?? false %}
-                                {% endif %}
-                                {% if itemData.item.flagTwo!=3 %}
+                                {% set attrIsSalable = salableAttributeValues[itemAttribute.attributeId|int][itemAttributeValue.attributeValueId|int] ?? false %}
                                 <li {% if attrIsSalable != false %}{% if linkedValue and itemAttributeValue.attributeValueId == linkedValue.attributeValueId %}data-selected {% endif %}data-eg-value="{{ itemAttributeValue.attributeValueId }}" data-eg-attrname="{{ itemAttributeValue.name  }}"{% else %}class="nosalable"{% endif %} data-eg-issalable="{{ attrIsSalable | json_encode() }}">
                                     {% if itemAttribute.type=="image" %}
                                         <img src="" data-src="{{ itemAttributeValue.imageUrl }}" alt="{{ itemAttributeValue.name }}" class="lozad" />
@@ -441,15 +437,6 @@
                                         <span>{{ itemAttributeValue.name }}</span>
                                     {% endif %}
                                 </li>
-                                {% else %}
-                                <li {% if linkedValue and itemAttributeValue.attributeValueId == linkedValue.attributeValueId %}data-selected {% endif %}data-eg-value="{{ itemAttributeValue.attributeValueId }}" data-eg-attrname="{{ itemAttributeValue.name  }}">
-                                    {% if itemAttribute.type=="image" %}
-                                        <img src="" data-src="{{ itemAttributeValue.imageUrl }}" alt="{{ itemAttributeValue.name }}" class="lozad" />
-                                    {% else %}
-                                        <span>{{ itemAttributeValue.name }}</span>
-                                    {% endif %}
-                                </li>
-                                {% endif %}
                                 {% set activeAttrName = itemAttributeValue.name %}
                             {% endfor %}
                             </ul>
@@ -572,7 +559,7 @@
                 </div>
                 <div class="col-12">
                     <div class="category-product-list row disp-flexi">
-                        {% set crossAttributeMapsByItem = getCardAttributeMaps(crossSimiliar|map(item => item.data.variation.itemId), true) %}
+                        {% set crossAttributeMapsByItem = getCardAttributeMaps(crossSimiliar|map(item => item.data.variation.itemId), true, crossSimiliar|default([])) %}
                         {% for itemCross in crossSimiliar %}
                             <div class="col-6 col-sm-6 col-md-6 col-lg-6 col-xl-6 col-xlg-3 col-xxlg-3">
                                 {% include "GuardiansBasic::Category.Item.Partials.CategoryListItem" with {
