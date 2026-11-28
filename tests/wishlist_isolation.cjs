@@ -22,7 +22,7 @@ fs.mkdirSync(out,{recursive:true});
     let context, writeGate, legacyProfile = true;
     let delayAddReply;
     const sequence = [];
-    let documentReads = 0, hiddenDocument = 0, missingReads = 0;
+    let documentReads = 0, hiddenDocument = 0, missingReads = 0, rollbackOnDocuments = 0;
     const sessionReads = new Map();
     async function launch() {
         context = await chromium.launchPersistentContext(profile,{headless:true,serviceWorkers:'block',executablePath:process.env.O46_BROWSER_EXECUTABLE});
@@ -60,6 +60,10 @@ fs.mkdirSync(out,{recursive:true});
             }
             if (url.pathname===api+'/items' && route.request().method()==='GET') {
                 documentReads++;
+                if (rollbackOnDocuments) {
+                    guest.delete(rollbackOnDocuments);
+                    rollbackOnDocuments = 0;
+                }
                 if (hiddenDocument && ++missingReads > 3) return route.fulfill({status:503});
                 const pruned={};
                 if(soldOut && current().delete(soldOut)){
@@ -159,6 +163,41 @@ fs.mkdirSync(out,{recursive:true});
     const login=(p,email)=>p.evaluate(email=>new Promise(resolve=>eGuardians.user.login(email,'fixture',(response,status)=>resolve(status))),email);
     const logout=p=>p.evaluate(()=>new Promise(resolve=>eGuardians.user.logout((response,status)=>resolve(status))));
     try {
+        // Set 428: POST returned 201, the first basket contained both IDs, then a
+        // navigation returned just the old guest row. There was no DELETE or stock pruning.
+        shop=18;
+        guest.add(1454706);
+        const cardTab=await launch();await known(cardTab,[1454706]);
+        await cardTab.evaluate(()=>new Promise(resolve=>eGuardians.apiservice.post('/rest/io/itemWishList/',{variationId:1454702},async (r,status)=>{
+            if(status===201 && r.data.variationId===1454702) await O46Core.basketHeader.refreshAfterWrite(true);
+            resolve();
+        })));
+        await known(cardTab,[1454706,1454702]);
+        guest.delete(1454702);
+        const freshList=await context.newPage();await freshList.goto(origin+'/merkliste/');
+        await expect(freshList.locator('main')).toHaveText('1454706,1454702');
+        assert.deepEqual([...guest],[1454706,1454702]);
+        assert.deepEqual((await backupFor(cardTab,'o46-guest-wish-b2c-17-18')).ids,[1454706,1454702]);
+        await freshList.reload();await expect(freshList.locator('main')).toHaveText('1454706,1454702');
+        assert.deepEqual(restores,[[1454702]],'Only the missing confirmed guest add is restored, once');
+        // The open list can first read the new ID and then receive an older document response.
+        // Recovery must put its product row back even though its last set of heart IDs is unchanged.
+        rollbackOnDocuments=1454704;
+        await cardTab.evaluate(()=>new Promise(resolve=>eGuardians.apiservice.post('/rest/io/itemWishList/',{variationId:1454704},async (r,status)=>{
+            if(status===201 && r.data.variationId===1454704) await O46Core.basketHeader.refreshAfterWrite(true);
+            resolve();
+        })));
+        await expect(freshList.locator('main')).toHaveText('1454706,1454702,1454704');
+        assert.deepEqual(restores,[[1454702],[1454704]]);
+        // On 428 an overlapping page read also reverted the first successful recovery.
+        guest.delete(1454704);
+        await cardTab.evaluate(()=>O46Core.basketHeader.refresh());
+        assert.ok(guest.has(1454704),'A second confirmed rollback can be repaired');
+        await expect(freshList.locator('main')).toHaveText('1454706,1454702,1454704');
+        guest.delete(1454704);
+        await cardTab.evaluate(()=>O46Core.basketHeader.refresh());
+        assert.deepEqual(restores,[[1454702],[1454704],[1454704]],'Stop after two recoveries for the original add');
+        await context.close();guest.clear();restores.length=0;legacyProfile=true;
         // A guest deletion applies to its original account only after that account signs back in.
         shop=11;
         a.add(80002);a.add(80003);b.add(80002);

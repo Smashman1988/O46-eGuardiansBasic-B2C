@@ -2,6 +2,10 @@
 
 ## Unreleased · B2C develop
 
+- Product cards, product pages, quick view and the wish list confirm a change once the shared IO session read shows the requested state. If a recently saved guest variation disappears after navigating, the shop restores that variation and updates open wish list pages.
+
+- Known multi-device limitation. If the same variation is removed and saved again on a second device, an older guest removal can delete the new account entry at the next sign-in.
+
 - Signing in also transfers newly saved guest favourites when IO has already initialised its wishlist service for the guest.
 
 - Confirmed wish list removals survive logout and a browser restart. When a signed-out customer removes a variation previously saved in their account, the shop applies the removal the next time they sign in to that account. This also covers confirmed out-of-stock removals.

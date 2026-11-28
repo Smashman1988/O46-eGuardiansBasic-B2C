@@ -90,6 +90,10 @@ async function run() {
         await page.evaluate(()=>MagicZoom.close('ItemImgZoom'));
         await page.locator('.mz-expand').waitFor({state:'hidden'});
         results.push({thumbnail:'3 / 3',zoom:'open and close'});save();
+        let confirmedIds = [];
+        await page.route(/\/rest\/(?:io|guardiansbasic\/wishlist)\/basket\/?$/, route => route.fulfill({json:{data:{
+            itemQuantity:0,itemSum:0,currency:'EUR',shippingCountryId:1,itemWishListIds:confirmedIds
+        }}}));
         await page.evaluate(()=>{
             window.activeLang='de';
             window.messageServiceTranslations={wishlistplus:'Added',wishlistminus:'Removed',searchexample:'Suche'};
@@ -97,14 +101,15 @@ async function run() {
             window.writes=[];
             O46Core.wishPicker.sync([]);
             eGuardians.apiservice.post=(url,data,cb)=>{writes.push(data.variationId);window.reply=cb;};
-            O46Core.basketHeader.refreshAfterWrite=()=>{};
         });
         const heart=page.locator('article.single .eg-wish-heart');
         await heart.click();
         assert.deepEqual(await page.evaluate(()=>writes),['1011']);
+        confirmedIds = [1011];
         await page.evaluate(()=>reply({data:{variationId:1011}},201));
         assert.equal(await heart.getAttribute('aria-pressed'),'true');
         results.push({wishlist:'Single variation without an attribute selector'}); save();
+        confirmedIds = [];
         const multi = render(require('node:path').join(require('node:path').dirname(process.argv[2]),'pdp-multi.html'));
         await page.route('**/multi-item/', route => route.fulfill({contentType:'text/html',body:multi}));
         await page.goto('https://shop.test/multi-item/');
@@ -116,7 +121,6 @@ async function run() {
             eGuardians.initialize();window.writes=[];
             O46Core.wishPicker.sync([]);
             eGuardians.apiservice.post=(url,data,cb)=>{writes.push(data.variationId);window.reply=cb;};
-            O46Core.basketHeader.refreshAfterWrite=()=>{};
         });
         await heart.click();
         const picker=page.locator('#eg-wish-picker');
@@ -127,6 +131,7 @@ async function run() {
         await page.evaluate(()=>reply({error:true},409));
         assert.equal(await picker.isVisible(),true);
         await picker.locator('[data-wish-save]').click();
+        confirmedIds = [1012];
         await page.evaluate(()=>reply({data:{variationId:1012}},201));
         await picker.waitFor({state:'hidden'});
         assert.equal(await heart.getAttribute('aria-pressed'),'true');

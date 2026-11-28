@@ -49,11 +49,17 @@ O46Core.wishPicker = (function () {
 
     // The list page owns product documents in Vuex. Remove confirmed rows locally.
     // Only a newly added, unknown ID needs the list endpoint to supply its document.
-    let listRequest = null;
+    let listRequest = null, documentsInvalidated = false;
+    function invalidateDocuments() {
+        // A guest restore can leave the same IDs in Vuex while its last document response is stale.
+        listRequest = null;
+        documentsInvalidated = true;
+    }
     function reconcileList() {
         const store = window.ceresStore;
         const state = store?.state.wishList;
         if (!saved || !document.querySelector('[data-wish-list]') || !state?.isWishListInitiallyLoading || state.isLoading) return;
+        documentsInvalidated = false;
         const documents = state.wishListItems.filter(row => saved.has(String(row.id)));
         const inactive = (state.inactiveVariationIds || []).filter(id => saved.has(String(id)));
         if (documents.length !== state.wishListItems.length) store.commit('setWishListItems', documents);
@@ -64,6 +70,7 @@ O46Core.wishPicker = (function () {
         const owner = session;
         listRequest = expected;
         eGuardians.apiservice.get('/rest/io/itemWishList', {}, (response, code) => {
+            if (listRequest !== expected) return;
             listRequest = null;
             if (!saved) return;
             if (session !== owner) { reconcileList(); return; }
@@ -85,7 +92,10 @@ O46Core.wishPicker = (function () {
     function sync(list) {
         if (list === null) { session++; pending = null; }
         const next = list === null ? null : new Set(list.map(String));
-        if (next && saved && next.size === saved.size && [...next].every(id => saved.has(id))) return;
+        if (next && saved && next.size === saved.size && [...next].every(id => saved.has(id))) {
+            if (documentsInvalidated) reconcileList();
+            return;
+        }
         saved = next;
         for (const product of products.values()) renderHeart(product);
         reconcileList();
@@ -102,22 +112,19 @@ O46Core.wishPicker = (function () {
         notice(product, '');
         for (const entry of products.values()) renderHeart(entry);
         if (dialog) { save.disabled = true; modal.setAttribute('aria-busy', 'true'); }
-        function complete(response, code) {
-            const ok = !response?.error && (remove ? code === 200 && response?.data === true :
+        async function complete(response, code) {
+            const written = !response?.error && (remove ? code === 200 && response?.data === true :
                 code === 201 && String(response?.data?.variationId) === id);
+            const verified = written && await O46Core.basketHeader.refreshAfterWrite(true);
             if (pending !== ticket || session !== ticket.session) {
-                // The write can finish after a new owner check. Read the current session without applying the old IDs.
-                if (ok) O46Core.basketHeader.refreshAfterWrite(true);
                 return;
             }
             pending = null;
             modal.removeAttribute('aria-busy');
-            if (ok) {
-                if (remove) saved.delete(id); else saved.add(id);
+            // sync() has applied the same private IO read used by the list and the other hearts.
+            if (verified && saved && saved.has(id) === !remove) {
                 if (dialog?.product === product) closeDialog();
                 notice(product, window.messageServiceTranslations?.[remove ? 'wishlistminus' : 'wishlistplus'] || '');
-                reconcileList();
-                O46Core.basketHeader.refreshAfterWrite(true);
             } else if (dialog?.product === product) {
                 dialog.error = labels.error;
             } else {
@@ -401,5 +408,5 @@ O46Core.wishPicker = (function () {
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once:true});
     else queueMicrotask(start);
-    return {sync, reconcileList};
+    return {sync, reconcileList, invalidateDocuments};
 })();

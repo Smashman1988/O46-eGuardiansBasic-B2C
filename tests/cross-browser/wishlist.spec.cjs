@@ -15,13 +15,13 @@ async function session(context, initial, customerId = 0) {
         const id = remove ? Number(new URL(request.url()).pathname.split('/').pop()) :
             Number(new URLSearchParams(request.postData()).get('variationId'));
         writes.push([request.method(),id]);
-        const ok = await new Promise(resolve => { reply = resolve; });
-        if (ok && remove) ids.delete(id);
-        else if (ok) ids.add(id);
+        const {ok, persisted} = await new Promise(resolve => { reply = resolve; });
+        if (persisted && remove) ids.delete(id);
+        else if (persisted) ids.add(id);
         return route.fulfill({status: ok && !remove ? 201 : 200,
             json:{data:ok ? (remove || {variationId:id}) : false}});
     });
-    return {ids, writes, get reads() { return reads; }, confirm(ok) { reply(ok); }};
+    return {ids, writes, get reads() { return reads; }, confirm(ok, persisted = ok) { reply({ok, persisted}); }};
 }
 const card = (page, id) => page.locator('.cat-item[data-eg-item="' + id + '"]').first();
 const heart = product => product.locator('.eg-wish-heart');
@@ -126,6 +126,25 @@ test('Merklistenherz mit bestätigten Antworten, Hover, Touch und Wiederholung',
     await expect(page).toHaveURL(origin+'/alle-artikel/');
     await expect.poll(() => io.reads).toBe(3);
     await info.attach('wishlist-network',{body:JSON.stringify({reads:io.reads,writes:io.writes}),contentType:'application/json'});
+});
+
+test('Kartenherz bestätigt nur den im Sitzungsabgleich gespeicherten Zustand', async ({context,page,shop}) => {
+    const io = await session(context, []);
+    await shop.open();
+    const product = card(page,10002), button = heart(product), notice = product.getByRole('status');
+    await state(button,false);
+    await page.evaluate(()=>Object.assign(window.messageServiceTranslations,{wishlistplus:'Gespeichert',wishlistminus:'Entfernt'}));
+    const error = await page.locator('#eg-wish-picker').getAttribute('data-error');
+    for (const [index, persisted] of [false,true,false,true].entries()) {
+        const removing = index >= 2;
+        await button.click();
+        await expect.poll(()=>io.writes.length).toBe(index+1);
+        expect(io.writes[index]).toEqual([removing ? 'DELETE' : 'POST',110002]);
+        io.confirm(true,persisted);
+        await expect(notice).toHaveText(persisted ? (removing ? 'Entfernt' : 'Gespeichert') : error);
+        await state(button,io.ids.has(110002));
+        expect(io.reads).toBe(index+2);
+    }
 });
 
 test('Varianten zwischen Karte, Schnellansicht, Produktseite und Verlauf', async ({context,page,shop}) => {

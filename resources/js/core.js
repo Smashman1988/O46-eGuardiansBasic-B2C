@@ -609,6 +609,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                 if (source?.scope && (method === 'DELETE' || method === 'POST') && !url.searchParams.has('wishScope') &&
                     !new URLSearchParams(settings.data).has('wishScope')) url.searchParams.set('wishScope', source.scope);
                 const addedId = method === 'POST' ? Number(new URLSearchParams(settings.data).get('variationId')) : 0;
+                const revisionAtAdd = addedId ? storage('localStorage','getItem',signalKey) : null;
                 let prior;
                 if (source && ['POST','DELETE','GET'].includes(method)) {
                     try { prior = JSON.parse(guestStorage('getItem',wishKey(source))); } catch (_) {}
@@ -616,11 +617,12 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                 let receipt;
                 xhr.done(response => {
                     if (response?.error) return;
-                    if (method === 'DELETE' && response?.data === true) {
+                    if (method === 'DELETE' && xhr.status === 200 && response?.data === true) {
                         const id = Number(path.split('/').filter(Boolean).pop());
                         receipt = rememberWishResult(source,[id],true,prior);
-                    } else if (method === 'POST' && addedId > 0 && Number(response?.data?.variationId) === addedId) {
-                        receipt = rememberWishResult(source,[addedId],false,prior);
+                    } else if (method === 'POST' && xhr.status === 201 && addedId > 0 && Number(response?.data?.variationId) === addedId) {
+                        const currentAdd = source?.guest && revisionAtAdd === storage('localStorage','getItem',signalKey);
+                        receipt = rememberWishResult(source,[addedId],false,prior,currentAdd);
                     } else if (method === 'GET' && Array.isArray(response?.data?.wishListPrunedIds)) {
                         receipt = rememberWishResult(response.data.wishListPrunedOwner,response.data.wishListPrunedIds,true,prior);
                     }
@@ -750,13 +752,17 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
     function removalStamp() {
         return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
     }
-    function rememberWishResult(owner, ids, removed, prior) {
+    const guestAddWindow = 30_000;
+    function rememberWishResult(owner, ids, removed, prior, currentAdd = false) {
         if (!owner || !ids.length) return;
         const key = wishKey(owner);
         return withWishLock(key, () => {
             const raw = guestStorage('getItem',key);
             let backup;
             try { backup = JSON.parse(raw); } catch (_) { return; }
+            if (!backup && currentAdd && wishContext?.scope === owner.scope && scope) {
+                backup = {scope, ownerScope:owner.scope, ids:[]};
+            }
             if (!backup || !Array.isArray(backup.ids)) return;
             const matches = !backup.ownerScope || backup.ownerScope === owner.scope;
             const origin = prior?.ownerScope === owner.scope ? prior : matches ? backup : null;
@@ -786,6 +792,18 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
                 for (const field of ['ids','customerIds','imported']) {
                     if (Array.isArray(backup[field])) backup[field] = backup[field].filter(id=>!affected.has(id));
                 }
+            }
+            if (matches && owner.guest && (removed || currentAdd)) {
+                const recent = backup.recentAdds && typeof backup.recentAdds === 'object' && !Array.isArray(backup.recentAdds) ? backup.recentAdds : {};
+                for (const id of affected) {
+                    if (removed) delete recent[id];
+                    else if (!pending.guest?.[id] && !pending[account]?.[id]) {
+                        recent[id] = {time:Date.now(), remaining:2};
+                        if (!customer.has(id) && !backup.ids.includes(id)) backup.ids.push(id);
+                    }
+                }
+                if (Object.keys(recent).length) backup.recentAdds = recent;
+                else delete backup.recentAdds;
             }
             if (Object.keys(pending).length) backup.pendingRemovals = pending;
             else delete backup.pendingRemovals;
@@ -853,7 +871,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
     async function reconcileFavorites(basket, ids, verified, ticket, backupKey) {
         const owner = basket.wishListOwner;
         guestKey = owner.guest ? backupKey : '';
-        const raw = guestStorage('getItem', backupKey);
+        let raw = guestStorage('getItem', backupKey);
         let previous;
         try { previous = JSON.parse(raw); } catch (_) {}
         const validIds = list => Array.isArray(list) && list.every(id => Number.isSafeInteger(id) && id > 0);
@@ -918,9 +936,35 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         if (previous?.loginPending) for (const id of guestIds) protectedIds.add(id);
         // A fresh page can also receive an empty IO guest list under the same basket session ID.
         const emptyOnArrival = !known.size && !verifiedHere && !invalidating && !writeVersion && !staleBootstrap;
-        if (previous && (previous.scope !== verified || previous.restoreAfterLogin || previous.loginPending || emptyOnArrival)) {
+        const recoverSession = previous && (previous.scope !== verified || previous.restoreAfterLogin || previous.loginPending || emptyOnArrival);
+        // A navigation can return an older, nonempty guest list after IO already confirmed an add.
+        // Repair only recent writes from this guest. A newer delete or a stock prune cancels its receipt.
+        const recent = {};
+        const missingAdds = [];
+        const now = Date.now();
+        if (previous?.ownerScope === owner.scope) {
+            for (const [key,receipt] of Object.entries(previous.recentAdds || {})) {
+                const id = Number(key);
+                if (!(guestIds.has(id) || customerIds.has(id)) || !Number.isFinite(receipt?.time) ||
+                    receipt.time > now || now - receipt.time > guestAddWindow || ![0,1,2].includes(receipt.remaining)) continue;
+                if (known.has(id)) recent[key] = receipt;
+                else if (receipt.remaining > 0) {
+                    missingAdds.push(id);
+                    recent[key] = {...receipt, remaining:receipt.remaining - 1};
+                } else {
+                    guestIds.delete(id);
+                    customerIds.delete(id);
+                }
+            }
+        }
+        if (missingAdds.length) {
+            // Reserve each attempt under the shop lock. An overlapping page load can revert the first repair.
+            writeWishBackup(backupKey,{...previous,recentAdds:recent},raw);
+            raw = guestStorage('getItem',backupKey);
+        }
+        if (recoverSession || missingAdds.length) {
             if (refusedGuestScope === verified) return ids;
-            const saved = new Set([...guestIds, ...customerIds]);
+            const saved = recoverSession ? new Set([...guestIds, ...customerIds]) : missingAdds;
             const missing = [...saved].filter(id => !known.has(id) || (protectedIds.has(id) && !serverImported.has(id)));
             for (let offset = 0; offset < missing.length; offset += 5000) {
                 if (generation !== ticket) return ids;
@@ -970,9 +1014,11 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
             const guest = [...known].filter(id => guestIds.has(id) || !customerIds.has(id));
             const customer = [...known].filter(id => customerIds.has(id));
             save({scope:verified,ids:guest,imported:guest.filter(id => protectedIds.has(id)),
+                ...(Object.keys(recent).length ? {recentAdds:recent} : {}),
                 ...(customer.length ? {customerIds:customer} : {})});
         }
-        if (restored || reconciled) signal('wish');
+        if (restored) O46Core.wishPicker?.invalidateDocuments();
+        if (restored || reconciled) signal('wish',restored);
         return [...known];
     }
     async function accept(basket, changed = true, authoritative = false, bootstrap = false, revision = storage('localStorage','getItem',signalKey)) {
@@ -1061,8 +1107,9 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
         request = pending;
         return pending;
     }
-    function signal(kind) {
+    function signal(kind, restored = false) {
         const message = {kind, nonce:Date.now() + '-' + Math.random().toString(36).slice(2)};
+        if (restored) message.restored = true;
         storage('localStorage', 'setItem', signalKey, JSON.stringify(message));
         if (channel) channel.postMessage(message);
     }
@@ -1070,6 +1117,7 @@ O46Core.basketHeader = O46Core.basketHeader || (function () {
     function onSignal(message) {
         if (!message || typeof message.nonce !== 'string' || message.nonce === lastSignal) return;
         lastSignal = message.nonce;
+        if (message.kind === 'wish' && message.restored === true) O46Core.wishPicker?.invalidateDocuments();
         if (initialCeres && (message.kind === 'auth' || message.kind === 'wish')) staleBootstrap = true;
         if (message.kind === 'auth') invalidate(false);
         if (message.kind === 'wish' && hasWishes() && !initialCeres) {

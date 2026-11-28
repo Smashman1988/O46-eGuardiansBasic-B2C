@@ -2,6 +2,10 @@
 
 ## Unveröffentlicht · B2C develop
 
+- Kartenherz, Artikelseite, Schnellansicht und Merkliste bestätigen eine Änderung erst, wenn der zentrale IO-Abgleich den gewünschten Zustand zeigt. Fehlt ein gerade bestätigter Gastartikel nach einem Seitenwechsel, stellt der Shop die betroffene Variante gezielt wieder her und aktualisiert die geöffneten Merklisten.
+
+- Bekannte Einschränkung bei mehreren Geräten. Wird dieselbe Variante auf einem zweiten Gerät entfernt und erneut gemerkt, kann eine ältere Gastlöschung beim nächsten Login den neuen Kontoeintrag entfernen.
+
 - Beim Anmelden übernimmt IO neu gemerkte Gastartikel auch dann, wenn der Merklistendienst vor der Anmeldung bereits aktiv war.
 
 - Bestätigte Merklistenlöschungen bleiben nach dem Abmelden und einem Browserneustart erhalten. Entfernt ein Gast eine zuvor im Konto gemerkte Variante, wird diese Änderung bei der nächsten Anmeldung mit demselben Konto übernommen. Das gilt auch bei bestätigtem Ausverkauf.

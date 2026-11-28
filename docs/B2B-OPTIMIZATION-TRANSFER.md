@@ -345,3 +345,15 @@ Alle zehn ausgelieferten Assetdateien stimmen mit dem B2C-Stand `dfbd230` übere
 In beiden lokalen Themes verwendet die Anmeldung die vorhandene IO-Gastübernahme auch dann, wenn der Warenkorb den Merklistendienst im selben Request zuvor als Gast initialisiert hat. Ein Regressionstest bildet diese Aufrufreihenfolge mit dem originalen IO-Dienst ab. Die Korrektur betrifft nur PHP. Der nächste native Nachweis auf 428 ist die Übernahme eines neu gemerkten Gastartikels in dasselbe Konto. Bis dahin bleibt der B2B-Transfer der Kartenherzen und der Quickview-Funktion offen.
 
 Ein Sonderfall bleibt bestehen. Entfernt und merkt ein zweites Gerät dieselbe Variante erneut, kann eine ältere Gastlöschung vom ersten Gerät den neueren Eintrag löschen. Änderungen an anderen Varianten bleiben erhalten. Die lokale Gegenprobe lässt sich mit `php tests/wishlist_logout.php <IO-Quellverzeichnis> --check-concurrent-resave` wiederholen. [Prüfbericht zu Core v33](../.cache/wishlist-v33-native/Pruefbericht.md)
+
+### Native Nachprüfung der PHP-Gastübernahme auf Set 428
+
+PlentyONE meldete für `Outlet46de_dev` eine erfolgreiche Bereitstellung. Alle zehn JS- und CSS-Prüfsummen entsprechen dem Manifest von `8bcb1e7`. Die als Gast gemerkte Variante 1454704 war nach Anmeldung in der privaten IO-Antwort, auf der Merkliste und als rotes Kartenherz sichtbar. Die Gastlöschung von 1454705 und anschließend auch das vollständige Leeren überstanden die Anmeldung mit demselben Konto.
+
+Der B2B-Transfer bleibt offen. Bei zwei Gastversuchen mit 1454702 verlor die Produktkarte den Merkzustand und IO lieferte die Variante nicht mehr. Über die Artikeldetailseite blieb dieselbe Variante beim anschließenden Aufruf der Liste erhalten. Für den Unterschied fehlt ein zeitlich zugeordneter Netzwerkverlauf der betroffenen Kartenaktion. Die zusätzlichen B2B-Kartenherzen und die Quickview-Bedienung warten auf die Klärung dieses Falls. [Messungen und Grenzen der Prüfung](../.cache/wishlist-428-php/Pruefbericht.md)
+
+### Kartenherz und widersprüchliche IO-Gastantworten
+
+Auf Set 428 mit Core v33 bestätigte IO den Schreibvorgang. Eine erste Sitzungsantwort enthielt die neue Variante, kurz darauf lieferte IO wieder die ältere, teilweise gefüllte Gastliste. Das war bei einem schnellen Seitenwechsel im isolierten Gastprofil messbar. Die Aufzeichnung enthält weder eine Löschanfrage noch eine gemeldete Bestandsbereinigung. Karte und Artikeldetailseite verwenden denselben IO-Aufruf.
+
+Der lokale B2C-Core v36 wartet mit der Erfolgsmeldung auf den zentralen Abgleich. Nach einem bestätigten Gastklick kann er ausschließlich die gerade verlorenen Varianten gebündelt wiederherstellen. Ein neuer Abgleich lädt bei Bedarf auch fehlende Produktzeilen in offenen Merklisten. Die Freigabe für B2B-Kartenherzen und Quickview setzt die Prüfung des regulär von 428 ausgelieferten Korrekturstands voraus. [Netzwerkverlauf, Regression und Abnahmegrenzen](../.cache/wish-card-428/Pruefbericht.md)
