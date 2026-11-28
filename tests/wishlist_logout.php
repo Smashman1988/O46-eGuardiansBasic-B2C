@@ -36,7 +36,7 @@ namespace {
     use GuardiansBasic\Resources\WishListSessionResource;
     function check($ok,$message){if(!$ok)throw new \RuntimeException($message);}
     function pluginApp($name){
-        if($name===\IO\Services\ItemWishListService::class)return new $name($GLOBALS['session']);
+        if($name===\IO\Services\ItemWishListService::class)return $GLOBALS['requestWishService'] ?? new $name($GLOBALS['session']);
         return $name===\IO\DBModels\ItemWishList::class?new $name():$GLOBALS['services'][$name];}
     $root=dirname(__DIR__);require $root.'/src/Resources/WishListLoginResource.php';require $root.'/src/Services/WishListMigration.php';
     $io=$argv[1]??getenv('O46_IO_ROOT');
@@ -173,6 +173,46 @@ namespace {
         $account->silent=0;check($res->reconcileRemovals()->data===['removed'=>[14,15,123]],'Idempotent retry');
         check($owner()->getItemWishList()===[13,11,12] && $account->rows[42]===[42,21,22],'Scoped replay touched a different account');
         echo "Native IO migration: two accounts, duplicate, exception, silent write failure, retry and repeated logout/login passed.\n";
+
+        // IO registers ItemWishListService as a request singleton. A login can
+        // reuse a service that the basket already constructed for the guest.
+        $contact = 0;
+        $eagerLogin = false;
+        $requestWishService = $owner();
+        $native->addItemWishListEntry(711);
+        $api->args = ['shop'=>0, 'plenty'=>17, 'session'=>'session-two', 'ids'=>[11], 'customerIds'=>[11]];
+        check($res->restoreGuest()->code === 200, 'Prepare a protected customer copy alongside the new guest entry');
+        $nextContact = 42;
+        check($login->store()->status() === 200, 'Login after adding a guest item');
+        check(in_array(711, $account->rows[42], true), 'Confirmed guest addition missing from the account after login');
+        check(!in_array(11, $account->rows[42], true), 'A protected customer copy was imported');
+        check($native->getItemWishList() === [] && !$session->getSessionValue(Session::GUEST_WISHLIST_MIGRATION), 'Completed guest transfer was left queued');
+        unset($requestWishService);
+        $contact = 31;
+        echo "Confirmed guest addition visible in the account with a pre-existing IO service; protected copy excluded.\n";
+
+        // Independent IO sessions share this customer's persistent repository. The
+        // guest device observed the old entries before the other device edited them.
+        $originalDevice = $owner();
+        $otherDevice = new \IO\Services\ItemWishListService(new Session());
+        foreach ([701, 702] as $id) {
+            $originalDevice->addItemWishListEntry($id, 1);
+        }
+        $otherDevice->removeItemWishListEntry(702);
+        $otherDevice->addItemWishListEntry(703, 1);
+        $api->args = ['ids' => [701], 'wishScope' => $aOwner['scope'], 'account' => $aOwner['account']];
+        check($res->reconcileRemovals()->code === 200, 'Replay after changes on another device');
+        $actual = $originalDevice->getItemWishList();
+        check(!in_array(701, $actual, true), 'Original entry still present after confirmed removal');
+        check(!in_array(702, $actual, true) && in_array(703, $actual, true), 'Unrelated device changes were lost');
+        if (in_array('--check-concurrent-resave', $argv, true)) {
+            $originalDevice->addItemWishListEntry(704, 1);
+            $otherDevice->removeItemWishListEntry(704);
+            $otherDevice->addItemWishListEntry(704, 1);
+            $api->args['ids'] = [704];
+            check($res->reconcileRemovals()->code === 200, 'Replay of the older removal');
+            check(in_array(704, $originalDevice->getItemWishList(), true), 'An older guest removal erased the entry explicitly saved again on the other device');
+        }
     }
     echo "Native logout routing, private owner metadata, guest recovery, unavailable stock, shop and tenant isolation passed.\n";
 }

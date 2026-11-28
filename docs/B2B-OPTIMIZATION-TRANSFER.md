@@ -337,3 +337,11 @@ Nach einer bestätigten Anmeldung ersetzt der Browser die letzte Kontokopie mit 
 Der lokale Prüfbericht enthält den beobachteten Ablauf auf 428, den SHA-256-Vergleich aller zehn ausgelieferten Assets sowie die HTML-Größen und Netzwerkmessungen für 12 bis 500 Karten. [Prüfbericht zur Gastmerkliste](../.cache/guest-retention/Pruefbericht.md)
 
 Mit Core v32 auf Testpluginset 428 blieben die drei Varianten 1454704, 1454705 und 1454706 nach Logout und Neuladen sichtbar. Nach dem Entfernen von 1454704 als Gast erschien diese Variante beim erneuten Login mit demselben Konto wieder. B2C v33 und B2B v51 gleichen bestätigte Löschungen beim ursprünglichen Konto lokal nach. Der B2B-Transfer der zusätzlichen Kartenherzen und der Quickview-Merklistenfunktion wartet auf die native B2C-Abnahme dieses Ablaufs. [Prüfbericht zu Core v32 und den lokalen Korrekturen](../.cache/wishlist-v32-native/Pruefbericht.md)
+
+### Gast und Kundenkonto auf 428 mit Core v33
+
+Alle zehn ausgelieferten Assetdateien stimmen mit dem B2C-Stand `dfbd230` überein. Auf 428 blieben die im Konto gemerkten Artikel nach der Abmeldung sichtbar. Die im Gastmodus entfernte Variante 1454704 und eine anschließend vollständig geleerte Liste blieben nach der erneuten Anmeldung entfernt. In der Gegenrichtung trat ein Fehler auf. Die als Gast neu gemerkte Variante 1454702 war auf der Merklistenseite bedienbar, fehlte im angemeldeten Konto und erschien nach der Abmeldung erneut.
+
+In beiden lokalen Themes verwendet die Anmeldung die vorhandene IO-Gastübernahme auch dann, wenn der Warenkorb den Merklistendienst im selben Request zuvor als Gast initialisiert hat. Ein Regressionstest bildet diese Aufrufreihenfolge mit dem originalen IO-Dienst ab. Die Korrektur betrifft nur PHP. Der nächste native Nachweis auf 428 ist die Übernahme eines neu gemerkten Gastartikels in dasselbe Konto. Bis dahin bleibt der B2B-Transfer der Kartenherzen und der Quickview-Funktion offen.
+
+Ein Sonderfall bleibt bestehen. Entfernt und merkt ein zweites Gerät dieselbe Variante erneut, kann eine ältere Gastlöschung vom ersten Gerät den neueren Eintrag löschen. Änderungen an anderen Varianten bleiben erhalten. Die lokale Gegenprobe lässt sich mit `php tests/wishlist_logout.php <IO-Quellverzeichnis> --check-concurrent-resave` wiederholen. [Prüfbericht zu Core v33](../.cache/wishlist-v33-native/Pruefbericht.md)

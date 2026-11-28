@@ -50,9 +50,14 @@ class WishListMigration
         if (!$before) {
             return;
         }
-        // IO's constructor runs the existing, idempotent migration and clears the guest scope.
         try {
-            pluginApp(ItemWishListService::class);
+            $wishlist = pluginApp(ItemWishListService::class);
+            // IO may already have constructed this singleton before authentication.
+            if ($session->getSessionValue(SessionStorageRepositoryContract::GUEST_WISHLIST_MIGRATION)) {
+                $this->beforeNativeMigration((int)pluginApp(ContactRepositoryContract::class)->getContactId());
+                $wishlist->migrateGuestItemWishList();
+                $session->setSessionValue(SessionStorageRepositoryContract::GUEST_WISHLIST_MIGRATION, false);
+            }
             $saved = pluginApp(ItemWishListRepository::class)->getItemWishList();
             $pending = array_diff_key($before, array_fill_keys($saved, true));
         } catch (\Exception $exception) {

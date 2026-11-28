@@ -76,7 +76,8 @@ function observeViewport(width) {
 }
 
 async function setViewport(page, size, mobileWebKit) {
-    if (!mobileWebKit || page.url() === 'about:blank') {
+    const webKit = page.context().browser()?.browserType().name() === 'webkit';
+    if ((!mobileWebKit && !webKit) || page.url() === 'about:blank') {
         await page.setViewportSize(size);
         return;
     }
@@ -100,8 +101,10 @@ async function setViewport(page, size, mobileWebKit) {
     const observations = [];
     let primaryError;
     try {
-        await resizeAndMeasure(page,size,true,async()=>{
-            const result=await observer.evaluate(o=>o.settle());
+        // Desktop WebKit can expose the new CSS layout before delivering media-query
+        // changes. Observe painted frames before a test requests the next viewport.
+        await resizeAndMeasure(page,size,mobileWebKit,async()=>{
+            const result=await observer.evaluate((o,strictClient)=>o.settle(0,strictClient),mobileWebKit);
             observations.push(result);
             return result;
         });
